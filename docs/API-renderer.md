@@ -33,6 +33,14 @@
     bounds all derive from `ZGeo` (reworked for the slanted grid: ZGeo.A, B, CORNERS, W, H, HW, HH, depth, edgeMidY; no use of RS or SH; tiles are laid in ascending screen y; the floor canvas covers every possible camera position so forest reaches the screen edges; scroll limit is the screen box of the owned hexes plus a margin; the road runs straight down the screen from the gate). All ground, including the forest
     outside the grid and the road to the gate, is drawn with whole `ZSprites.tile` hexes, so the Artist's honeycomb shows everywhere.
 
+14. **New game or load is noticed automatically**: when `getState()` starts returning a different state object, the renderer
+    does what `reset()` does. Calling `reset()` is still fine but no longer required.
+15. **Opening camera**: everything built plus the gate, centred if it fits the screen; otherwise the gate low on the screen.
+16. Decorations are never placed on the hexes touching the gate, nor where the gate arch or pillars would cover them.
+    On-floor icons sit above the habitat's rearmost hex that has nothing built behind it, on a small dark backing.
+    Only one animal per habitat walks at a time. Callers and happening characters stand just outside the gate pillars.
+17. `debug()` also returns `gateKinds`, `gateMarks`, `gateArrived`, `icons` (per habitat id, e.g. `["sick","ready-event","bar"]`) and `moving`.
+
 ## Functions
 
 | Call | What it does |

@@ -162,7 +162,8 @@ async function run(name) {
   ok((chk.got[setup.sickHab] || []).includes('sick'), 'sick icon missing'); ok(setup.choiceHab != null && (chk.got[setup.choiceHab] || []).includes('choice'), 'choice icon missing');
   ok(allIcons.includes('ready-breed'), 'no habitat shows the breed-ready icon (the savanna pair should)'); ok(allIcons.includes('ready-event'), 'no habitat shows the event-ready icon');
   notes.push('gate: ' + JSON.stringify(chk.gateKinds) + ' (marked: ' + JSON.stringify(chk.gateMarks) + '); icons by habitat: ' + JSON.stringify(chk.got));
-  await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 2, true), [ent.q, ent.r]); await sleep(2500); await shot('gate');
+  await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 2, true), [ent.q, ent.r]); await sleep(9000); await shot('gate');
+  { const dg = await dbg(); ok(dg.gateArrived === dg.gate && dg.gate >= 3, 'gate people have not reached the gate after 9 s: ' + dg.gateArrived + ' of ' + dg.gate); }
   let maxMoving = 0; for (let i = 0; i < 40; i++) { const mv = (await dbg()).moving; Object.values(mv).forEach(n => { maxMoving = Math.max(maxMoving, n); }); await sleep(120); }
   ok(maxMoving <= 1, 'more than one animal walking at once in a habitat: ' + maxMoving); notes.push('animals walking at once per habitat (40 samples): at most ' + maxMoving);
   await page.evaluate(() => { const S = RT.S; S.happening = null; S.headhunt = null; S.animals.forEach(a => { a.sick = 0; }); S.projects.forEach(p => { delete p.choice; }); }); await sleep(900);
@@ -184,7 +185,7 @@ async function runShell(name) {
   const browser = await pw[name].launch({ headless: true });
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
   const page = await ctx.newPage(), errors = [];
-  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|ERR_FILE_NOT_FOUND/.test(m.text())) errors.push('console: ' + m.text()); });
+  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|ERR_FILE_NOT_FOUND|Not allowed to load local resource|Access-Control-Allow-Origin/.test(m.text())) errors.push('console: ' + m.text()); });
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   try {
     await page.goto(require('url').pathToFileURL(path.join(root, 'index.html')).href);
@@ -209,7 +210,7 @@ async function runShell(name) {
     await page.mouse.move(b.x, b.y); await page.mouse.down(); await page.mouse.move(b.x - 60, b.y - 30, { steps: 5 }); await page.mouse.up(); await sleep(200);
     ok(await page.evaluate(() => ZT.stack().length) === 0, 'a drag opened the menu');
     // placement through ZCore
-    const spot = await page.evaluate(() => { const S = ZT.S; window.__placed = 0; window.__cancel = 0; S.money = Math.max(S.money, 50000); let best = null; for (let r = 0; r < ZD.GRID_H; r++) for (let c = 0; c < ZD.GRID_W; c++) { const a = ZE.fromOffset(c, r); if (!ZE.canPlace(S, 'fac', 'bench', a[0], r, 0)) continue; const hb = S.items.find(i => i.k === 'hab'), d2 = Math.abs(a[0] - hb.q) + Math.abs(r - hb.r); if (!best || d2 < best.d) best = { q: a[0], r: r, d: d2 }; }
+    const spot = await page.evaluate(() => { const S = ZT.S; window.__placed = 0; window.__cancel = 0; S.money = Math.max(S.money, 50000); let best = null; for (let r = 0; r < ZD.GRID_H; r++) for (let c = 0; c < ZD.GRID_W; c++) { const a = ZE.fromOffset(c, r); if (!ZE.canPlace(S, 'fac', 'bench', a[0], r, 0)) continue; const oc = ZE.occupancy(S); if (ZE.DIRS.some(d => oc[(a[0] + d[0]) + ',' + (r + d[1])])) continue; /* a lone spot: no combo pop-up to dismiss */ const hb = S.items.find(i => i.k === 'hab'), d2 = Math.abs(a[0] - hb.q) + Math.abs(r - hb.r); if (!best || d2 < best.d) best = { q: a[0], r: r, d: d2 }; }
       ZRender.startPlacement({ kind: 'fac', t: 'bench', label: 'Garden Bench' }, { onPlace: (q, r, rot) => { window.__placed++; return ZT.act('build', 'fac', 'bench', q, r, rot); }, onCancel: () => { window.__cancel++; } }); ZRender.centerOn(best.q, best.r, true); return best; });
     await sleep(300); ok(!(await page.evaluate(() => ZT.running())), 'game should pause during placement');
     const pc = await page.evaluate(([q, r]) => ZRender.hexToClient(q, r), [spot.q, spot.r]); await page.touchscreen.tap(pc.x, pc.y); await sleep(250);

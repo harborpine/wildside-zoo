@@ -215,7 +215,8 @@
       const down = DIR6.filter(d => G.toScreen(d[0], d[1]).y > HH * 0.9); let q = ent.q, r = ent.r;
       for (let i = 0; i < 40 && down.length; i++) { let best = null, bx = 0; down.forEach(d => { const nx = G.toScreen(q + d[0], r + d[1]).x; if (!best || Math.abs(nx - ent.x) < Math.abs(bx - ent.x)) { best = d; bx = nx; } }); q += best[0]; r += best[1]; const c = grid[key(q, r)]; if (!c || c.grid) break; c.road = true; m.road.push(c); }
     }
-    const nearRoad = c => m.road.some(o => Math.abs(o.x - c.x) < W * 0.95 && Math.abs(o.y - c.y) < W * 0.95);
+    const roadAll = m.road; m.road = roadAll.slice(0, 8); // people only walk the first stretch (it is off screen beyond that)
+    const nearRoad = c => roadAll.some(o => Math.abs(o.x - c.x) < W * 0.95 && Math.abs(o.y - c.y) < W * 0.95);
     // paths: shared trunks from the entrance to one side of every habitat and facility
     const order = (S.items || []).slice();
     if (ent && m.nodes[ent.k]) {
@@ -410,10 +411,11 @@
       else if (S.headhunt) here.push({ k: 'c:headhunter', kind: 'headhunter' });
     } catch (e) { /* none */ }
     if (S.happening && S.happening.who) here.push({ k: 'h:' + (S.happening.key || '') + S.happening.who, kind: S.happening.who, mark: 'choice' });
-    const SLOT = [[-19, -5], [19, -5], [-30, 3], [30, 3], [-9, -11], [9, -11]], keep = {};
+    const ghw = M.gate ? Math.max(M.gate.ax, M.gate.c.width - M.gate.ax) : 26; // stand just outside the pillars, in front of the arch line, never behind it
+    const SLOT = [[-(ghw + 7), 4], [ghw + 7, 4], [-(ghw + 18), -5], [ghw + 18, -5], [-(ghw + 28), 6], [ghw + 28, 6]], keep = {};
     if (M.ent) here.forEach((c, i) => {
       keep[c.k] = 1; let g = gatePeople[c.k]; const sl = SLOT[i % SLOT.length];
-      if (!g) { g = gatePeople[c.k] = newWalker(c.kind, strHash(c.k)); g.gate = true; g.mark = c.mark; g.speed = 13; g.slot = -1; const s = first || !M.road.length ? null : M.road[M.road.length - 1]; g.x = s ? s.x : M.ent.x + sl[0]; g.y = s ? s.y : M.ent.y + sl[1]; }
+      if (!g) { g = gatePeople[c.k] = newWalker(c.kind, strHash(c.k)); g.gate = true; g.mark = c.mark; g.speed = 24; g.slot = -1; const s = first || !M.road.length ? null : M.road[Math.min(3, M.road.length - 1)]; g.x = s ? s.x : M.ent.x + sl[0]; g.y = s ? s.y : M.ent.y + sl[1]; }
       if (g.slot !== i) { g.slot = i; g.wp = [{ x: M.ent.x + sl[0], y: M.ent.y + sl[1], wait: 1e9, face: sl[0] > 0 }]; g.wait = 0; }
     });
     for (const k in gatePeople) if (!keep[k]) delete gatePeople[k];
@@ -746,7 +748,7 @@
   R.debug = function () {
     return { sprites: stats.sprites, fps: stats.fps, frameMs: stats.frameMs, cam: { x: cam.x, y: cam.y }, buffer: { w: Math.round(vw), h: Math.round(vh), scale: N / dpr, deviceScale: N, dpr: dpr },
       running: running, zoom: zoom, realSprites: usingReal(), spriteGetters: spriteState(), spriteErrors: Object.assign({}, stats.warned), animals: Object.keys(animals).length, visitors: walkers.filter(w => w.staff == null).length, staff: walkers.filter(w => w.staff != null && !w.hidden).length,
-      gate: Object.keys(gatePeople).length, gateKinds: Object.keys(gatePeople).map(k => gatePeople[k].kind), gateMarks: Object.keys(gatePeople).filter(k => gatePeople[k].mark).map(k => gatePeople[k].kind),
+      gate: Object.keys(gatePeople).length, gateKinds: Object.keys(gatePeople).map(k => gatePeople[k].kind), gateArrived: Object.keys(gatePeople).filter(k => !gatePeople[k].wp.length).length, gateMarks: Object.keys(gatePeople).filter(k => gatePeople[k].mark).map(k => gatePeople[k].kind),
       icons: (() => { const o = {}; for (const id in statuses) if (id !== '_exp') { const s2 = statuses[id]; o[id] = iconsOf(s2).concat(s2.busy && s2.progress != null ? ['bar'] : []); } return o; })(), moving: (() => { const o = {}; for (const id in animals) if (animals[id].moving) o[animals[id].hab] = (o[animals[id].hab] || 0) + 1; return o; })(), floaters: floaters.length, combos: M ? M.combos.length : 0, statics: M ? M.statics.length : 0, paths: M ? M.pathKeys.length : 0,
       placement: P ? { q: P.q, r: P.r, rot: P.rot, ok: P.ok, state: P.state, msg: P.msg, makes: P.makes, breaks: P.breaks } : null };
   };
