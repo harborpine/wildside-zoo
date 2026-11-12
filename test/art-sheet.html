@@ -1,0 +1,163 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Wildside Zoo art sheets</title>
+<style>
+  html, body { margin: 0; background: #1e2a33; }
+  canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+</style></head><body>
+<canvas id="c" width="10" height="10"></canvas>
+<script src="../geo.js"></script>
+<script src="../data.js"></script>
+<script src="../sprites.js"></script>
+<script>
+/* Artist's contact sheets. Open with ?s=<sheet>: animals-<biome>, people, tiles, fences, buildings, extras, scene, scene2.
+   test/art-shot.js renders every sheet to test/shots/art-<sheet>.png with headless Chromium. Words on these sheets are
+   labels for checking the art only; the game itself draws no words on its canvas. */
+'use strict';
+var S = window.ZSprites, D = window.ZD, G = window.ZGeo, cv = document.getElementById('c'), g = cv.getContext('2d');
+window.__err = []; window.onerror = function (m) { window.__err.push(String(m)); };
+var sheet = (location.search.match(/[?&]s=([\w:-]+)/) || [0, 'animals-savanna'])[1];
+var GRASS = '#86c94e';
+function size(w, h, bg) { cv.width = w; cv.height = h; g.imageSmoothingEnabled = false; g.fillStyle = bg || GRASS; g.fillRect(0, 0, w, h); }
+function put(s, x, y, k) { k = k || 1; g.drawImage(s.c, Math.round(x - s.ax * k), Math.round(y - s.ay * k), s.w * k, s.h * k); }
+function label(t, x, y, col, sz) { g.font = 'bold ' + (sz || 13) + 'px system-ui, sans-serif'; g.textAlign = 'center'; g.fillStyle = col || '#16301a'; g.fillText(t, x, y); }
+function hexes(list, x, y, k, fn) { list.forEach(function (c) { var p = G.toScreen(c[0], c[1]); fn(c, x + p.x * k, y + p.y * k); }); }
+
+function animals(biome) {
+  var list = D.SPECIES_LIST.filter(function (s) { return s.biome === biome; }), K = 4, CW = 128, RH = 180, perRow = 2, cols = 6;
+  var water = biome === 'ocean';
+  size(perRow * (cols * CW + 30), Math.ceil(list.length / perRow) * RH + 10, water ? '#4aa3d8' : biome === 'arctic' ? '#dfeef7' : GRASS);
+  list.forEach(function (sp, i) {
+    var x0 = (i % perRow) * (cols * CW + 30) + 10, y0 = Math.floor(i / perRow) * RH + RH - 34;
+    var cells = [{}, { frame: 1 }, { frame: 3, flip: true }, { variant: true }, { juv: true }, { juv: true, variant: true, frame: 1 }];
+    cells.forEach(function (o, n) { put(S.animal(sp.id, o), x0 + n * CW + CW / 2, y0, K); });
+    var a = S.animal(sp.id, {});
+    label(sp.name + '  (' + a.w + 'x' + a.h + ')   |  rare: ' + sp.variant + '  |  young', x0 + cols * CW / 2, y0 + 22, water ? '#06284a' : '#16301a');
+  });
+}
+function people() {
+  var kinds = S.PERSON_KINDS, K = 4, CW = 64, RH = 104;
+  size(16 * CW + 20, (Math.ceil(kinds.length / 4) + 3) * RH + 20, '#d8c9a3');
+  kinds.forEach(function (k, i) {
+    var x0 = (i % 4) * (4 * CW) + 10, y0 = Math.floor(i / 4) * RH + RH - 22;
+    [{}, { frame: 1 }, { frame: 3 }, { flip: true, frame: 1 }].forEach(function (o, n) { put(S.person(k, o), x0 + n * CW + CW / 2, y0, K); });
+    var a = S.person(k, {}); label(k + ' (' + a.w + 'x' + a.h + ')', x0 + 2 * CW, y0 + 18, '#3a2a1a');
+  });
+  var yv = Math.ceil(kinds.length / 4) * RH + RH - 22;
+  for (var s = 0; s < 48; s++) put(S.person('visitor', { seed: s, frame: s % 4 === 3 ? 1 : 0, flip: s % 5 === 4 }), 10 + (s % 16) * CW + CW / 2, yv + Math.floor(s / 16) * RH, K);
+  label('visitors, seeds 0 to 47', 8 * CW, yv + 2 * RH + 18, '#3a2a1a');
+}
+function tiles() {
+  var K = 4, kinds = [];
+  for (var i = 0; i < S.GRASS_VARIANTS; i++) kinds.push(['grass', i]);
+  kinds.push(['path', 0], ['path', 1], ['locked', 0], ['locked', 1], ['water', 0]);
+  D.BIOME_ORDER.forEach(function (b) { kinds.push(['hab:' + b, 0]); kinds.push(['hab:' + b, 1]); });
+  var CW = 210, RH = 170, per = 6;
+  size(per * CW + 20, Math.ceil(kinds.length / per) * RH + 330, '#31414d');
+  kinds.forEach(function (k, n) { var x = 10 + (n % per) * CW + CW / 2, y = Math.floor(n / per) * RH + 80; put(S.tile(k[0], k[1]), x, y, K); label(k[0] + ' #' + k[1], x, y + 82, '#fff'); });
+  // tiling check at 2x: a patch of mixed ground
+  var y0 = Math.ceil(kinds.length / per) * RH + 60, kinds2 = ['grass', 'grass', 'path', 'hab:savanna', 'hab:arctic', 'water', 'hab:desert', 'locked', 'hab:jungle', 'hab:mountain', 'hab:ocean', 'hab:paleo', 'hab:mythic'];
+  for (var r = 0; r < 6; r++) for (var q = 0; q < 12; q++) { var p = G.toScreen(q - (r >> 1), r), kk = r < 2 ? 'grass' : kinds2[(q + r * 5) % kinds2.length]; put(S.tile(kk, q * 7 + r * 13), 60 + p.x * 2, y0 + p.y * 2, 2); }
+}
+var SHAPE3 = [[0, 0], [1, 0], [0, 1]];
+function ring(biome, cells, x, y, k, who) {
+  var items = [], has = {};
+  cells.forEach(function (c) { has[c[0] + ',' + c[1]] = 1; });
+  hexes(cells, x, y, k, function (c, sx, sy) { put(S.tile('hab:' + biome, c[0] * 3 + c[1]), sx, sy, k); });
+  hexes(cells, x, y, k, function (c, sx, sy) {
+    G.EDGES.forEach(function (e, i) { if (has[(c[0] + e[0][0]) + ',' + (c[1] + e[0][1])]) return; var f = S.fence(biome, i); items.push({ s: f, x: sx, y: sy, d: sy + (f.sortDy || 0) * k }); });
+  });
+  (who || []).forEach(function (w) { var p = G.toScreen(w[1], w[2]); items.push({ s: w[0], x: x + (p.x + w[3]) * k, y: y + (p.y + w[4]) * k, d: y + (p.y + w[4]) * k }); });
+  items.sort(function (a, b) { return a.d - b.d; });
+  items.forEach(function (it) { put(it.s, it.x, it.y, k); });
+}
+function fences() {
+  var K = 3, RH = 250; size(1180, 8 * RH + 20);
+  D.BIOME_ORDER.forEach(function (b, n) {
+    var y = n * RH + 110, sp = D.SPECIES_LIST.filter(function (s) { return s.biome === b; });
+    ring(b, [[0, 0]], 110, y, K, [[S.animal(sp[0].id, {}), 0, 0, 0, 4]]);
+    ring(b, SHAPE3, 370, y - 20, K, [[S.animal(sp[1].id, {}), 0, 0, -6, -6], [S.animal(sp[2].id, { flip: true }), 1, 0, 2, 6], [S.animal(sp[3].id, {}), 0, 1, 0, 4]]);
+    for (var e = 0; e < 6; e++) { var f = S.fence(b, e), x = 700 + e * 80; put(S.tile('hab:' + b, 0), x, y - 30, 1.5); put(f, x, y - 30, 1.5); label(['NE', 'E', 'SE', 'SW', 'W', 'NW'][e] + ' ' + f.sortDy, x, y + 20); }
+    label(D.BIOMES[b].name + ' fence', 800, y + 60);
+  });
+}
+function buildings() {
+  var K = 4, ids = D.FAC_ORDER.slice(), CW = 230, RH = 250, per = 5;
+  size(per * CW + 20, (Math.ceil(ids.length / per) + 1) * RH + 80);
+  ids.forEach(function (id, n) { var x = 10 + (n % per) * CW + CW / 2, y = Math.floor(n / per) * RH + 170; put(S.tile('grass', n), x, y, K); put(S.building(id, {}), x, y, K); var b = S.building(id, {}); label(D.FAC[id].name + ' (' + b.w + 'x' + b.h + ')', x, y + 72); });
+  var y2 = Math.ceil(ids.length / per) * RH + 200, e = S.entrance();
+  [-1, 0, 1].forEach(function (q) { put(S.tile(q ? 'grass' : 'path', q + 5), 300 + q * G.W * K, y2, K); });
+  put(e, 300, y2, K); label('entrance gate (' + e.w + 'x' + e.h + ')', 300, y2 + 76);
+  put(S.tile('grass', 3), 800, y2, K); put(S.building('fountain', { frame: 1 }), 800, y2, K); label('fountain frame 1', 800, y2 + 76);
+  put(S.tile('grass', 3), 1000, y2, K); put(S.building('nope', {}), 1000, y2, K); label('unknown id fallback', 1000, y2 + 76);
+}
+function extras() {
+  var K = 4; size(1180, 700);
+  var x = 60;
+  S.DECOS.forEach(function (d) { for (var s = 0; s < 4; s++) { put(S.deco(d, s), x, 150, K); x += 76; } label(d, x - 190, 172); });
+  var names = S.ICONS, K2 = 6;
+  names.forEach(function (n, i) { var ix = 60 + (i % 10) * 114, iy = 290 + Math.floor(i / 10) * 130; put(S.icon(n), ix, iy, K2); put(S.icon(n), ix + 44, iy, 2); var s = S.icon(n); label(n + ' ' + s.w + 'x' + s.h, ix + 10, iy + 20, '#16301a', 12); });
+  put(S.icon('nope'), 60, 640, K2); label('fallback', 60, 660, '#16301a', 12);
+  put(S.animal('nope', {}), 200, 640, K); label('unknown animal', 200, 660, '#16301a', 12);
+  put(S.person('nope', {}), 340, 640, K); label('unknown person', 340, 660, '#16301a', 12);
+}
+
+// ----- composed scene at the real game scale: 195 px wide buffer shown at 2x on a 390 px page -----
+function scene(which) {
+  var BW = 195, BH = 330, K = 2, buf = document.createElement('canvas'); buf.width = BW; buf.height = BH;
+  var b = buf.getContext('2d'); b.imageSmoothingEnabled = false; b.fillStyle = '#2f6d8e'; b.fillRect(0, 0, BW, BH);
+  var COLS = 6, ROWS = 17, cell = {}, items = [];
+  function ax(c, r) { return [c - (r >> 1), r]; }
+  function key(q, r) { return q + ',' + r; }
+  for (var r = 0; r < ROWS; r++) for (var c = -1; c < COLS + 1; c++) { var a = ax(c, r); cell[key(a[0], a[1])] = { q: a[0], r: a[1], t: r < 2 ? 'locked' : 'grass' }; }
+  function setc(c, r, t, extra) { var a = ax(c, r), o = cell[key(a[0], a[1])]; if (!o) return null; o.t = t; if (extra) for (var k in extra) o[k] = extra[k]; return o; }
+  function hab(biome, c, r, shape) { var a = ax(c, r), out = []; shape.forEach(function (s) { var o = cell[key(a[0] + s[0], a[1] + s[1])]; if (o) { o.t = 'hab'; o.b = biome; o.h = biome + c + r; out.push(o); } }); return out; }
+  var H = [];
+  if (which === 2) {
+    H.push(['ocean', hab('ocean', 2, 5, D.SHAPES.ocean)]); H.push(['paleo', hab('paleo', 1, 10, [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1]])]);
+    H.push(['mythic', hab('mythic', 4, 13, [[0, 0], [1, 0], [0, 1]])]); H.push(['mountain', hab('mountain', 0, 13, [[0, 0], [1, 0], [0, 1]])]);
+    [[2, 16], [2, 15], [2, 14], [3, 13], [3, 12], [0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [4, 9], [4, 10], [4, 11], [3, 12]].forEach(function (p) { setc(p[0], p[1], 'path'); });
+    setc(5, 9, 'fac', { f: 'cafe' }); setc(5, 10, 'fac', { f: 'playground' }); setc(5, 11, 'fac', { f: 'lab' }); setc(4, 12, 'fac', { f: 'deck' }); setc(0, 9, 'fac', { f: 'kiosk' }); setc(1, 15, 'fac', { f: 'photo' }); setc(3, 15, 'fac', { f: 'vet' });
+    setc(0, 3, 'fac', { f: 'gate' }); setc(2, 2, 'fac', { f: 'pavilion' }); setc(4, 3, 'fac', { f: 'center' });
+  } else {
+    H.push(['savanna', hab('savanna', 0, 11, D.SHAPES.savanna)]); H.push(['arctic', hab('arctic', 3, 4, [[0, 0], [1, 0], [0, 1], [1, 1], [-1, 1]])]);
+    H.push(['jungle', hab('jungle', 3, 11, D.SHAPES.jungle)]); H.push(['desert', hab('desert', 0, 5, [[0, 0], [1, 0], [0, 1]])]);
+    [[2, 16], [2, 15], [2, 14], [2, 13], [2, 12], [2, 11], [2, 10], [2, 9], [0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [5, 8], [2, 7], [2, 6], [2, 5], [2, 4], [2, 3]].forEach(function (p) { setc(p[0], p[1], 'path'); });
+    setc(1, 9, 'fac', { f: 'snack' }); setc(3, 9, 'fac', { f: 'bench' }); setc(4, 7, 'fac', { f: 'icecream' }); setc(3, 13, 'fac', { f: 'gift' }); setc(1, 14, 'fac', { f: 'restroom' }); setc(1, 7, 'fac', { f: 'fountain' }); setc(4, 9, 'fac', { f: 'photo' });
+    setc(3, 15, 'fac', { f: 'kiosk' });
+  }
+  var ox = -G.W * 0.75, oy = -G.RS * 3.4;
+  function P(o) { var p = G.toScreen(o.q, o.r); return { x: p.x + ox, y: p.y + oy }; }
+  var all = Object.keys(cell).map(function (k) { return cell[k]; }).sort(function (a, c2) { return a.r - c2.r || a.q - c2.q; });
+  all.forEach(function (o) { var p = P(o), t = o.t === 'hab' ? 'hab:' + o.b : o.t === 'fac' ? 'grass' : o.t; var s = S.tile(t, o.q * 7 + o.r * 13); b.drawImage(s.c, Math.round(p.x - s.ax), Math.round(p.y - s.ay)); });
+  function add(s, x, y, d) { items.push({ s: s, x: x, y: y, d: d == null ? y : d }); }
+  all.forEach(function (o) {
+    var p = P(o), hsh = Math.abs((o.q * 73856093) ^ (o.r * 19349663));
+    if (o.t === 'hab') G.EDGES.forEach(function (e, i) { var n = cell[key(o.q + e[0][0], o.r + e[0][1])]; if (n && n.h === o.h) return; var f = S.fence(o.b, i); add(f, p.x, p.y, p.y + f.sortDy); });
+    if (o.t === 'fac') add(S.building(o.f, {}), p.x, p.y, p.y + 2);
+    if (o.t === 'grass' && hsh % 5 < 2) add(S.deco(['tree', 'tree', 'bush', 'flowers', 'rock', 'tree'][hsh % 6], hsh % 7), p.x + (hsh % 9) - 4, p.y + 3 + (hsh % 5));
+    if (o.t === 'locked' && hsh % 3 === 0) add(S.deco('tree', hsh % 7), p.x, p.y + 4);
+  });
+  var pick = { savanna: [['lion', 0], ['zebra', 0], ['giraffe', 0], ['elephant', 0, 1]], arctic: [['penguin', 0], ['polarbear', 0], ['penguin', 0, 1], ['walrus', 0], ['seal', 0]], jungle: [['gorilla', 0], ['toucan', 0], ['jaguar', 0], ['capybara', 0]], desert: [['kangaroo', 0], ['camel', 0], ['koala', 0]],
+    ocean: [['dolphin', 0], ['turtle', 0], ['clownfish', 0], ['octopus', 0], ['reefshark', 0], ['manta', 0], ['whaleshark', 0]], paleo: [['trex', 0], ['triceratops', 0], ['raptor', 0], ['mammoth', 0], ['dodo', 0]], mythic: [['dragon', 0], ['unicorn', 0], ['phoenix', 0]], mountain: [['panda', 0], ['redpanda', 0], ['yak', 0]] };
+  H.forEach(function (h, hi) { var list = pick[h[0]] || []; h[1].forEach(function (o, i) { var a = list[i % list.length]; if (!a || i >= list.length) return; var p = P(o); add(S.animal(a[0], { flip: (i + hi) % 2 === 1, juv: !!a[2], frame: i % 2 }), p.x + ((i * 7) % 9) - 4, p.y + 5 + (i % 3) * 2); }); });
+  var vis = 0, staffKinds = ['keeper', 'guide', 'vet'];
+  all.forEach(function (o) { if (o.t !== 'path' || o.r < 2) return; var p = P(o), hsh = Math.abs((o.q * 83492791) ^ (o.r * 2971215073 | 0)); if (hsh % 3 === 2) return; vis++; add(S.person('visitor', { seed: hsh % 97, frame: hsh % 4, flip: hsh % 2 === 0 }), p.x + (hsh % 15) - 7, p.y + (hsh % 7) - 2); if (hsh % 4 === 0) add(S.person('visitor', { seed: (hsh >> 3) % 97, frame: 1 }), p.x + 9, p.y + 6); });
+  var k1 = H[0][1][0], pk = P(k1); add(S.person(staffKinds[0], { frame: 0 }), pk.x + 12, pk.y - 4);
+  var ent = cell[key(ax(2, 16)[0], 16)], pe = P(ent); add(S.entrance(), pe.x, pe.y, pe.y + 6);
+  add(S.person(which === 2 ? 'director' : 'trader', {}), pe.x + 18, pe.y - 12);
+  items.sort(function (a, c2) { return a.d - c2.d; });
+  items.forEach(function (it) { b.drawImage(it.s.c, Math.round(it.x - it.s.ax), Math.round(it.y - it.s.ay)); });
+  // on-floor icons float above everything
+  var ic = [['ready-event', H[0][1][0]], ['ready-breed', H[1][1][0]], ['busy', H[2][1][0]], ['choice', H[3][1][0]]];
+  ic.forEach(function (i) { var p = P(i[1]), s = S.icon(i[0]); b.drawImage(s.c, Math.round(p.x - s.ax), Math.round(p.y - 26 - s.ay)); });
+  size(BW * K, BH * K, '#000'); g.drawImage(buf, 0, 0, BW * K, BH * K);
+}
+
+try {
+  if (S.init) S.init();
+  if (sheet.indexOf('animals-') === 0) animals(sheet.slice(8));
+  else if (sheet === 'people') people(); else if (sheet === 'tiles') tiles(); else if (sheet === 'fences') fences();
+  else if (sheet === 'buildings') buildings(); else if (sheet === 'extras') extras(); else if (sheet === 'scene2') scene(2); else scene(1);
+} catch (e) { window.__err.push(String(e && e.stack || e)); }
+window.__done = true;
+</script></body></html>

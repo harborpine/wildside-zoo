@@ -7,7 +7,7 @@ const OFF = {}; (process.env.BOT_OFF || '').split(',').forEach(k => { if (k) OFF
 
 function run(skill, verbose) {
   const S = Z.newGame({ runs: 0 });
-  const rows = [], reviews = {}, seen = {}, haps = {}, choices = { asked: 0, answered: 0 };
+  const rows = [], idle = [], reviews = {}, seen = {}, haps = {}, choices = { asked: 0, answered: 0 };
   const count = (o, k) => { o[k] = (o[k] || 0) + 1; };
   const must = (r, what) => { if (!r || !r.ok) throw new Error('bot: ' + what + ' refused: ' + (r && r.msg)); return r; };
   const freeStaff = () => Z.freeStaff(S);
@@ -26,7 +26,7 @@ function run(skill, verbose) {
     }
     return def;
   }
-  function topTier(list) { let best = -1; list.forEach((t, i) => { if (!t.lock && t.cost <= S.money * 0.3) best = i; }); return best; }
+  function topTier(list) { let best = -1; list.forEach((t, i) => { if (!t.lock && t.cost <= S.money * 0.4) best = i; }); return best; }
 
   for (let w = 0; w < D.WPY * D.RUN_YEARS; w++) {
     S.reports = [];
@@ -75,7 +75,7 @@ function run(skill, verbose) {
       // train
       S.staff.forEach(s => { if (Z.trainWait(S, s) === 0 && S.money > Z.trainCost(s) * 6) { const r = must(Z.train(S, s.id, D.ROLES[s.role].main), 'train'); count(seen, r.super ? 'super' : 'train'); } });
       // advertising campaign
-      if (!OFF.campaign && !Z.campaignNow(S)) { const t = topTier(Z.campaigns(S)); if (t >= 0) { must(Z.runCampaign(S, t), 'campaign'); count(seen, 'campaign'); } }
+      if (!OFF.campaign) D.CAMPAIGNS.forEach((C, i) => { const t = Z.campaigns(S)[i]; if (!t.lock && !t.weeksLeft && t.cost <= S.money * 0.6) { must(Z.runCampaign(S, i), 'campaign'); count(seen, 'campaign'); } });
       // mid-point choices, happenings, Open Day / Festival plans
       S.projects.forEach(p => { if (p.choice && !OFF.choices) { const key = p.choice.key; must(Z.resolveChoice(S, p.id, choose(p.choice.options, p.choice.def)), 'choice ' + key); choices.answered++; count(seen, 'choice:' + key); } });
       if (S.happening && S.happening.options && !OFF.happenings) { const key = S.happening.key; must(Z.resolveHappening(S, choose(S.happening.options, S.happening.def)), 'happening ' + key); }
@@ -86,6 +86,7 @@ function run(skill, verbose) {
     if (S.show) { const best = S.animals.slice().sort((x, y) => Z.showScore(S, y) - Z.showScore(S, x))[0]; if (best) must(Z.enterShow(S, best.id), 'show'); }
     const before = S.reports.length;
     Z.tick(S);
+    idle.push(S.money / Math.max(1, S.incomeLast));
     if (!isFinite(S.money) || !isFinite(S.rep) || !isFinite(S.rp)) throw new Error('bot: a number went bad in week ' + S.week);
     S.reports.forEach((r, i) => {
       count(seen, 'report:' + r.type);
@@ -94,7 +95,7 @@ function run(skill, verbose) {
       if (r.type === 'review') { const y = Z.year(S); (reviews[y] = reviews[y] || []).push(r.total); }
       if (r.type === 'yearend') {
         const h = r.stats, rv = reviews[h.year] || [], avgRev = rv.length ? (rv.reduce((a, b) => a + b, 0) / rv.length).toFixed(1) : '-';
-        h.idleWeeks = +(h.money / Math.max(1, h.income / D.WPY)).toFixed(1); h.avgReview = avgRev; h.minReview = rv.length ? Math.min.apply(null, rv) : 0;
+        const yi = idle.splice(0).sort((a, b) => a - b); h.idleWeeks = +yi[Math.floor(yi.length / 2)].toFixed(1); /* typical bank balance through the year, in weeks of income */ h.avgReview = avgRev; h.minReview = rv.length ? Math.min.apply(null, rv) : 0;
         rows.push(h); h.repBy = Object.assign({}, S.life.repBy);
         if (verbose) console.log(`Y${h.year} place ${h.place} rating ${h.rating} (top ${Z.rivalTop(h.year)}) $${h.money} idle ${h.idleWeeks}wk inc/wk ${Math.round(h.income / 48)} cost/wk ${Math.round(h.cost / 48)} spent/wk ${Math.round(h.spent / 48)} vis/wk ${Math.round(h.visitors / 48)} rep ${h.rep} r${h.rank} sp ${h.species} best ${h.bestReview} rev ${h.minReview}-${h.bestReview} avg ${avgRev} ev ${h.events} exp ${h.expeditions} births ${h.births} awards ${h.awards.join('/')} | staff ${S.staff.length} avgAnimal ${Z.snapshot(S).avgStat} bestBaby ${h.bestBaby} prest ${r.awards[1].mine.match(/\((\d+)\)/)?.[1]} rp ${Math.round(S.rp)} rows ${S.rows} habs ${Z.snapshot(S).habitats}`);
       }

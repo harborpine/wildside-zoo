@@ -51,7 +51,8 @@
   Z.salary = s => Math.round(30 + s.lvl * 22 + (s.care + s.sci + s.exp + s.charm) * 0.6 + (s.mastered ? s.mastered.length * 80 : 0));
   Z.trainCost = s => Math.round(400 * Math.pow(s.lvl, 1.5) / 50) * 50;
   Z.trainWait = (S, s) => Math.max(0, 10 - (S.week - s.trainAt));      // weeks until this person can train again
-  Z.ticket = S => 6 + 1.0 * (Z.rank(S) - 1);                           // ticket price per visitor
+  Z.ticketAt = rank => 6 + 1.0 * (rank - 1);                           // ticket price per visitor at a given zoo rank
+  Z.ticket = S => Z.ticketAt(Z.rank(S));
   Z.buzzNow = (S, h) => h.buzz ? h.buzz * Math.max(0, 1 - (S.week - h.buzzAt) / 40) : 0;
   Z.modSum = (S, k) => (S.mods || []).reduce((t, m) => t + (m.k === k && m.until > S.week ? m.amt : 0), 0);
   const buildMult = S => 1 + clamp(Z.modSum(S, 'build'), -0.5, 0);
@@ -79,10 +80,21 @@
     if (after > before) {
       news(S, 'Now a ' + D.RANK_NAME[after] + ' (rank ' + after + ').', 'good');
       ev(S, 'rankup', { rank: after });
-      report(S, { type: 'rankup', rank: after });
+      report(S, { type: 'rankup', rank: after, name: D.RANK_NAME[after], unlocks: Z.rankUnlocks(after) });
     }
   }
   Z.addRep = addRep;
+  // What reaching a rank opens up, as short lines for the rank-up moment.
+  Z.rankUnlocks = function (rank) {
+    const out = [];
+    if (D.STAFF_CAP[rank] > D.STAFF_CAP[rank - 1]) out.push('Staff room for ' + D.STAFF_CAP[rank]);
+    if (D.LAND.some(l => l.rank === rank)) out.push('More land for sale');
+    Object.keys(D.REGION_RANK).forEach(b => { if (D.REGION_RANK[b] === rank) out.push('Region: ' + D.BIOMES[b].region); });
+    D.HIRE_TIERS.forEach(t => { if (t.rank === rank) out.push('Hiring: ' + t.name); });
+    D.CAMPAIGNS.forEach(t => { if (t.rank === rank) out.push('Campaign: ' + t.name); });
+    out.push('Tickets ' + usd(Z.ticketAt(rank)));
+    return out;
+  };
   const repChunk = (S, f) => Math.max(5, Math.round(Z.rankGap(S) * f));
   function gain(S, o) { // money, reputation and research from a one-off moment, with floor pop-ups
     if (o.money) { S.money += o.money; fx(S, { type: 'money', amt: o.money, gate: true }); }
@@ -182,7 +194,7 @@
       v: Z.SAVE_VERSION, runId: 'run' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), zooName: opts.zooName || 'Wildside Zoo',
       ng: legacy.runs || 0, startedAt: Date.now(), week: 0, money: 20000 + Math.min(legacy.runs || 0, 5) * 6000, rp: 0, rep: 0, rows: D.START_ROWS,
       items: [], animals: [], staff: [], candidates: [], candAt: 0, projects: [], reports: [], news: [], elog: [],
-      offers: null, headhunt: null, headhuntAt: 0, show: null, yearly: null, happening: null, hapAt: ri(5, 7), hapLast: [], mods: [], campaign: null, habN: {}, fx: [], callerN: 0,
+      offers: null, headhunt: null, headhuntAt: 0, show: null, yearly: null, happening: null, hapAt: ri(5, 7), hapLast: [], mods: [], campaigns: {}, habN: {}, fx: [], callerN: 0,
       research: {}, regions: { savanna: true }, aff: Object.assign({}, legacy.aff || {}), combos: {}, knownCombos: Object.assign({}, legacy.combos || {}),
       book: {}, fragments: 0, flags: {}, vips: {}, trophies: 0, history: [], nextId: 1, finished: false, score: null,
       yr: newYearStats(), life: { events: 0, expeditions: 0, births: 0, income: 0, bestReview: 0, hof: 0, spent: 0, repBy: {} },
@@ -523,14 +535,15 @@
 
   // ----- money ladders: advertising campaigns -----
   const campCost = (S, C) => price(C.k * Z.scale(S));
-  Z.campaigns = S => D.CAMPAIGNS.map(C => ({ key: C.key, name: C.name, cost: campCost(S, C), vis: C.vis, weeks: C.weeks, rep: repChunk(S, C.rep), lock: C.rank && Z.rank(S) < C.rank ? 'Rank ' + C.rank : '', note: '+' + Math.round(C.vis * 100) + '% visitors, ' + C.weeks + ' weeks' }));
-  Z.campaignNow = S => S.campaign && S.campaign.until > S.week ? { key: S.campaign.key, name: S.campaign.name, weeksLeft: S.campaign.until - S.week } : null;
+  const campLeft = (S, C) => Math.max(0, (S.campaigns[C.key] || 0) - S.week);
+  // One of each kind can run at a time. weeksLeft > 0 means that one is running now.
+  Z.campaigns = S => D.CAMPAIGNS.map(C => ({ key: C.key, name: C.name, cost: campCost(S, C), vis: C.vis, weeks: C.weeks, rep: repChunk(S, C.rep), weeksLeft: campLeft(S, C), lock: C.rank && Z.rank(S) < C.rank ? 'Rank ' + C.rank : '', note: '+' + Math.round(C.vis * 100) + '% visitors, ' + C.weeks + ' weeks' }));
   Z.runCampaign = function (S, i) {
     const C = D.CAMPAIGNS[i]; if (!C) return fail('Pick a campaign.');
     if (C.rank && Z.rank(S) < C.rank) return fail('Needs zoo rank ' + C.rank + '.');
-    const now = Z.campaignNow(S); if (now) return fail(now.name + ' runs ' + now.weeksLeft + ' more weeks.');
+    if (campLeft(S, C)) return fail('Already running, ' + campLeft(S, C) + ' weeks left.');
     const c = campCost(S, C), rep = repChunk(S, C.rep); if (!spendOpt(S, c)) return need(c);
-    S.campaign = { key: C.key, name: C.name, until: S.week + C.weeks };
+    S.campaigns[C.key] = S.week + C.weeks;
     addMod(S, 'visitors', C.vis, C.weeks, 'campaign'); gain(S, { rep: rep, src: 'campaign' });
     ev(S, 'campaign', { key: C.key, cost: c, rep: rep }); news(S, C.name + ' campaign started.', 'good'); Z.refresh(S);
     return { ok: true, cost: c, rep: rep, weeks: C.weeks, vis: C.vis };
@@ -543,7 +556,7 @@
     if (!S.offers || S.offers.kind !== 'trader' || !S.offers.crates) return null;
     const w = crateOdds(S), tot = w.reduce((a, b) => a + b, 0); let evv = 0;
     const odds = w.map((x, i) => { const p = x / tot; evv += p * D.RARITY.value[i + 1] * (0.5 + (crateBase(S) + 6) / 50); return { rarity: i + 1, name: D.RARITY.name[i + 1], p: p }; }).filter(o => o.p > 0);
-    return { cost: price(Math.max(evv * 1.15, 0.6 * Z.scale(S))), odds: odds, left: S.offers.crates };
+    return { cost: price(Math.max(evv * 1.2, Z.scale(S))), odds: odds, left: S.offers.crates };
   };
   Z.openCrate = function (S) {
     const info = Z.crateInfo(S); if (!info) return fail('No crate on offer.');
@@ -686,13 +699,13 @@
       }).sort((x, y) => y.gain - x.gain);
       return Object.assign(base, { key: 'star', title: 'Pick the star', text: 'Who leads the show?', def: 0, options: opts });
     }
-    const o1 = clamp(0.55 + lead.charm / 250, 0.55, 0.9), c1 = Math.round(4 * Math.pow(1.45, Z.rank(S) - 1));
+    const o1 = clamp(0.55 + lead.charm / 250, 0.55, 0.9), c1 = 3 + 2 * Z.rank(S);
     return Object.assign(base, { key: 'boost', title: 'A big idea', text: first(lead) + ' wants to try something.', def: 2, options: [
-      { label: 'Go for it', note: '+2 to 3 points, flop -1', costRp: c1, odds: o1 },
-      { label: 'Go big', note: '+4 to 5 points, flop -2', costRp: Math.round(c1 * 2.5), odds: +(o1 - 0.2).toFixed(2) },
+      { label: 'Go for it', note: '+1.5 to 2.5 points, flop -1', costRp: c1, odds: o1 },
+      { label: 'Go big', note: '+3 to 4 points, flop -2', costRp: Math.round(c1 * 2.5), odds: +(o1 - 0.2).toFixed(2) },
       { label: 'No thanks' }] });
   }
-  const starGain = stat => +clamp(0.6 + stat / 40, 0.6, 3).toFixed(1);
+  const starGain = stat => +clamp(0.8 + stat / 100, 0.8, 1.8).toFixed(1);
   function applyChoice(S, p, i, auto) {
     const c = p.choice, o = c && c.options[i]; if (!o) return fail('Pick an option.');
     if (o.cost && S.money < o.cost) return need(o.cost);
@@ -714,7 +727,7 @@
       fx(S, { type: 'event', hab: p.hab, gains: { [o.score]: o.gain }, fired: null, who: o.label });
       text = o.label + ' takes centre stage.';
     } else if (k === 'boost' && i < 2) {
-      const t = p.pts.fun <= p.pts.learning ? 'fun' : 'learning', amt = win ? (i === 0 ? rnd(2, 3) : rnd(4, 5)) : (i === 0 ? -1 : -2);
+      const t = p.pts.fun <= p.pts.learning ? 'fun' : 'learning', amt = win ? (i === 0 ? rnd(1.5, 2.5) : rnd(3, 4)) : (i === 0 ? -1 : -2);
       p.pts[t] = Math.max(0, p.pts[t] + amt); p.boost = { good: win, score: t, amt: +amt.toFixed(1), big: i === 1 }; good = win;
       fx(S, { type: 'event', hab: p.hab, gains: { [t]: amt }, fired: win ? t : null, who: lead ? first(lead) : '' });
       text = win ? 'The crowd loved it!' : 'It fell a bit flat.';
@@ -842,7 +855,7 @@
     S.aff[h.t + '|' + p.theme] = aff;
     h.lastTheme = p.theme; h.eventAt = S.week; h.buzz = Math.pow(total / 40, 1.4) * 0.9; h.buzzAt = S.week;
     const rank = Z.rank(S);
-    const repGain = Math.round(total * total / 30), money = Math.round(total * 60 * (1 + rank * 0.8) * (1 + S.week / 300)), rp = Math.round(total / 2 + rank);
+    const repGain = Math.round(total * total / D.REVIEW_REP_DIV), money = Math.round(total * 60 * (1 + rank * 0.8) * (1 + S.week / 300)), rp = Math.round(total / 2 + rank);
     S.money += money; S.rp += rp; addRep(S, repGain, 'reviews'); giveXp(S, lead, 40);
     S.yr.events++; S.life.events++; S.flags.firstEvent = true;
     if (total >= 30) S.flags.rev30 = true;
@@ -931,9 +944,9 @@
     }
   };
   function coldPool(S) { const ev = {}; S.projects.forEach(p => { if (p.hab) ev[p.hab] = 1; }); const busy = Z.busyAnimals(S); return S.animals.filter(a => a.hab != null && !ev[a.hab] && !busy[a.id] && !Z.isSick(S, a)); }
-  function rollHappening(S) {
-    const keys = Object.keys(D.HAPPENINGS).filter(k => S.hapLast.indexOf(k) < 0 && (!HAP[k].can || HAP[k].can(S)));
-    if (!keys.length) return;
+  function rollHappening(S, forceKey) {
+    const keys = Object.keys(D.HAPPENINGS).filter(k => forceKey ? k === forceKey : S.hapLast.indexOf(k) < 0).filter(k => !HAP[k].can || HAP[k].can(S));
+    if (!keys.length) return false;
     let r = Math.random() * keys.reduce((t, k) => t + D.HAPPENINGS[k].w, 0), key = keys[0];
     for (let i = 0; i < keys.length; i++) { r -= D.HAPPENINGS[keys[i]].w; if (r <= 0) { key = keys[i]; break; } }
     const M = D.HAPPENINGS[key], m = HAP[key].make(S);
@@ -943,7 +956,14 @@
     const rep = { type: 'happening', key: key, title: h.title, text: h.text, bad: h.bad };
     if (h.who) rep.who = h.who; if (h.hab) rep.hab = h.hab; if (h.animal) rep.animal = h.animal; if (h.newAnimal) rep.newAnimal = h.newAnimal; if (h.options) rep.options = h.options;
     report(S, rep);
+    return true;
   }
+  // For tests and for building the pop-up screens: force a moment to happen right now.
+  Z.debug = {
+    happening: (S, key) => { S.happening = null; return rollHappening(S, key); },
+    caller: (S, kind) => { if (kind === 'headhunter') { S.headhunt = makeStaff(S, pick(BASIC), 22 + Z.rank(S) * 5); S.headhuntAt = S.week; } else rollOffers(S, kind); report(S, { type: 'caller', kind: kind }); return true; },
+    yearly: (S, id) => { if (id === 'show') openShow(S); else yearlyPlan(S, id); return true; }
+  };
   function applyHappening(S, i, auto) {
     const h = S.happening; if (!h || !h.options) return fail('Nothing to decide.');
     const o = h.options[i]; if (!o) return fail('Pick an option.');
@@ -990,9 +1010,17 @@
   };
 
   // Rival curve: the top rival's rating in a given year. Tuned from test runs.
-  Z.rivalRating = (r, y) => Math.round(205 * Math.pow(r.t, 1.33) * (0.55 + 0.45 * y / r.t));
+  Z.rivalRating = (r, y) => Math.round(220 *Math.pow(r.t, 1.33) * (0.55 + 0.45 * y / r.t));
   Z.rivalTop = y => Z.rivalRating(D.RIVALS[0], y);
   Z.rating = S => Math.round(S.yr.visitors / D.WPY / 4 + S.rep / 6 + Z.speciesCount(S) * 12 + S.trophies * 30);
+  // The league table as it stands today (the year-end table adds a little luck to the rivals). yearF = years played so far.
+  Z.rankings = function (S) {
+    const yearF = S.week / D.WPY, woy = Z.woy(S);
+    const mine = Math.round((woy ? S.yr.visitors / woy : S.visitorsLast) / 4 + S.rep / 6 + Z.speciesCount(S) * 12 + S.trophies * 30);
+    const table = D.RIVALS.map(r => ({ name: r.name, rating: Z.rivalRating(r, yearF) }));
+    table.push({ name: S.zooName, rating: mine, me: true }); table.sort((a, b) => b.rating - a.rating);
+    return { table: table, place: table.findIndex(t => t.me) + 1, of: table.length };
+  };
   Z.awardBars = y => ({ exhibit: Math.min(36, 14 + y * 1.1), rarest: 60 + y * 7, breeder: Math.min(92, 20 + y * 3.6), explorer: y < 12 ? 3 : y < 17 ? 2 : 1 });
   Z.prizeBase = y => Math.round(1500 * Math.pow(1.35, y) / 500) * 500;
 
@@ -1054,6 +1082,10 @@
   Z.resolveYearly = (S, i) => applyYearly(S, i, false);
 
   // Winter Animal Show
+  function openShow(S) {
+    S.show = { stat: pick(['charm', 'vigor', 'wit']), bar: Math.min(122, 30 + 4.8 * Z.year(S)), year: Z.year(S) };
+    ev(S, 'show_open', { stat: S.show.stat }); report(S, { type: 'show', stat: S.show.stat, medals: Z.showMedals(S) });
+  }
   Z.showScore = (S, a) => S.show ? a[S.show.stat] + Z.sp(a).rarity * 5 + (a.variant ? 8 : 0) : 0;
   Z.showMedals = S => S.show ? { gold: Math.round(S.show.bar * D.SHOW_MEDALS.gold), silver: Math.round(S.show.bar * D.SHOW_MEDALS.silver), bronze: Math.round(S.show.bar * D.SHOW_MEDALS.bronze) } : null; // score needed for each medal
   Z.showMedal = function (S, a) { if (!S.show) return null; const sc = Z.showScore(S, a), bar = S.show.bar; return sc >= bar * D.SHOW_MEDALS.gold ? 'gold' : sc >= bar * D.SHOW_MEDALS.silver ? 'silver' : sc >= bar * D.SHOW_MEDALS.bronze ? 'bronze' : null; };
@@ -1095,10 +1127,9 @@
     fx(S, { type: 'money', amt: tickets, gate: true });
     Object.keys(c.shopVal).forEach(id => { const amt = Math.round(visitors * c.shopVal[id]); if (amt > 0) fx(S, { type: 'money', amt: amt, item: +id }); });
     if (c.rpw >= 1) fx(S, { type: 'rp', amt: Math.round(c.rpw) });
-    addRep(S, visitors / 450 + c.repw, 'visitors');
+    addRep(S, visitors / D.VISITORS_PER_REP + c.repw, 'visitors');
     S.week++;
     S.mods = S.mods.filter(m => m.until > S.week);
-    if (S.campaign && S.campaign.until <= S.week) S.campaign = null;
     if (S.candidates.length && S.week - S.candAt >= 8) S.candidates = [];
     // every project takes its weekly step, then finished ones resolve (an unanswered choice falls back to its safe default)
     S.projects.slice().forEach(p => projectWeek(S, p));
@@ -1119,10 +1150,7 @@
     }
     if (woy === D.YEARLY.openday) yearlyPlan(S, 'openday');
     if (woy === D.YEARLY.festival) yearlyPlan(S, 'festival');
-    if (woy === D.YEARLY.show && S.animals.length) {
-      S.show = { stat: pick(['charm', 'vigor', 'wit']), bar: Math.min(122, 30 + 4.8 * Z.year(S)), year: Z.year(S) };
-      ev(S, 'show_open', { stat: S.show.stat }); report(S, { type: 'show', stat: S.show.stat, medals: Z.showMedals(S) });
-    }
+    if (woy === D.YEARLY.show && S.animals.length) openShow(S);
     checkVips(S);
     if (S.week % D.WPY === 0) yearEnd(S);
     if (S.money < 0 && !S.flags.loan) { S.flags.loan = true; news(S, 'Money is below zero. A patron covers you for now.', 'bad'); }

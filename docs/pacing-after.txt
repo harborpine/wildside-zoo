@@ -1,0 +1,132 @@
+Wildside Zoo pacing AFTER the rules rebuild (save version 3). Compare with docs/pacing-before.txt.
+Part 1 is one run in the same layout as the before file (node test/bot.js 0.8). One run is noisy, so parts 2 to 5 are averages.
+New columns: idle = typical bank balance through the year in weeks of income; spent/wk = optional spending (adverts, campaigns,
+crates, festival extras, choice fees); rev = lowest-best event score, avg = average event score.
+
+== 1. One run, bot skill 0.8 ==
+Y1 place 12 rating 329 (top 5081) $16568 idle 2.8wk inc/wk 2418 cost/wk 817 spent/wk 629 vis/wk 284 rep 709 r3 sp 11 best 18 rev 14-18 avg 16.0 ev 3 exp 8 births 5 awards exhibit/rarest/breeder/explorer | staff 4 avgAnimal 30 bestBaby 34 prest 108 rp 89 rows 10 habs savanna2
+Y2 place 10 rating 960 (top 5328) $52247 idle 2.9wk inc/wk 11381 cost/wk 2528 spent/wk 3061 vis/wk 883 rep 1919 r4 sp 22 best 23 rev 14-23 avg 18.0 ev 11 exp 10 births 8 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 31 bestBaby 42 prest 129 rp 33 rows 12 habs savanna3,jungle1,savanna3,desert1
+Y3 place 9 rating 1524 (top 5575) $68116 idle 3.1wk inc/wk 24524 cost/wk 4333 spent/wk 9600 vis/wk 1558 rep 3041 r5 sp 27 best 25 rev 16-25 avg 19.7 ev 13 exp 8 births 6 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 34 bestBaby 45 prest 129 rp 163 rows 12 habs savanna3,jungle3,savanna3,desert1,jungle2
+Y4 place 8 rating 2075 (top 5822) $101247 idle 2.9wk inc/wk 31745 cost/wk 5921 spent/wk 12249 vis/wk 1989 rep 4382 r5 sp 33 best 26 rev 19-26 avg 21.4 ev 16 exp 8 births 8 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 37 bestBaby 48 prest 130 rp 60 rows 14 habs savanna3,jungle3,savanna3,desert2,jungle3
+Y5 place 7 rating 2705 (top 6069) $141593 idle 3.2wk inc/wk 51873 cost/wk 8185 spent/wk 27202 vis/wk 2567 rep 6116 r6 sp 37 best 28 rev 16-28 avg 22.3 ev 21 exp 7 births 12 awards exhibit/rarest/breeder/explorer | staff 6 avgAnimal 40 bestBaby 53 prest 160 rp 217 rows 14 habs savanna3,jungle3,savanna3,desert3,jungle3,desert2,arctic1
+Y6 place 6 rating 3377 (top 6317) $313072 idle 5.5wk inc/wk 73923 cost/wk 10720 spent/wk 45448 vis/wk 3421 rep 7861 r6 sp 38 best 29 rev 21-29 avg 24.3 ev 21 exp 6 births 13 awards exhibit/rarest/breeder | staff 6 avgAnimal 43 bestBaby 57 prest 163 rp 274 rows 14 habs savanna3,jungle3,savanna3,desert3,jungle3,desert3,arctic2
+Y7 place 5 rating 4068 (top 6564) $459775 idle 5.1wk inc/wk 99199 cost/wk 12241 spent/wk 61683 vis/wk 4425 rep 9790 r7 sp 38 best 33 rev 22-33 avg 25.6 ev 22 exp 6 births 13 awards exhibit/rarest/breeder | staff 6 avgAnimal 45 bestBaby 60 prest 170 rp 466 rows 14 habs savanna4,jungle4,savanna4,desert3,jungle4,desert3,arctic2
+Y8 place 5 rating 4714 (top 6811) $618105 idle 4.2wk inc/wk 120755 cost/wk 14991 spent/wk 75234 vis/wk 4969 rep 12062 r7 sp 39 best 30 rev 19-30 avg 25.4 ev 24 exp 6 births 16 awards exhibit/rarest/breeder | staff 6 avgAnimal 46 bestBaby 63 prest 173 rp 114 rows 17 habs savanna4,jungle4,savanna4,desert3,jungle4,desert3,arctic2,arctic2
+Y9 place 4 rating 5676 (top 7058) $766805 idle 4.6wk inc/wk 169570 cost/wk 16847 spent/wk 102554 vis/wk 6765 rep 14429 r8 sp 39 best 32 rev 18-32 avg 26.4 ev 26 exp 7 births 15 awards exhibit/rarest/breeder | staff 7 avgAnimal 48 bestBaby 69 prest 184 rp 90 rows 17 habs savanna4,jungle4,savanna4,desert4,jungle4,desert4,arctic3,arctic3
+Y10 place 3 rating 6322 (top 7305) $1687529 idle 7.1wk inc/wk 200826 cost/wk 18448 spent/wk 128371 vis/wk 7408 rep 16631 r8 sp 39 best 31 rev 21-31 avg 26.3 ev 24 exp 8 births 13 awards exhibit/rarest/breeder | staff 7 avgAnimal 50 bestBaby 75 prest 185 rp 108 rows 17 habs savanna4,jungle4,savanna4,desert4,jungle4,desert4,arctic4,arctic3
+Y11 place 2 rating 7042 (top 7552) $1141417 idle 7.3wk inc/wk 208838 cost/wk 21268 spent/wk 145725 vis/wk 7797 rep 19502 r8 sp 42 best 30 rev 15-30 avg 26.5 ev 26 exp 12 births 12 awards exhibit/rarest/breeder/explorer | staff 7 avgAnimal 52 bestBaby 83 prest 193 rp 309 rows 17 habs savanna4,jungle4,savanna4,desert4,jungle4,desert4,arctic4,arctic4,mountain1
+Y12 place 1 rating 8039 (top 7800) $1608886 idle 6.7wk inc/wk 244416 cost/wk 25819 spent/wk 158440 vis/wk 8971 rep 22555 r9 sp 48 best 33 rev 22-33 avg 27.8 ev 27 exp 14 births 10 awards exhibit/rarest/breeder/explorer/zoo | staff 7 avgAnimal 53 bestBaby 92 prest 202 rp 29 rows 17 habs savanna4,jungle4,savanna4,desert4,jungle4,desert4,arctic4,arctic4,mountain2,mountain2
+Y13 place 1 rating 9070 (top 8047) $999462 idle 5.6wk inc/wk 280099 cost/wk 29899 spent/wk 214855 vis/wk 9702 rep 26507 r9 sp 48 best 32 rev 21-32 avg 27.8 ev 30 exp 12 births 13 awards exhibit/rarest/breeder/zoo | staff 7 avgAnimal 55 bestBaby 98 prest 205 rp 792 rows 17 habs savanna4,jungle4,savanna4,desert4,jungle4,desert4,arctic4,arctic4,mountain3,mountain2
+Y14 place 1 rating 9772 (top 8294) $2018178 idle 5.9wk inc/wk 276220 cost/wk 31083 spent/wk 211488 vis/wk 9663 rep 29887 r9 sp 48 best 32 rev 23-32 avg 28.5 ev 31 exp 13 births 5 awards exhibit/rarest/breeder/zoo | staff 7 avgAnimal 56 bestBaby 99 prest 209 rp 1181 rows 17 habs savanna4,jungle4,savanna4,desert4,jungle4,desert4,arctic4,arctic4,mountain3,mountain2
+Y15 place 1 rating 10657 (top 8541) $2347665 idle 5.8wk inc/wk 303684 cost/wk 31178 spent/wk 266467 vis/wk 10232 rep 33451 r10 sp 48 best 32 rev 26-32 avg 29.2 ev 31 exp 14 births 6 awards exhibit/rarest/breeder/zoo | staff 8 avgAnimal 58 bestBaby 99 prest 209 rp 1258 rows 17 habs savanna4,jungle4,savanna4,desert4,jungle4,desert4,arctic4,arctic4,mountain3,mountain2
+Y16 place 1 rating 11481 (top 8788) $2514428 idle 3.4wk inc/wk 325987 cost/wk 34712 spent/wk 199855 vis/wk 10419 rep 36582 r10 sp 58 best 33 rev 18-33 avg 28.6 ev 35 exp 11 births 9 awards exhibit/rarest/breeder/explorer/zoo | staff 8 avgAnimal 57 bestBaby 99 prest 209 rp 595 rows 17 habs savanna5,jungle4,savanna5,desert4,jungle4,desert4,arctic4,arctic4,mountain3,mountain2,ocean1
+Y17 place 1 rating 12514 (top 9035) $2670639 idle 4.3wk inc/wk 367630 cost/wk 36499 spent/wk 214204 vis/wk 11583 rep 39894 r10 sp 59 best 34 rev 20-34 avg 29.5 ev 31 exp 13 births 17 awards exhibit/rarest/breeder/explorer/zoo | staff 8 avgAnimal 62 bestBaby 99 prest 209 rp 438 rows 20 habs savanna5,jungle5,savanna5,desert4,jungle5,desert4,arctic4,arctic4,mountain3,mountain2,ocean1
+Y18 place 1 rating 13639 (top 9283) $3746386 idle 4wk inc/wk 411901 cost/wk 38830 spent/wk 267600 vis/wk 12970 rep 43425 r10 sp 60 best 34 rev 20-34 avg 28.7 ev 36 exp 11 births 11 awards exhibit/rarest/breeder/explorer/zoo | staff 8 avgAnimal 62 bestBaby 99 prest 209 rp 1383 rows 20 habs savanna5,jungle5,savanna5,desert5,jungle5,desert4,arctic4,arctic4,mountain3,mountain2,ocean1
+Y19 place 1 rating 14677 (top 9530) $5336889 idle 3.4wk inc/wk 462158 cost/wk 48753 spent/wk 267672 vis/wk 13692 rep 47355 r10 sp 62 best 35 rev 22-35 avg 29.5 ev 34 exp 12 births 10 awards exhibit/rarest/breeder/explorer/zoo | staff 8 avgAnimal 62 bestBaby 99 prest 209 rp 1235 rows 20 habs savanna5,jungle5,savanna5,desert5,jungle5,desert5,arctic4,arctic4,mountain3,mountain3,ocean1,paleo1
+Y20 place 1 rating 15955 (top 9777) $5148229 idle 5.4wk inc/wk 503075 cost/wk 55482 spent/wk 383392 vis/wk 15108 rep 51598 r10 sp 64 best 34 rev 22-34 avg 29.5 ev 37 exp 12 births 14 awards rarest/breeder/explorer/zoo | staff 8 avgAnimal 62 bestBaby 99 prest 209 rp 637 rows 20 habs savanna5,jungle5,savanna5,desert5,jungle5,desert5,arctic4,arctic4,mountain3,mountain3,ocean2,paleo1
+score {"total":293153,"parts":[["Zoo rating",79775],["Final ranking",22000],["Species recorded",38400],["Rare variants",16200],["Trophies",100000],["Combos found",800],["Best exhibit review",8750],["Bank balance",27228]]}
+regions savanna,jungle,desert,arctic,paleo,mountain,ocean,mythic | frag 4 | combos picnic,scoop | vips reporter,filmcrew,photog,professor,critic,mayor,royal | variants 18 | hall of fame 10
+happenings 134 (one per 7.2 weeks) {"sale":7,"school":6,"volunteers":10,"scholar":8,"stray":7,"cold":8,"storm":6,"coins":7,"tv":11,"mentor":9,"feature":8,"viral":7,"heat":8,"spring":11,"powercut":6,"escape":9,"donor":6}
+choices asked 1393 answered 1181 | seen {"campaign":600,"report:choice":1393,"choice:star":407,"report:caller":192,"report:review":499,"report:vip":7,"train":536,"choice:vet":66,"report:combo":2,"report:birth":193,"report:yearlyplan":40,"report:rankup":9,"report:yearly":40,"report:happening":134,"choice:diet":61,"crate":93,"report:expedition":196,"choice:river":39,"choice:tracks":46,"choice:watch":68,"choice:boost":383,"report:show":20,"report:showresult":20,"choice:guide":61,"report:yearend":20,"super":65,"choice:camp":50,"report:secret":2,"report:final":1}
+reputation by source {"species":3338,"campaign":10939,"visitors":8668,"reviews":8118,"vips":1265,"combo":20,"births":1564,"yearly":6260,"happenings":3696,"show":2040,"awards":5694}
+optional spending over the run $134,195,000 | saveKB with log 560 without 44
+
+== 2. Before and after, bot skill 0.8 (the main comparison) ==
+Bot skill 0.8, average of 16 full 20-year runs each. BEFORE = old game and old bot, AFTER = new rules and updated bot.
+idle = typical bank balance through the year, in weeks of income. reviews = lowest / average / best event score of the year.
+
+      |            BEFORE                                           |            AFTER
+year  |     money  idle  inc/wk  rank place   reviews      species |     money  idle  inc/wk  rank place   reviews      species
+   Y1 |   $22,466   4.2    2346   3.0  11.9   13/15/17            9 |   $19,296   2.9    2747   3.1  11.6   14/16/19           12
+   Y2 |   $47,793   3.5    8512   4.0  10.2   12/17/22           19 |   $54,626   2.9   11570   4.1  10.1   14/20/25           22
+   Y3 |   $93,219   4.1   17195   4.9   9.1   14/19/24           26 |   $84,518   2.9   24306   5.0   8.8   16/22/26           28
+   Y4 |  $193,076   4.8   29855   5.0   8.2   15/21/25           32 |  $173,411   3.2   37217   5.6   7.9   18/23/27           32
+   Y5 |  $347,257   6.2   45071   5.8   7.2   17/22/27           35 |  $231,946   3.6   56171   6.0   7.1   19/24/28           36
+   Y6 |  $682,298   8.1   62896   6.0   6.7   18/23/28           36 |  $318,122   4.1   73934   6.4   6.2   20/24/29           37
+   Y7 |$1,098,559  10.9   79817   6.1   5.9   19/24/28           38 |  $475,186   4.2  100378   7.0   5.4   20/26/30           38
+   Y8 |$1,103,509  12.4   98687   6.9   5.1   17/24/29           42 |  $523,055   4.6  123580   7.0   4.3   20/26/31           40
+   Y9 |$1,391,469  10.4  121022   7.0   4.3   18/24/29           46 |  $560,678   3.7  144714   7.8   3.6   19/26/31           44
+  Y10 |$1,412,350  11.2  135425   7.2   3.8   18/24/29           49 |  $586,180   3.7  174452   8.0   2.7   20/27/32           47
+  Y11 |$1,379,728  10.1  157670   7.9   3.2   19/25/30           51 |  $708,077   3.8  192768   8.1   2.0   21/27/32           48
+  Y12 |$1,677,816   8.3  184095   8.0   2.5   18/25/30           54 |  $972,835   4.1  217103   8.6   1.3   21/27/32           50
+  Y13 |$1,877,725   8.6  212168   8.1   1.6   18/25/30           58 |$1,223,698   3.8  261666   9.0   1.0   20/28/33           52
+  Y14 |$2,475,172   8.0  252171   8.5   1.2   18/26/31           60 |$1,600,561   3.9  298147   9.1   1.0   19/28/34           56
+  Y15 |$3,170,263   9.3  290496   8.9   1.1   20/26/32           61 |$1,939,955   4.1  333646   9.6   1.0   20/28/34           58
+  Y16 |$4,194,706  11.8  309470   9.1   1.0   19/26/32           62 |$2,391,868   4.1  388126  10.0   1.0   21/28/35           59
+  Y17 |$5,290,527  12.2  334940   9.3   1.0   19/26/32           63 |$2,680,248   4.1  428368  10.0   1.0   21/29/36           60
+  Y18 |$5,482,167  12.4  364623   9.9   1.0   19/26/32           63 |$3,467,486   4.3  452445  10.0   1.0   21/29/36           61
+  Y19 |$6,800,638  12.5  398930  10.0   1.0   19/27/33           64 |$4,464,378   4.2  477344  10.0   1.0   22/29/36           62
+  Y20 |$7,085,103  12.9  422692  10.0   1.0   19/27/33           65 |$5,677,325   4.7  518983  10.0   1.0   21/29/36           64
+
+final score: BEFORE 250,837   AFTER 294,512
+
+== 3. Before and after, bot skill 0.5 (selected years) ==
+Bot skill 0.5, average of 8 full 20-year runs each. BEFORE = old game and old bot, AFTER = new rules and updated bot.
+idle = typical bank balance through the year, in weeks of income. reviews = lowest / average / best event score of the year.
+
+      |            BEFORE                                           |            AFTER
+year  |     money  idle  inc/wk  rank place   reviews      species |     money  idle  inc/wk  rank place   reviews      species
+   Y1 |   $15,250   4.7    1944   3.0  12.0   14/15/16            9 |   $18,212   3.3    2598   3.0  11.9   15/16/18           10
+   Y2 |   $34,958   4.0    5651   4.0  10.8   13/16/20           16 |   $49,248   3.1   11901   4.0  10.1   13/18/23           21
+   Y3 |   $72,172   4.3   14521   4.5   9.5   12/18/23           24 |  $104,565   3.6   25620   5.0   8.9   17/21/26           27
+   Y4 |  $190,992   5.0   27387   5.0   8.5   16/20/24           29 |  $157,611   3.8   37565   5.3   8.0   17/22/26           33
+   Y5 |  $359,125   6.7   43134   5.6   7.6   17/22/26           35 |  $183,425   4.1   54451   6.0   7.1   20/23/28           36
+  Y10 |$1,444,837  12.6  133757   7.0   4.0   20/24/29           49 |  $675,590   5.9  159407   8.0   3.4   20/26/30           47
+  Y15 |$3,698,628  11.3  283853   8.8   1.3   20/26/31           62 |$1,910,053   4.5  311307   9.1   1.0   20/27/33           58
+  Y20 |$7,582,754  16.8  423277  10.0   1.0   20/26/32           64 |$4,357,512   5.0  509426  10.0   1.0   20/29/36           64
+final score: BEFORE 237,002   AFTER 271,563
+
+== 4. Before and after, bot skill 1.0 (selected years) ==
+Bot skill 1, average of 8 full 20-year runs each. BEFORE = old game and old bot, AFTER = new rules and updated bot.
+idle = typical bank balance through the year, in weeks of income. reviews = lowest / average / best event score of the year.
+
+      |            BEFORE                                           |            AFTER
+year  |     money  idle  inc/wk  rank place   reviews      species |     money  idle  inc/wk  rank place   reviews      species
+   Y1 |   $21,959   4.0    2126   3.0  12.0   13/15/18            9 |   $24,410   2.8    2756   3.3  11.8   15/17/20           12
+   Y2 |   $38,851   3.4    6858   4.0  10.5   13/17/20           18 |   $56,617   2.6   11371   4.4   9.9   14/20/25           22
+   Y3 |   $60,561   4.0   14049   4.8   9.3   14/19/24           24 |   $73,485   2.9   24883   5.0   8.8   17/22/27           28
+   Y4 |  $133,900   4.3   24493   5.0   8.4   16/21/25           29 |  $104,181   2.9   34959   5.4   7.8   17/24/28           32
+   Y5 |  $244,878   5.2   37179   5.6   7.5   16/21/25           35 |  $140,092   3.1   51185   6.0   7.3   19/24/28           35
+  Y10 |$1,606,806  13.0  135897   7.1   3.8   19/24/29           48 |  $576,572   3.7  161437   8.0   2.8   20/27/32           44
+  Y15 |$2,826,983   9.1  268780   9.0   1.1   18/26/31           62 |$1,479,558   3.7  289194   9.6   1.0   21/28/34           53
+  Y20 |$5,418,542  11.0  367512  10.0   1.0   18/26/31           64 |$4,909,789   4.4  509340  10.0   1.0   21/29/35           61
+final score: BEFORE 236,973   AFTER 284,657
+
+== 5. A player who ignores every new system (no campaigns, crates, festival extras, never answers a choice or happening), skill 0.8 ==
+AFTER column = new rules with BOT_OFF=campaign,crate,yearly,choices,happenings. Pace matches the old game; cash piles up as before.
+      |            BEFORE                                           |            AFTER
+year  |     money  idle  inc/wk  rank place   reviews      species |     money  idle  inc/wk  rank place   reviews      species
+   Y1 |   $19,950   4.2    2126   3.0  12.0   13/15/18            9 |   $20,604   3.7    2557   3.0  11.8   14/16/19           10
+   Y2 |   $45,084   3.6    7274   4.0  10.5   13/17/21           17 |   $52,988   3.5   10093   3.9  10.3   14/19/23           19
+   Y3 |   $76,086   4.3   15131   5.0   9.1   14/19/24           25 |  $112,768   4.2   20218   4.9   8.9   16/21/25           27
+   Y4 |  $179,106   4.5   27210   5.0   8.4   15/21/26           30 |  $268,477   5.6   31339   5.1   8.4   17/22/26           32
+   Y5 |  $271,874   6.2   38479   5.6   7.6   16/22/27           34 |  $358,573   6.3   44530   5.9   7.8   19/23/26           36
+  Y10 |$1,032,439  10.2  123039   7.1   3.9   19/24/29           48 |$1,319,307  10.6  128951   7.0   4.8   21/26/30           48
+  Y15 |$2,343,834   9.3  246399   8.8   1.4   18/26/31           61 |$2,128,919   8.3  249087   8.5   1.6   20/27/32           62
+  Y20 |$6,533,714  12.5  391723  10.0   1.0   19/27/32           64 |$5,920,661  13.3  380855   9.8   1.0   21/28/33           64
+final score: BEFORE 245,467   AFTER 239,525
+
+== 6. Headless checks (node test/rules-check.js) ==
+ok   new game: version 3, portrait grid, entrance at the front
+ok   land grows by rows from the front
+ok   stable habitat numbers and names
+ok   habStatus shape and readiness
+ok   event: star and boost choices arrive, resolve, and the review carries critic scores
+ok   ignored choices fall back to the safe default and nothing deadlocks
+ok   every project choice option resolves (14 option paths)
+ok   every happening works, with every option, and setbacks never undo progress (276 cases)
+ok   happenings: unanswered ones resolve themselves; about one every 6 to 8 weeks; mostly good (one per 7.0 weeks, 17% setbacks)
+ok   training: Super! is triple and about 1 in 8 (12.1%)
+ok   hiring by advert
+ok   mystery crate
+ok   campaigns and yearly spend ladders
+ok   births: housing tries other habitats before the pen, reveal data is complete (357 babies rehoused next door)
+ok   expedition reveal data
+ok   auto-housing in one step
+ok   rule lookups the interface used to copy
+ok   reports raised inside an action are in S.reports when it returns
+ok   save: serialize, deserialize, 50 more ticks (fresh game and several points of a played game) (9 saves from a played game)
+ok   bot: 20 years at skills 0.3, 0.6, 0.8 and 1.0 (0.3: 231921, 0.6: 258692, 0.8: 280795, 1: 286087)
+ok   short labels
+
+RULES CHECK: ALL PASSED

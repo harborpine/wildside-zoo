@@ -187,6 +187,8 @@
   D.FAST_ROLES = ['explorer', 'leader'];                                      // roles that bring an expedition home a week sooner
   D.SHOW_MEDALS = { gold: 1, silver: 0.85, bronze: 0.7 };                     // share of the gold bar needed for each medal
   D.UPGRADE_MULT = [0, 2, 5, 14, 40];                                         // habitat upgrade cost = build cost x this, by current level
+  D.VISITORS_PER_REP = 800;                                                   // weekly visitors that earn one point of reputation
+  D.REVIEW_REP_DIV = 46;                                                      // review reputation = total x total / this
   D.HOF_SCORE = 34;                                                           // review total that enters the Hall of Fame
   D.CRITICS = [{ key: 'animals', name: 'Animals' }, { key: 'habitat', name: 'Habitat' }, { key: 'fun', name: 'Fun' }, { key: 'learning', name: 'Learning' }];
   D.STAT_SCORE = { charm: 'fun', wit: 'learning', vigor: 'animals' };         // which review score a star animal's best stat lifts
@@ -199,17 +201,17 @@
     { key: 'agency', name: 'Agency',       k: 3.0, n: 3, q: 9,  star: 0.16, note: '3 skilled people', rank: 3 },
     { key: 'tv',     name: 'TV appeal',    k: 8.0, n: 4, q: 16, star: 0.30, note: '4 of the best', rank: 5 }
   ];
-  // Advertising campaigns. vis = extra visitors while it runs, rep = share of the current rank gap gained as reputation.
+  // Advertising campaigns (one of each kind can run at a time). vis = extra visitors while it runs, rep = share of the current rank gap gained as reputation.
   D.CAMPAIGNS = [
-    { key: 'flyers', name: 'Flyers',   k: 0.25, vis: 0.04, weeks: 4, rep: 0.006 },
-    { key: 'radio',  name: 'Radio ad', k: 0.7,  vis: 0.07, weeks: 5, rep: 0.012 },
-    { key: 'tv',     name: 'TV ad',    k: 1.5,  vis: 0.10, weeks: 6, rep: 0.022, rank: 3 },
-    { key: 'blimp',  name: 'Blimp',    k: 3.0,  vis: 0.14, weeks: 8, rep: 0.036, rank: 5 }
+    { key: 'flyers', name: 'Flyers',   k: 0.3,  vis: 0.02, weeks: 4, rep: 0.0011 },
+    { key: 'radio',  name: 'Radio ad', k: 0.8,  vis: 0.03, weeks: 5, rep: 0.0022 },
+    { key: 'tv',     name: 'TV ad',    k: 1.8,  vis: 0.05, weeks: 6, rep: 0.0038, rank: 3 },
+    { key: 'blimp',  name: 'Blimp',    k: 4.0,  vis: 0.07, weeks: 8, rep: 0.0068, rank: 5 }
   ];
   // Optional spend at the Open Day and the Summer Festival. mult = crowd multiplier, rep = share of the rank gap.
   D.YEARLY_SPEND = {
-    openday:  [{ key: 'none', name: 'Just open', k: 0, mult: 1, rep: 0 }, { key: 'band', name: 'Brass band', k: 0.5, mult: 1.4, rep: 0.012 }, { key: 'parade', name: 'Parade', k: 1.5, mult: 1.9, rep: 0.024 }, { key: 'gala', name: 'Fireworks', k: 4, mult: 2.6, rep: 0.04 }],
-    festival: [{ key: 'none', name: 'Stalls only', k: 0, mult: 1, rep: 0 }, { key: 'music', name: 'Live music', k: 0.5, mult: 1.4, rep: 0.012 }, { key: 'fair', name: 'Food fair', k: 1.5, mult: 1.9, rep: 0.024 }, { key: 'star', name: 'Headline act', k: 4, mult: 2.6, rep: 0.04 }]
+    openday:  [{ key: 'none', name: 'Just open', k: 0, mult: 1, rep: 0 }, { key: 'band', name: 'Brass band', k: 0.5, mult: 1.3, rep: 0.0045 }, { key: 'parade', name: 'Parade', k: 1.5, mult: 1.6, rep: 0.009 }, { key: 'gala', name: 'Fireworks', k: 4, mult: 2, rep: 0.015 }],
+    festival: [{ key: 'none', name: 'Stalls only', k: 0, mult: 1, rep: 0 }, { key: 'music', name: 'Live music', k: 0.5, mult: 1.3, rep: 0.0045 }, { key: 'fair', name: 'Food fair', k: 1.5, mult: 1.6, rep: 0.009 }, { key: 'star', name: 'Headline act', k: 4, mult: 2, rep: 0.015 }]
   };
   D.YEARLY_NAME = { openday: 'Spring Open Day', festival: 'Summer Festival', show: 'Winter Animal Show' };
   // Mystery crate at the trader: chance of each rarity (1 to 5), by zoo rank band (ranks 1-2, 3-4, 5-6, 7-8, 9-10).

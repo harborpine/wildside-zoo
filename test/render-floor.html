@@ -59,7 +59,7 @@ var STUB = /[?&]stub=1/.test(location.search);
   function placeFac(t, hab, nth) {
     var list = [];
     if (!hab) return null;
-    Z.cells(hab).forEach(function (k) { DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (Z.canPlace(S, 'fac', t, q, rr, 0) && !list.some(function (o) { return o.q === q && o.r === rr; })) { var p = ZGeo.toScreen(q, rr); list.push({ q: q, r: rr, d: Math.abs(p.x - ex.x) + Math.abs(p.y - ex.y) * 2 }); } }); });
+    Z.cells(hab).forEach(function (k) { DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (Z.canPlace(S, 'fac', t, q, rr, 0) && !(Math.abs(ZGeo.toScreen(q, rr).x - ex.x) < 60 && ex.y - ZGeo.toScreen(q, rr).y < 70) && !list.some(function (o) { return o.q === q && o.r === rr; })) { var p = ZGeo.toScreen(q, rr); list.push({ q: q, r: rr, d: Math.abs(p.x - ex.x) + Math.abs(p.y - ex.y) * 2 }); } }); });
     list.sort(function (a, b) { return a.d - b.d; });
     var pick = list[Math.min(nth || 0, list.length - 1)]; if (!pick) { log.push('no spot for ' + t); return null; }
     var res = Z.build(S, 'fac', t, pick.q, pick.r, 0); if (!res.ok) log.push(t + ': ' + res.msg);
@@ -67,6 +67,8 @@ var STUB = /[?&]stub=1/.test(location.search);
   }
   var sav = S.items.find(function (i) { return i.k === 'hab'; });
   var H = { savanna: sav };
+  // the starting snack stand may sit right beside the gate: for the showcase move it to another free hex touching the savanna
+  (function () { var sn = S.items.find(function (i) { return i.k === 'fac'; }); if (!sn || !ent || !sav || Math.abs(sn.q - ent.q) + Math.abs(sn.r - ent.r) > 2) return; var done = false; Z.cells(sav).forEach(function (k) { DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (!done && rr < ent.r - 1 && Z.canPlace(S, 'fac', sn.t, q, rr, 0, sn.id)) done = Z.move(S, sn.id, q, rr, 0).ok; }); }); })();
   H.jungle = placeHab('jungle', 75, -50);
   H.arctic = placeHab('arctic', -70, -150);
   H.desert = placeHab('desert', 120, -130);

@@ -71,15 +71,33 @@
     },
     icon: function (name) { return fb('i:' + name, () => mk(9, 9, 4, 9, x => { x.fillStyle = '#1d1a22'; x.fillRect(1, 0, 7, 9); x.fillRect(0, 1, 9, 7); x.fillStyle = hue(name, 85, 62); x.fillRect(1, 1, 7, 7); })); }
   };
+  // A half-finished sprites file hands back one shared placeholder for getters it has not drawn yet. Spot that by asking each
+  // getter for two different things: if both come back as the very same canvas, that getter is not ready, so use the built-in shapes.
+  const PROBE = { tile: [['grass', 0], ['path']], fence: [['savanna', 0], ['savanna', 2]], building: [[D.FAC_ORDER[0], {}], [D.FAC_ORDER[1], {}]], deco: [['tree', 0], ['flowers', 0]], icon: [['coin'], ['heart']], person: [['visitor', { seed: 1 }], ['trader', {}]], animal: [['zebra', {}], ['lion', {}]] };
+  let readyMap = null;
+  function ready(fn) {
+    const s = root.ZSprites; if (!s || typeof s[fn] !== 'function') return false;
+    if (!readyMap) readyMap = {};
+    if (readyMap[fn] == null) {
+      let okay = true;
+      try {
+        if (fn === 'entrance') { const e = s.entrance(), o = s.icon ? s.icon('coin') : null; okay = !!(e && e.c && e.c.width >= 20 && (!o || o.c !== e.c)); }
+        else { const p = PROBE[fn], x = s[fn](p[0][0], p[0][1]), y = s[fn](p[1][0], p[1][1]); okay = !!(x && y && x.c && y.c && x.c !== y.c); }
+      } catch (e) { okay = false; }
+      readyMap[fn] = okay;
+    }
+    return readyMap[fn];
+  }
   function spr(fn, a, b) {
     const s = root.ZSprites;
-    if (s && typeof s[fn] === 'function') {
+    if (ready(fn)) {
       try { const r = s[fn](a, b); if (r && r.c && r.c.width > 0) return r; }
       catch (e) { if (!stats.warned[fn]) stats.warned[fn] = String(e && e.message || e); }
     }
     return FB[fn](a, b);
   }
-  const usingReal = () => !!(root.ZSprites && typeof root.ZSprites.tile === 'function');
+  const usingReal = () => ready('tile') && ready('fence') && ready('building') && ready('person') && ready('animal');
+  const spriteState = () => { const o = {}; ['tile', 'fence', 'building', 'entrance', 'deco', 'icon', 'person', 'animal'].forEach(f => { o[f] = ready(f); }); return o; };
   const frames = name => { const s = root.ZSprites; const n = s && s[name]; return n > 0 ? n : 1; };
   const dimCache = new Map();
   function dimmed(s) {
@@ -260,7 +278,7 @@
       m.combos.push(outlineSprite(cs, COL[ci][0], COL[ci][1]));
     });
     M = m; mapDirty = false;
-    if (!cam.placed) { cam.placed = true; if (ent) { cam.x = ent.x - vw / 2; cam.y = ent.y - vh * 0.72; } }
+    if (!cam.placed) { cam.placed = true; if (ent) { cam.x = ent.x - vw / 2; cam.y = ent.y - vh * 0.8; } }
     clampCam();
     reseat(S); if (P) evalPlacement();
   }
@@ -269,8 +287,11 @@
   const CAP = 2; // animals drawn per hex
   function placeInCell(a, h, ci, snap) {
     const c = h.cells[ci]; let other = null; for (const id in animals) { const o = animals[id]; if (o !== a && o.hab === h.it.id && o.cell === ci) other = o; }
-    let ox = rnd(-10, 10); if (other) ox = other.ox > 0 ? rnd(-12, -5) : rnd(5, 12);
-    a.cell = ci; a.ox = ox; a.tx = c.x + ox; a.ty = c.y + rnd(-4, 6);
+    // two standing spots per hex (back-left and front-right) so a pair never stands on top of each other
+    const slot = other ? 1 - other.slot : (Math.random() < 0.5 ? 0 : 1), oy = Math.round(slot ? rnd(2, 6) : rnd(-6, -2));
+    // keep the whole body inside the hex: wide animals stand nearer the middle
+    const bw = a.sp ? spr('animal', a.sp, { juv: a.juv }).w : 16, lim = Math.max(1, hexHalf(oy) - 3 - bw / 2), ox = Math.round((slot ? 1 : -1) * rnd(Math.min(5, lim), Math.min(12, lim)));
+    a.cell = ci; a.slot = slot; a.ox = ox; a.tx = c.x + ox; a.ty = c.y + oy;
     if (snap) { a.x = a.tx; a.y = a.ty; }
   }
   function syncAnimals(S) {
@@ -280,7 +301,7 @@
       per[an.hab] = (per[an.hab] || 0) + 1; if (per[an.hab] > h.cells.length * CAP) return;
       seen[an.id] = 1; let a = animals[an.id]; const sig = h.it.q + ',' + h.it.r + ',' + (h.it.rot || 0);
       if (!a || a.hab !== an.hab || a.sig !== sig) {
-        a = animals[an.id] = { id: an.id, hab: an.hab, sig: sig, x: 0, y: 0, cell: null, wait: rnd(0, 4), t: rnd(0, 9), flip: Math.random() < 0.5, moving: false, speed: rnd(6, 9) };
+        a = animals[an.id] = { id: an.id, hab: an.hab, sig: sig, x: 0, y: 0, cell: null, wait: rnd(0, 4), t: rnd(0, 9), flip: Math.random() < 0.5, moving: false, speed: rnd(6, 9), sp: an.sp, juv: Z.isJuv ? !!Z.isJuv(S, an) : false };
         const cnt = h.cells.map(() => 0); for (const id in animals) { const o = animals[id]; if (o !== a && o.hab === an.hab && o.cell != null && cnt[o.cell] != null) cnt[o.cell]++; }
         let ci = 0; cnt.forEach((n, i) => { if (n < cnt[ci]) ci = i; }); placeInCell(a, h, ci, true);
       }
@@ -688,7 +709,7 @@
   R.entrance = () => (M && M.ent ? { q: M.ent.q, r: M.ent.r } : null);
   R.debug = function () {
     return { sprites: stats.sprites, fps: stats.fps, frameMs: stats.frameMs, cam: { x: cam.x, y: cam.y }, buffer: { w: Math.round(vw), h: Math.round(vh), scale: N / dpr, deviceScale: N, dpr: dpr },
-      running: running, zoom: zoom, realSprites: usingReal(), spriteErrors: Object.assign({}, stats.warned), animals: Object.keys(animals).length, visitors: walkers.filter(w => w.staff == null).length, staff: walkers.filter(w => w.staff != null && !w.hidden).length,
+      running: running, zoom: zoom, realSprites: usingReal(), spriteGetters: spriteState(), spriteErrors: Object.assign({}, stats.warned), animals: Object.keys(animals).length, visitors: walkers.filter(w => w.staff == null).length, staff: walkers.filter(w => w.staff != null && !w.hidden).length,
       gate: Object.keys(gatePeople).length, floaters: floaters.length, combos: M ? M.combos.length : 0, statics: M ? M.statics.length : 0, paths: M ? M.pathKeys.length : 0,
       placement: P ? { q: P.q, r: P.r, rot: P.rot, ok: P.ok, state: P.state, msg: P.msg, makes: P.makes, breaks: P.breaks } : null };
   };
