@@ -25,6 +25,14 @@
 10. Paths are not stored anywhere: the renderer lays them itself (shared trunks from the entrance to one side of every habitat and
     facility over free owned hexes), so they change when the map changes.
 
+11. **Camera start and scroll limits.** On `init` and `reset()` the camera aims at the owned land with the gate near the bottom of
+    the screen (about 85% down). Scrolling is clamped to the grid's sides and front, and at the back to about two rows of forest
+    past the last owned row, so the player cannot scroll far into nothing; the limit moves back when land is bought.
+12. **Combo outlines are drawn twice:** on the ground, and again faintly over the sprites so fences never hide which tiles belong together.
+13. **Nothing in render.js hard-codes hex proportions.** Standing spots, walker offsets, decoration scatter, outlines, tints and
+    bounds all derive from `ZGeo` (re-verified after the retune to W=48, RS=28, HH=20, SH=8). All ground, including the forest
+    outside the grid and the road to the gate, is drawn with whole `ZSprites.tile` hexes, so the Artist's honeycomb shows everywhere.
+
 ## Functions
 
 | Call | What it does |
@@ -83,7 +91,7 @@ rep, fun star, learning rp) and a flame when `fired`, `birth` -> two hearts, `ex
 ## Test files
 
 - `test/render-floor.html`: floor-only harness with a demo zoo built through real engine calls. `?stub=1` skips `sprites.js`,
-  `?rows=N` sets owned rows (default 16 so the screen is full of zoo; a real new game owns 8).
+  `?rows=N` sets owned rows (default 14, a mid-game zoo with open grass between things; a real new game owns 8), `?full=1` adds two more habitats.
 - `test/render-shot.js`: `node test/render-shot.js [chromium|webkit|both] [--stub]`. Headless. Writes `test/shots/render-floor.png`,
   `render-drag.png`, `render-fx.png`, `render-zoomout.png`, `render-place-valid.png`, `render-place-invalid.png`,
   `render-place-habitat.png`, `render-place-combo.png` (WebKit copies end in `-webkit.png`) and checks: buffer size and crisp

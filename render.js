@@ -183,7 +183,9 @@
       cells.push(cell); grid[cell.k] = cell;
       if (g) { x0 = Math.min(x0, p.x - HW); x1 = Math.max(x1, p.x + HW); y0 = Math.min(y0, p.y - HH); y1 = Math.max(y1, p.y + HH); }
     }
-    m.cells = grid; m.bounds = { x0: x0 - 10, x1: x1 + 10, y0: y0 - 44, y1: y1 + 34 };
+    // scrolling stops a little way into the unowned forest, so the player can never scroll far into nothing
+    let oy0 = 1e9; cells.forEach(c => { if (c.owned) oy0 = Math.min(oy0, c.y - HH); }); if (oy0 > 1e8) oy0 = y0;
+    m.cells = grid; m.bounds = { x0: x0 - 10, x1: x1 + 10, y0: Math.max(y0 - 44, oy0 - RS * 2 - 30), y1: y1 + 34 };
     (S.items || []).forEach(it => { m.items[it.id] = it; itemCells(it).forEach(c => { m.occ[key(c[0], c[1])] = it; }); });
     // entrance
     let ent = null;
@@ -254,7 +256,7 @@
     const builtAbove = c => [[1, -1], [0, -1]].some(d => m.occ[key(c.q + d[0], c.r + d[1])]) || (ent && Math.abs(c.x - ent.x) < W * 1.2 && c.y > ent.y - RS * 2.5);
     cells.forEach(c => {
       if (c.road || (m.occ[c.k] && c.owned)) return;
-      const h = hash(c.q, c.r, 11), ox = Math.round((hash(c.q, c.r, 12) - 0.5) * 18), oy = Math.round((hash(c.q, c.r, 13) - 0.5) * 10), seed = Math.floor(h * 9973);
+      const h = hash(c.q, c.r, 11), ox = Math.round((hash(c.q, c.r, 12) - 0.5) * 18), oy = Math.round((hash(c.q, c.r, 13) - 0.5) * HH * 0.6), seed = Math.floor(h * 9973);
       if (!c.owned) { // wild land: dim trees, thicker outside the map
         if (ent && Math.abs(c.x - ent.x) < W * 1.3 && c.y > ent.y) return;
         const dens = c.grid ? 0.42 : 0.6; if (h < dens) add(dimmed(spr('deco', h < dens * 0.75 ? 'tree' : 'bush', seed)), c.x + ox, c.y + oy, c.y + oy);
@@ -278,7 +280,7 @@
       m.combos.push(outlineSprite(cs, COL[ci][0], COL[ci][1]));
     });
     M = m; mapDirty = false;
-    if (!cam.placed) { cam.placed = true; if (ent) { cam.x = ent.x - vw / 2; cam.y = ent.y - vh * 0.8; } }
+    if (!cam.placed) { cam.placed = true; if (ent) { cam.x = ent.x - vw / 2; cam.y = ent.y - vh * 0.85; } }
     clampCam();
     reseat(S); if (P) evalPlacement();
   }
@@ -288,7 +290,7 @@
   function placeInCell(a, h, ci, snap) {
     const c = h.cells[ci]; let other = null; for (const id in animals) { const o = animals[id]; if (o !== a && o.hab === h.it.id && o.cell === ci) other = o; }
     // two standing spots per hex (back-left and front-right) so a pair never stands on top of each other
-    const slot = other ? 1 - other.slot : (Math.random() < 0.5 ? 0 : 1), oy = Math.round(slot ? rnd(2, 6) : rnd(-6, -2));
+    const slot = other ? 1 - other.slot : (Math.random() < 0.5 ? 0 : 1), oy = Math.round(slot ? rnd(HH * 0.12, HH * 0.4) : rnd(-HH * 0.4, -HH * 0.12));
     // keep the whole body inside the hex: wide animals stand nearer the middle
     const bw = a.sp ? spr('animal', a.sp, { juv: a.juv }).w : 16, lim = Math.max(1, hexHalf(oy) - 3 - bw / 2), ox = Math.round((slot ? 1 : -1) * rnd(Math.min(5, lim), Math.min(12, lim)));
     a.cell = ci; a.slot = slot; a.ox = ox; a.tx = c.x + ox; a.ty = c.y + oy;
@@ -320,7 +322,7 @@
       placeInCell(a, h, pick(cho), false);
     } else { a.x += dx / d * sp; a.y += dy / d * sp; if (Math.abs(dx) > 0.4) a.flip = dx < 0; a.moving = true; }
   }
-  function newWalker(kind, seed) { return { kind: kind, seed: seed, x: 0, y: 0, wp: [], wait: 0, t: rnd(0, 9), flip: false, moving: false, speed: rnd(11, 16), ox: Math.round(rnd(-7, 7)), oy: Math.round(rnd(-4, 4)), node: null, left: 0, last: null, dead: false, hidden: false, post: null, staff: null }; }
+  function newWalker(kind, seed) { return { kind: kind, seed: seed, x: 0, y: 0, wp: [], wait: 0, t: rnd(0, 9), flip: false, moving: false, speed: rnd(11, 16), ox: Math.round(rnd(-7, 7)), oy: Math.round(rnd(-HH * 0.25, HH * 0.25)), node: null, left: 0, last: null, dead: false, hidden: false, post: null, staff: null }; }
   function goTo(w, destKey, stand) { // queue hex-by-hex waypoints from the walker's node to destKey; optional stand = look-at spot
     const r = route(w.node, destKey); if (!r) return false;
     r.forEach(k => { const n = M.nodes[k]; w.wp.push({ x: n.x + w.ox, y: n.y + w.oy, k: k }); });

@@ -44,18 +44,18 @@ async function run(name) {
   notes.push('crisp check: ' + (crisp.tot - crisp.bad) + '/' + crisp.tot + ' sampled art pixels flat; image-rendering ' + crisp.style + '; canvas ' + crisp.w + 'x' + crisp.h);
 
   // --- tap hit-testing over the whole grid (centre each hex, tap it, also tap off-centre points inside it)
-  const grid = await page.evaluate(() => { const out = [], occ = ZE.occupancy(RT.S); for (let r = 0; r < ZD.GRID_H; r++) for (let c = 0; c < ZD.GRID_W; c++) { const a = ZE.fromOffset(c, r); out.push({ q: a[0], r: a[1], item: occ[a[0] + ',' + a[1]] || null }); } return out; });
-  let tapped = 0, wrong = 0; const OFF = [[0, 0], [-19, 0], [19, 2], [0, -12], [8, 11], [-14, -7]];
+  const grid = await page.evaluate(() => { const out = [], occ = ZE.occupancy(RT.S); for (let r = 0; r < ZD.GRID_H; r++) for (let c = 0; c < ZD.GRID_W; c++) { const a = ZE.fromOffset(c, r); out.push({ q: a[0], r: a[1], item: occ[a[0] + ',' + a[1]] || null, owned: ZE.inLand(RT.S, a[0], a[1]) }); } return out; });
+  let tapped = 0, wrong = 0, ownedTapped = 0; const ownedAll = grid.filter(g => g.owned).length; const OFF = [[0, 0], [-19, 0], [19, 2], [0, -12], [8, 11], [-14, -7]];
   for (let i = 0; i < grid.length; i += 1) {
-    const g = grid[i]; if (i % 3 === 0) await page.evaluate(([q, r]) => ZRender.centerOn(q, r, true), [g.q, g.r]);
+    const g = grid[i]; await page.evaluate(([q, r]) => ZRender.centerOn(q, r, true), [g.q, g.r]);
     const o = OFF[i % OFF.length], p = await posOf(g.q, g.r, o[0], o[1]); if (p.x < 2 || p.y < 2 || p.x > p.w - 2 || p.y > p.h - 2) continue;
     const n0 = await tapCount();
     if (i % 4 === 0) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y);
-    const t = await lastTap(), n1 = await tapCount(); tapped++;
+    const t = await lastTap(), n1 = await tapCount(); tapped++; if (g.owned) ownedTapped++;
     if (n1 !== n0 + 1 || !t || t.q !== g.q || t.r !== g.r || t.item !== g.item) { wrong++; if (wrong < 4) fails.push('tap on hex ' + g.q + ',' + g.r + ' offset ' + o + ' reported ' + JSON.stringify(t) + ' (expected item ' + g.item + ')'); }
   }
-  ok(tapped >= 150, 'only ' + tapped + ' hexes could be tapped'); ok(wrong === 0, wrong + ' of ' + tapped + ' taps reported the wrong hex');
-  notes.push('tap test: ' + (tapped - wrong) + '/' + tapped + ' taps reported the right hex and item (mouse and touch, centre and off-centre)');
+  ok(ownedTapped === ownedAll, 'only ' + ownedTapped + ' of ' + ownedAll + ' owned hexes could be tapped (unowned hexes far past the scroll limit are out of reach on purpose)'); ok(wrong === 0, wrong + ' of ' + tapped + ' taps reported the wrong hex');
+  notes.push('tap test: ' + (tapped - wrong) + '/' + tapped + ' taps reported the right hex and item, covering all ' + ownedAll + ' owned hexes (mouse and touch, centre and off-centre)');
   const helper = await page.evaluate(() => { let bad = 0; for (let r = 0; r < ZD.GRID_H; r++) for (let c = 0; c < ZD.GRID_W; c++) { const a = ZE.fromOffset(c, r), p = ZRender.hexToClient(a[0], a[1]), h = ZRender.clientToHex(p.x, p.y); if (h.q !== a[0] || h.r !== a[1]) bad++; } return bad; });
   ok(helper === 0, 'hexToClient/clientToHex round trip failed for ' + helper + ' hexes');
 

@@ -1040,7 +1040,13 @@
   };
   function drawTile(kind, seed) {
     var hab = kind.indexOf('hab:') === 0 ? kind.slice(4) : null, name = hab || kind, pal = GROUND[name] || GROUND.grass, x, y, v, i;
+    if (name === 'grass' || name === 'locked') { // neighbouring hexes get one of three close tones so the honeycomb shows
+      var tone = Math.floor(seed / GRASS_VARIANTS) % 3, tp = {}, tk; for (tk in pal) tp[tk] = pal[tk];
+      if (tone === 1) { tp.A = mix(pal.A, '#f4f08a', 0.1); tp.B = mix(pal.B, '#f4f08a', 0.1); tp.C = mix(pal.C, '#f4f08a', 0.1); } else if (tone === 2) { tp.A = mix(pal.A, '#2f7a4a', 0.1); tp.B = mix(pal.B, '#2f7a4a', 0.1); tp.C = mix(pal.C, '#2f7a4a', 0.1); }
+      pal = tp;
+    }
     var P = new Pt(pal, W, 2 * HH + LIP, HW, HH), r = rng(seed * 31 + name.length * 7 + 5);
+    P.key('Z', mix(pal.A, pal.D, 0.8)); P.key('H', mix(pal.A, '#ffffff', name === 'arctic' ? 0.9 : 0.3));
     function put(px, py, k, s) { if (inHex(px, py)) P.set(px, py, k, s == null ? 1 : s); }
     for (y = -HH; y < HH + LIP; y++) for (x = -HW; x < HW; x++) {
       if (inHex(x, y)) {
@@ -1052,8 +1058,9 @@
         else if (name === 'mountain') { k = v < 0.1 ? 'B' : v > 0.93 ? 'C' : 'A'; }
         else k = v < 0.09 ? 'B' : v > 0.92 ? 'C' : 'A';
         P.set(x, y, k, 1);
-        if (!inHex(x, y + 1)) P.set(x, y, name === 'path' ? 'D' : 'B', 1);       // lower edges a touch darker: the tiles read as a grid
-        else if (!inHex(x, y - 1)) P.set(x, y, 'C', 1);                            // upper edges a touch lighter
+        // every tile shows its hexagon: darker line on the lower and right edges, lighter on the upper and left ones
+        if (!inHex(x, y + 1) || !inHex(x + 1, y)) P.set(x, y, 'Z', 1);
+        else if (!inHex(x, y - 1) || !inHex(x - 1, y)) P.set(x, y, 'H', 1);
       } else { for (i = 1; i <= LIP; i++) if (inHex(x, y - i)) { P.set(x, y, 'L', i === 1 ? 1 : 2); break; } }
     }
     function tuft(tx, ty, k) { put(tx, ty, k); put(tx - 1, ty - 1, k); put(tx + 1, ty - 1, k); }
@@ -1085,7 +1092,7 @@
   function tile(kind, seed) {
     kind = String(kind || 'grass'); var name = kind.indexOf('hab:') === 0 ? kind.slice(4) : kind;
     if (!GROUND[name]) kind = 'grass';
-    var v = kind === 'grass' ? GRASS_VARIANTS * 2 : 4, sd = (((seed | 0) % v) + v) % v;
+    var v = (kind === 'grass' || kind === 'locked') ? GRASS_VARIANTS * 3 : 4, sd = (((seed | 0) % v) + v) % v;
     return cached('t|' + kind + '|' + sd, function () { return drawTile(kind, sd); });
   }
 

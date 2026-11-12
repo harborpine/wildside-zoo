@@ -30,7 +30,7 @@ var STUB = /[?&]stub=1/.test(location.search);
   S.money = 1e10; S.rp = 1e6;
   D.BIOME_ORDER.forEach(function (b) { S.regions[b] = true; });
   D.FAC_ORDER.forEach(function (f) { S.research['fac:' + f] = true; });
-  var m = /[?&]rows=(\d+)/.exec(location.search), rows = m ? +m[1] : 16;
+  var m = /[?&]rows=(\d+)/.exec(location.search), rows = m ? +m[1] : 14;
   if (S.rows != null) S.rows = Math.min(D.GRID_H, Math.max(S.rows, rows)); else if (S.cols != null) S.cols = D.GRID_W;
   var ent = Z.entrance ? Z.entrance(S) : null;
   var cells = [];
@@ -69,14 +69,14 @@ var STUB = /[?&]stub=1/.test(location.search);
   var H = { savanna: sav };
   // the starting snack stand may sit right beside the gate: for the showcase move it to another free hex touching the savanna
   (function () { var sn = S.items.find(function (i) { return i.k === 'fac'; }); if (!sn || !ent || !sav || Math.abs(sn.q - ent.q) + Math.abs(sn.r - ent.r) > 2) return; var done = false; Z.cells(sav).forEach(function (k) { DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (!done && rr < ent.r - 1 && Z.canPlace(S, 'fac', sn.t, q, rr, 0, sn.id)) done = Z.move(S, sn.id, q, rr, 0).ok; }); }); })();
-  H.jungle = placeHab('jungle', 75, -50);
-  H.arctic = placeHab('arctic', -70, -150);
-  H.desert = placeHab('desert', 120, -130);
-  H.mythic = placeHab('mythic', 40, -230);
-  H.ocean = placeHab('ocean', -120, -250);
-  H.mountain = placeHab('mountain', 180, -240);
-  placeFac('bench', H.savanna, 1); placeFac('icecream', H.arctic, 0); placeFac('gift', H.jungle, 0); placeFac('kiosk', H.jungle, 3);
-  placeFac('photo', H.desert, 1); placeFac('fountain', H.mythic, 0); placeFac('cafe', H.ocean, 1); placeFac('restroom', H.arctic, 4); placeFac('deck', H.mountain, 0);
+  var RSU = ZGeo.RS; // wished-for spots are in hex rows above the gate, so they follow the geometry
+  H.jungle = placeHab('jungle', 80, -3.2 * RSU);
+  H.arctic = placeHab('arctic', -85, -6.5 * RSU);
+  H.desert = placeHab('desert', 110, -8 * RSU);
+  H.mythic = placeHab('mythic', -10, -11.2 * RSU);
+  if (/[?&]full=1/.test(location.search)) { H.ocean = placeHab('ocean', -150, -11 * RSU); H.mountain = placeHab('mountain', 190, -11.5 * RSU); }
+  placeFac('bench', H.savanna, 1); placeFac('icecream', H.arctic, 0); placeFac('gift', H.jungle, 1);
+  placeFac('photo', H.desert, 1); placeFac('fountain', H.mythic, 0);
   // animals: copies of a starting animal with the species, home and age changed
   var proto = S.animals[0];
   function addAnimal(sp, hab, o) { if (!hab || !D.SPECIES[sp]) return; var a = JSON.parse(JSON.stringify(proto)); a.id = S.nextId++; a.sp = sp; a.hab = hab.id; a.name = sp; a.sex = S.animals.length % 2 ? 'F' : 'M'; a.born = null; a.variant = false; Object.assign(a, o || {}); S.animals.push(a); if (S.book && !S.book[sp]) S.book[sp] = { variant: false, bred: false, best: 0, at: 0 }; }

@@ -103,7 +103,7 @@ function extras() {
 
 // ----- composed scene at the real game scale: 195 px wide buffer shown at 2x on a 390 px page -----
 function scene(which) {
-  var BW = 195, BH = 262, K = 2, buf = document.createElement('canvas'); buf.width = BW; buf.height = BH;
+  var BW = 195, BH = 340, K = 2, buf = document.createElement('canvas'); buf.width = BW; buf.height = BH;
   var b = buf.getContext('2d'); b.imageSmoothingEnabled = false; b.fillStyle = '#2f6d8e'; b.fillRect(0, 0, BW, BH);
   var COLS = 6, ROWS = 17, cell = {}, items = [];
   function ax(c, r) { return [c - (r >> 1), r]; }
@@ -125,7 +125,7 @@ function scene(which) {
     setc(1, 9, 'fac', { f: 'snack' }); setc(3, 9, 'fac', { f: 'bench' }); setc(4, 7, 'fac', { f: 'icecream' }); setc(3, 13, 'fac', { f: 'gift' }); setc(1, 14, 'fac', { f: 'restroom' }); setc(1, 7, 'fac', { f: 'fountain' }); setc(4, 9, 'fac', { f: 'photo' });
     setc(3, 15, 'fac', { f: 'kiosk' });
   }
-  var ox = -G.W * 0.75, oy = -G.RS * 3.4;
+  var ox = -G.W * 0.75, oy = -G.RS * 4.6;
   function P(o) { var p = G.toScreen(o.q, o.r); return { x: p.x + ox, y: p.y + oy }; }
   var all = Object.keys(cell).map(function (k) { return cell[k]; }).sort(function (a, c2) { return a.r - c2.r || a.q - c2.q; });
   all.forEach(function (o) { var p = P(o), t = o.t === 'hab' ? 'hab:' + o.b : o.t === 'fac' ? 'grass' : o.t; var s = S.tile(t, o.q * 7 + o.r * 13); b.drawImage(s.c, Math.round(p.x - s.ax), Math.round(p.y - s.ay)); });
