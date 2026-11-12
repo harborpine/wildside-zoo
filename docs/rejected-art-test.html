@@ -1,0 +1,245 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Tilted hex pixel-art scout</title>
+<style>
+  html,body{margin:0;height:100%;background:#14202b;overflow:hidden;font:12px/1.2 system-ui,sans-serif;color:#fff}
+  #stage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+  #cv{display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+  #dom{position:absolute;inset:0;pointer-events:none}
+  .tag{position:absolute;transform:translate(-50%,-100%);background:#fff;color:#243;border:2px solid #243;border-radius:3px;padding:0 4px;font-weight:700;font-size:11px;white-space:nowrap}
+  #hud{position:absolute;left:6px;top:6px;background:#0008;padding:3px 6px;border-radius:3px}
+</style></head><body>
+<div id="stage"><canvas id="cv" width="640" height="360"></canvas><div id="dom"><div id="hud">hover a hex</div></div></div>
+<script>
+'use strict';
+// ---------- 1. projection: squashed pointy-top hexes on an integer pixel lattice ----------
+const BW = 640, BH = 360;            // internal buffer
+const GW = 18, GH = 10;
+const HW = 15, W = 2 * HW;           // column step 30 px (hex is 31 px wide incl. shared border)
+const RS = 15;                       // row step  (= 1.5 * R * ky, ky = 0.577)
+const RV = 10, HS = 5;               // vertical "radius" 10 px, half side 5 px  -> slanted edges are exact 3:1 pixel stairs
+const OX = 40, OY = 120;             // screen position of hex (0,0) centre
+const toCol = (q, r) => q + (r - (r & 1)) / 2, fromOffset = (c, r) => [c - (r - (r & 1)) / 2, r];
+const ctr = (q, r) => [OX + W * q + HW * r, OY + RS * r];                 // forward: axial -> screen (ground plane)
+function pick(x, y) {                                                      // inverse: screen -> axial (ground plane)
+  const rf = (y - OY) / RS, qf = (x - OX) / W - rf / 2;
+  let rx = Math.round(qf), rz = Math.round(rf), ry = Math.round(-qf - rf);
+  const dx = Math.abs(rx - qf), dz = Math.abs(rz - rf), dy = Math.abs(ry + qf + rf);
+  if (dx > dy && dx > dz) rx = -ry - rz; else if (dy <= dz) rz = -rx - ry;
+  return [rx, rz];
+}
+const inLand = (q, r) => { const c = toCol(q, r); return r >= 0 && r < GH && c >= 0 && c < GW; };
+const CORN = [[0, -RV], [HW, -HS], [HW, HS], [0, RV], [-HW, HS], [-HW, -HS]];
+const EDGES = [[[1, -1], 0, 1], [[1, 0], 1, 2], [[0, 1], 2, 3], [[-1, 1], 3, 4], [[-1, 0], 4, 5], [[0, -1], 5, 0]];
+const DIRS = EDGES.map(e => e[0]);
+const inHex = (dx, dy) => 3 * Math.abs(dy) <= 30 - Math.abs(dx) && Math.abs(dx) <= HW;
+const SHAPES = { mountain: [[0,0],[1,0],[2,0],[0,1],[1,1],[0,2]], arctic: [[0,0],[1,0],[2,0],[0,1],[1,1]], mythic: [[1,0],[-1,0],[0,1],[0,-1],[1,-1],[-1,1]] };
+
+// ---------- 2. sprites: arrays of strings, one char = one pixel = one palette role ----------
+function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; return [c, g]; }
+const T = {
+  quad: { w: 16, h: 12, frames: [[
+    '...........k.k..',
+    '..........kakak.',
+    '.kk.......kaaaak',
+    'kak.kkkkkkaaeaak',
+    'kakkasaasaaaaank',
+    '.kaaasaasaaaaak.',
+    '..kasaasaaackk..',
+    '..kaaaaaaacck...',
+    '..kabkkkkkabk...',
+    '..kabk...kabk...',
+    '..kabk...kabk...',
+    '..kkkk...kkkk...'], [
+    '................',
+    '...........k.k..',
+    '.kk.......kakak.',
+    'kak.kkkkkkaaaaak',
+    'kakkasaasaaaeaak',
+    '.kaaasaasaaaaank',
+    '..kasaasaaaaak..',
+    '..kaaaaaaacckk..',
+    '..kkabkkkabkk...',
+    '...kabk.kabk....',
+    '...kabk.kabk....',
+    '...kkkk.kkkk....']] },
+  bird: { w: 12, h: 12, frames: [[
+    '............',
+    '.....kkkk...',
+    '....kaaaak..',
+    '....kaaeaknn',
+    '....kaaaak..',
+    '.kkkkccak...',
+    'kabbbccak...',
+    'kaabbccak...',
+    '.kaaaack....',
+    '..kkkkk.....',
+    '...n..n.....',
+    '..nn.nn.....'], [
+    '.....kkkk...',
+    '....kaaaak..',
+    '....kaaeaknn',
+    '....kaaaak..',
+    '.kkkkccak...',
+    'kabbbccak...',
+    'kaabbccak...',
+    '.kaaaack....',
+    '..kkkkk.....',
+    '....nn......',
+    '....n.......',
+    '...nn.......']] },
+  person: { w: 8, h: 12, frames: [[
+    '..kkkk..',
+    '.khhhhk.',
+    '.khfffk.',
+    '.kfefek.',
+    '..kffk..',
+    '.kttttk.',
+    'kfttttfk',
+    'kfttttfk',
+    '.kppppk.',
+    '.kpkkpk.',
+    '.kpkkpk.',
+    '.kk..kk.'], [
+    '........',
+    '..kkkk..',
+    '.khhhhk.',
+    '.khfffk.',
+    '.kfefek.',
+    '..kffk..',
+    '.kttttk.',
+    'kfttttfk',
+    '.kttttk.',
+    '..kppk..',
+    '..kppk..',
+    '..kkkk..']] }
+};
+// palette = role char -> colour. Species = template + palette (+ optional scale). 's' is the pattern role: same as body for plain animals.
+const P = {
+  goat:    { k: '#3b2f2f', a: '#f1ead8', b: '#cfc4a8', c: '#ffffff', s: '#f1ead8', e: '#222', n: '#d98c8c' },
+  bear:    { k: '#2e1c12', a: '#8a5a33', b: '#6b4324', c: '#c79a66', s: '#8a5a33', e: '#111', n: '#111' },
+  tiger:   { k: '#3a1d08', a: '#f08a24', b: '#c96a12', c: '#fff3d6', s: '#2b1608', e: '#111', n: '#e7a0a0' },
+  polar:   { k: '#55657a', a: '#fbfdff', b: '#d5e2ee', c: '#ffffff', s: '#fbfdff', e: '#111', n: '#111' },
+  penguin: { k: '#10151c', a: '#27303d', b: '#10151c', c: '#ffffff', e: '#fff', n: '#f5a623' },
+  flamingo:{ k: '#7a2748', a: '#ff8fb0', b: '#f0608c', c: '#ffc2d4', e: '#111', n: '#3a2a2a' },
+  parrot:  { k: '#4a0f0f', a: '#e23b2e', b: '#2a6fdb', c: '#ffd23f', e: '#111', n: '#444' }
+};
+const SKIN = ['#f6c9a0', '#d9a273', '#9a6642'], HAIR = ['#3a2a1a', '#111', '#c9862b', '#8a8a8a'], SHIRT = ['#e2562f', '#2f7f9b', '#f2b632', '#7a58b5', '#3a9d5d', '#d6456b'], PANTS = ['#34405a', '#5a4634', '#2f2f2f'];
+const bakeCache = {};
+function bake(tname, pal, key) {                // -> { w, h, f:[canvas...], fl:[flipped canvas...] }, cached by key
+  if (bakeCache[key]) return bakeCache[key];
+  const t = T[tname], out = { w: t.w, h: t.h, f: [], fl: [] };
+  t.frames.forEach(rows => {
+    if (rows.length !== t.h || rows.some(r => r.length !== t.w)) console.error('bad sprite size', tname);
+    const [c, g] = mk(t.w, t.h), [c2, g2] = mk(t.w, t.h);
+    rows.forEach((row, y) => { for (let x = 0; x < t.w; x++) { const col = pal[row[x]]; if (!col) continue; g.fillStyle = col; g.fillRect(x, y, 1, 1); g2.fillStyle = col; g2.fillRect(t.w - 1 - x, y, 1, 1); } });
+    out.f.push(c); out.fl.push(c2);
+  });
+  return (bakeCache[key] = out);
+}
+const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); const ch = s => Math.max(0, Math.min(255, Math.round(((n >> s) & 255) * f))); return '#' + ((1 << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).slice(1); };
+function rnd(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+// ground tile: one baked 31x21 canvas per (colour, variant)
+const tileCache = {};
+function tile(col, v) {
+  const k = col + v; if (tileCache[k]) return tileCache[k];
+  const [c, g] = mk(31, 21), R = rnd(v * 977 + 13), hi = shade(col, 1.1), lo = shade(col, 0.9), line = shade(col, 0.8);
+  for (let y = -10; y <= 10; y++) for (let x = -15; x <= 15; x++) {
+    if (!inHex(x, y)) continue;
+    const edge = !inHex(x + 1, y) || !inHex(x - 1, y) || !inHex(x, y + 1) || !inHex(x, y - 1);
+    const n = R(); g.fillStyle = edge ? line : n < 0.06 ? hi : n < 0.12 ? lo : col; g.fillRect(x + 15, y + 10, 1, 1);
+  }
+  return (tileCache[k] = c);
+}
+// fence: one baked sprite per (edge index, colour); wall rises FH px above the ground edge
+const FH = 5, fenceCache = {};
+function fence(ei, col) {
+  const k = ei + col; if (fenceCache[k]) return fenceCache[k];
+  const a = CORN[EDGES[ei][1]], b = CORN[EDGES[ei][2]], [c, g] = mk(18, 12 + FH + 2), top = shade(col, 1.25), dark = shade(col, 0.6), back = ei === 0 || ei === 5;
+  const x0 = Math.min(a[0], b[0]), y0 = Math.min(a[1], b[1]) - FH - 1, px = (x, y, w, h, s) => { g.fillStyle = s; g.fillRect(x - x0 + 1, y - y0, w, h); };
+  if (a[0] === b[0]) { px(a[0], Math.min(a[1], b[1]) - FH, 1, Math.abs(a[1] - b[1]) + FH, dark); px(a[0], Math.min(a[1], b[1]) - FH, 1, 1, top); }
+  else { const n = Math.abs(b[0] - a[0]); for (let i = 0; i <= n; i++) { const x = a[0] + (b[0] - a[0]) * i / n, y = Math.round(a[1] + (b[1] - a[1]) * i / n); px(x, y - FH + 1, 1, FH, back ? shade(col, 0.8) : (i % 3 === 0 ? dark : col)); px(x, y - FH, 1, 1, top); } }
+  [a, b].forEach(p => { px(p[0], p[1] - FH - 1, 1, FH + 2, dark); px(p[0], p[1] - FH - 1, 1, 1, top); });   // corner posts
+  return (fenceCache[k] = { c: c, ox: x0 - 1, oy: y0, key: (a[1] + b[1]) / 2 });
+}
+// facility: procedural box + roof, 24x24, anchored bottom-centre
+function building(kind, wall, roof) {
+  const [c, g] = mk(24, 24), R = (x, y, w, h, s) => { g.fillStyle = s; g.fillRect(x, y, w, h); }, K = '#2a2230';
+  R(2, 11, 20, 12, K); R(3, 12, 18, 10, wall); R(17, 12, 4, 10, shade(wall, 0.8)); R(3, 12, 18, 1, shade(wall, 0.7));
+  R(10, 16, 4, 6, K); R(11, 17, 2, 5, '#6b4a2a'); R(5, 15, 3, 3, K); R(5, 15, 2, 2, '#bfe9ff'); R(16, 15, 3, 3, K); R(16, 15, 2, 2, '#bfe9ff');
+  if (kind === 'gable') for (let i = 0; i < 9; i++) { const l = Math.max(0, 7 - i), w = 24 - 2 * l; R(l, 3 + i, w, 1, K); R(l + 1, 3 + i, w - 2, 1, i === 0 ? K : i < 3 ? shade(roof, 1.2) : i > 6 ? shade(roof, 0.8) : roof); }
+  else if (kind === 'awning') { R(2, 5, 20, 4, K); R(3, 6, 18, 2, shade(wall, 1.15)); R(0, 8, 24, 5, K); for (let x = 1; x < 23; x++) R(x, 9, 1, 3, (x >> 1) % 2 ? '#fff' : roof); R(8, 2, 8, 4, K); R(9, 3, 6, 2, roof); }
+  else { R(1, 6, 22, 6, K); R(2, 7, 20, 4, roof); R(2, 7, 20, 1, shade(roof, 1.25)); R(5, 2, 4, 5, K); R(6, 3, 2, 4, '#9aa'); R(14, 4, 6, 3, K); R(15, 5, 4, 1, '#bfe9ff'); }
+  return c;
+}
+
+// ---------- world ----------
+const BIOME = { mountain: ['#b7a58a', '#8a6a4a'], arctic: ['#e6f2fb', '#7fb2d9'], mythic: ['#c9a6e8', '#f2c14e'] };   // [ground, fence]
+const GRASS = '#7cc35a', DIRT = '#8a5f3a';
+const habs = [{ t: 'mountain', q: 2, r: 2, name: 'Mountain' }, { t: 'arctic', q: 6, r: 6, name: 'Arctic' }, { t: 'mythic', q: 12, r: 1, name: 'Mythic' }];
+const facs = [{ q: 3, r: 1, kind: 'gable', wall: '#f3e2c0', roof: '#d6453a' }, { q: 2, r: 5, kind: 'awning', wall: '#f7f0e0', roof: '#e2562f' }, { q: 12, r: 1, kind: 'flat', wall: '#dfe6ee', roof: '#4a7fbf' }, { q: 10, r: 4, kind: 'gable', wall: '#e9d7f5', roof: '#3a9d5d' }];
+const occ = {};
+habs.forEach(h => { h.cells = SHAPES[h.t].map(o => [h.q + o[0], h.r + o[1]]); h.cells.forEach(c => { occ[c] = h; }); });
+facs.forEach(f => { occ[[f.q, f.r]] = f; f.img = building(f.kind, f.wall, f.roof); });
+
+// static layer: floor baked once (rebake only when the map changes)
+const [floorC, fg] = mk(BW, BH);
+function bakeFloor() {
+  fg.fillStyle = '#2b4a5e'; fg.fillRect(0, 0, BW, BH);
+  const all = []; for (let r = 0; r < GH; r++) for (let c = 0; c < GW; c++) all.push(fromOffset(c, r));
+  all.forEach(a => { const p = ctr(a[0], a[1]); fg.drawImage(tile(DIRT, 9), p[0] - 15, p[1] - 10 + 7); fg.drawImage(tile(shade(DIRT, 0.8), 9), p[0] - 15, p[1] - 10 + 4); });   // slab front face
+  all.forEach(a => { const p = ctr(a[0], a[1]), o = occ[a], col = o && o.cells ? BIOME[o.t][0] : GRASS; fg.drawImage(tile(col, (a[0] * 7 + a[1] * 13 & 3)), p[0] - 15, p[1] - 10); });
+}
+bakeFloor();
+// static drawables: fence edges and buildings, each with a depth key = ground y of its base
+const statics = [];
+habs.forEach(h => h.cells.forEach(c => { const p = ctr(c[0], c[1]); EDGES.forEach((e, ei) => { const o = occ[[c[0] + e[0][0], c[1] + e[0][1]]]; if (o === h) return; const f = fence(ei, BIOME[h.t][1]); statics.push({ y: p[1] + f.key, img: f.c, x: p[0] + f.ox, top: p[1] + f.oy }); }); }));
+facs.forEach(f => { const p = ctr(f.q, f.r); statics.push({ y: p[1] + 5, img: f.img, x: p[0] - 12, top: p[1] + 6 - 24 }); });
+
+// movers
+const STRESS = /stress/.test(location.search), R0 = rnd(42), movers = [];
+function animal(h, tname, pname, speed) { const c = h.cells[Math.floor(R0() * h.cells.length)], p = ctr(c[0], c[1]); movers.push({ kind: 'a', h: h, cell: c, x: p[0], y: p[1], tx: p[0], ty: p[1], spr: bake(tname, P[pname], tname + pname), sp: speed, ph: R0() * 2, flip: false, wait: R0() * 2 }); }
+function visitor() {
+  let c; do { c = fromOffset(Math.floor(R0() * GW), Math.floor(R0() * GH)); } while (occ[c]);
+  const pal = { k: '#2a2230', f: SKIN[Math.floor(R0() * 3)], h: HAIR[Math.floor(R0() * 4)], t: SHIRT[Math.floor(R0() * 6)], p: PANTS[Math.floor(R0() * 3)], e: '#222' }, p = ctr(c[0], c[1]);
+  movers.push({ kind: 'v', cell: c, x: p[0], y: p[1], tx: p[0], ty: p[1], spr: bake('person', pal, 'p' + pal.f + pal.h + pal.t + pal.p), sp: 14 + R0() * 8, ph: R0() * 2, flip: false, wait: 0 });
+}
+animal(habs[0], 'quad', 'goat', 7); animal(habs[0], 'quad', 'bear', 5); animal(habs[0], 'quad', 'tiger', 8);
+animal(habs[1], 'bird', 'penguin', 5); animal(habs[1], 'bird', 'penguin', 5); animal(habs[1], 'quad', 'polar', 5);
+animal(habs[2], 'bird', 'flamingo', 6); animal(habs[2], 'bird', 'parrot', 7);
+for (let i = 0; i < (STRESS ? 70 : 10); i++) visitor();
+if (STRESS) for (let i = 0; i < 72; i++) { const names = Object.keys(P), n = names[i % names.length]; animal(habs[i % 3], P[n].s ? 'quad' : 'bird', n, 6); }
+function retarget(m) {
+  const opts = DIRS.map(d => [m.cell[0] + d[0], m.cell[1] + d[1]]).filter(c => inLand(c[0], c[1]) && (m.kind === 'a' ? occ[c] === m.h : !occ[c]));
+  if (opts.length) m.cell = opts[Math.floor(R0() * opts.length)];
+  const p = ctr(m.cell[0], m.cell[1]), j = m.kind === 'a' ? 1 : 0.6; m.tx = p[0] + (R0() * 2 - 1) * 6 * j; m.ty = p[1] + (R0() * 2 - 1) * 3 * j; m.wait = m.kind === 'a' ? R0() * 2.5 : R0() * 0.4;
+}
+// ---------- 3. frame: blit static floor, depth-sort statics + movers by ground y, blit ----------
+const cv = document.getElementById('cv'), g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+let hover = null, last = performance.now(), tAnim = 0; const stats = { ms: 0, n: 0 }; window.__stats = stats; window.__api = { ctr: ctr, pick: pick, get hover() { return hover; } };
+function hexOutline(q, r, col) { const p = ctr(q, r); g.fillStyle = col; for (let x = -15; x <= 15; x++) for (let y = -10; y <= 10; y++) if (inHex(x, y) && (!inHex(x + 1, y) || !inHex(x - 1, y) || !inHex(x, y + 1) || !inHex(x, y - 1) || !inHex(x, y + 2) || !inHex(x, y - 2))) g.fillRect(p[0] + x, p[1] + y, 1, 1); }
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now; tAnim += dt; const t0 = performance.now();
+  movers.forEach(m => { if (m.wait > 0) { m.wait -= dt; m.moving = false; return; } const dx = m.tx - m.x, dy = m.ty - m.y, d = Math.hypot(dx, dy), s = m.sp * dt; if (d <= s) { m.x = m.tx; m.y = m.ty; retarget(m); } else { m.x += dx / d * s; m.y += dy / d * s * 0.7; m.moving = true; if (Math.abs(dx) > 0.5) m.flip = dx < 0; } });
+  g.drawImage(floorC, 0, 0);
+  if (hover && inLand(hover[0], hover[1])) hexOutline(hover[0], hover[1], '#fff36b');
+  const list = statics.concat(movers); list.sort((a, b) => a.y - b.y);
+  for (let i = 0; i < list.length; i++) { const o = list[i];
+    if (!o.spr) { g.drawImage(o.img, o.x, o.top); continue; }
+    const fr = o.moving ? Math.floor(tAnim * 8 + o.ph) & 1 : 0, x = Math.round(o.x), y = Math.round(o.y), s = o.spr;
+    g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(x - (s.w >> 1) + 2, y, s.w - 4, 2); g.fillRect(x - (s.w >> 1) + 3, y - 1, s.w - 6, 4);
+    g.drawImage((o.flip ? s.fl : s.f)[fr], x - (s.w >> 1), y - s.h + 2);
+  }
+  stats.ms += performance.now() - t0; stats.n++;
+  requestAnimationFrame(frame);
+}
+// ---------- 4. integer CSS scale + DOM overlay for text ----------
+const stage = document.getElementById('stage'), dom = document.getElementById('dom'), hud = document.getElementById('hud'); let SC = 1;
+habs.forEach(h => { const e = document.createElement('div'); e.className = 'tag'; e.textContent = h.name; h.tag = e; dom.appendChild(e); });
+function fit() { SC = Math.max(1, Math.floor(Math.min(innerWidth / BW, innerHeight / BH))); cv.style.width = BW * SC + 'px'; cv.style.height = BH * SC + 'px';
+  habs.forEach(h => { let x = 0, y = 1e9; h.cells.forEach(c => { const p = ctr(c[0], c[1]); x += p[0]; y = Math.min(y, p[1]); }); h.tag.style.left = (x / h.cells.length) * SC + 'px'; h.tag.style.top = (y - 26) * SC + 'px'; }); }
+addEventListener('resize', fit); fit();
+cv.addEventListener('mousemove', e => { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * BW / r.width, y = (e.clientY - r.top) * BH / r.height; hover = pick(x, y); hud.textContent = inLand(hover[0], hover[1]) ? 'hex q=' + hover[0] + ' r=' + hover[1] + (occ[hover] ? ' (' + (occ[hover].name || occ[hover].kind) + ')' : '') : 'off map'; });
+cv.addEventListener('mouseleave', () => { hover = null; });
+requestAnimationFrame(frame);
+</script></body></html>
