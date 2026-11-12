@@ -93,7 +93,7 @@ function buildings() {
 function extras() {
   var K = 4; size(1180, 700);
   var x = 60;
-  S.DECOS.forEach(function (d) { for (var s = 0; s < 4; s++) { put(S.deco(d, s), x, 150, K); x += 76; } label(d, x - 190, 172); });
+  S.DECOS.forEach(function (d) { for (var s = 0; s < 4; s++) { put(S.deco(d, s), x, 150, K); x += 52; } label(d, x - 130, 172); });
   var names = S.ICONS, K2 = 6;
   names.forEach(function (n, i) { var ix = 60 + (i % 10) * 114, iy = 290 + Math.floor(i / 10) * 130; put(S.icon(n), ix, iy, K2); put(S.icon(n), ix + 44, iy, 2); var s = S.icon(n); label(n + ' ' + s.w + 'x' + s.h, ix + 10, iy + 20, '#16301a', 12); });
   put(S.icon('nope'), 60, 640, K2); label('fallback', 60, 660, '#16301a', 12);
@@ -103,7 +103,7 @@ function extras() {
 
 // ----- composed scene at the real game scale: 195 px wide buffer shown at 2x on a 390 px page -----
 function scene(which) {
-  var BW = 195, BH = 330, K = 2, buf = document.createElement('canvas'); buf.width = BW; buf.height = BH;
+  var BW = 195, BH = 262, K = 2, buf = document.createElement('canvas'); buf.width = BW; buf.height = BH;
   var b = buf.getContext('2d'); b.imageSmoothingEnabled = false; b.fillStyle = '#2f6d8e'; b.fillRect(0, 0, BW, BH);
   var COLS = 6, ROWS = 17, cell = {}, items = [];
   function ax(c, r) { return [c - (r >> 1), r]; }
@@ -119,7 +119,7 @@ function scene(which) {
     setc(5, 9, 'fac', { f: 'cafe' }); setc(5, 10, 'fac', { f: 'playground' }); setc(5, 11, 'fac', { f: 'lab' }); setc(4, 12, 'fac', { f: 'deck' }); setc(0, 9, 'fac', { f: 'kiosk' }); setc(1, 15, 'fac', { f: 'photo' }); setc(3, 15, 'fac', { f: 'vet' });
     setc(0, 3, 'fac', { f: 'gate' }); setc(2, 2, 'fac', { f: 'pavilion' }); setc(4, 3, 'fac', { f: 'center' });
   } else {
-    H.push(['savanna', hab('savanna', 0, 11, D.SHAPES.savanna)]); H.push(['arctic', hab('arctic', 3, 4, [[0, 0], [1, 0], [0, 1], [1, 1], [-1, 1]])]);
+    H.push(['savanna', hab('savanna', 0, 11, D.SHAPES.savanna)]); H.push(['arctic', hab('arctic', 3, 4, [[0, 0], [1, 0], [0, 1], [1, 1], [2, 0]])]);
     H.push(['jungle', hab('jungle', 3, 11, D.SHAPES.jungle)]); H.push(['desert', hab('desert', 0, 5, [[0, 0], [1, 0], [0, 1]])]);
     [[2, 16], [2, 15], [2, 14], [2, 13], [2, 12], [2, 11], [2, 10], [2, 9], [0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [5, 8], [2, 7], [2, 6], [2, 5], [2, 4], [2, 3]].forEach(function (p) { setc(p[0], p[1], 'path'); });
     setc(1, 9, 'fac', { f: 'snack' }); setc(3, 9, 'fac', { f: 'bench' }); setc(4, 7, 'fac', { f: 'icecream' }); setc(3, 13, 'fac', { f: 'gift' }); setc(1, 14, 'fac', { f: 'restroom' }); setc(1, 7, 'fac', { f: 'fountain' }); setc(4, 9, 'fac', { f: 'photo' });

@@ -653,12 +653,14 @@
     list.sort((a, b) => a.key - b.key);
     for (let i = 0; i < list.length; i++) { const e = list[i], s = e.s; if (e.a !== 1) c.globalAlpha = e.a; c.drawImage(s.c, Math.round(e.x - s.ax) - cx, Math.round(e.y - s.ay) - cy); if (e.a !== 1) c.globalAlpha = 1; }
     stats.sprites = list.length;
+    // the same combo outlines again, faintly, over the sprites, so a fence never hides which tiles belong together
+    c.globalAlpha = 0.28; for (let i = 0; i < M.combos.length; i++) { const o = M.combos[i]; if (o.x - cx < bw && o.y - cy < bh && o.x + o.w > cx && o.y + o.h > cy) c.drawImage(o.f[running ? ph : 0].c, o.x - cx, o.y - cy); } c.globalAlpha = 1;
     // quiet on-floor icons and progress bars
     const bar = (x, y, p) => { c.fillStyle = '#1d1a22'; c.fillRect(x - 10 - cx, y - cy, 20, 4); c.fillStyle = '#4a4458'; c.fillRect(x - 9 - cx, y + 1 - cy, 18, 2); c.fillStyle = '#7be36a'; c.fillRect(x - 9 - cx, y + 1 - cy, Math.round(18 * clamp(p || 0, 0, 1)), 2); };
     for (const id in M.habs) {
       const h = M.habs[id], s = statuses[id]; if (!s) continue; if (h.top.x < L || h.top.x > Rr || h.top.y < T || h.top.y > B + 40) continue;
       const ic = []; if (s.choice) ic.push('choice'); if (s.sick) ic.push('sick'); if (s.event) ic.push('ready-event'); if (s.breed) ic.push('ready-breed'); if (s.busy && s.progress == null) ic.push('busy'); if (s.buzz) ic.push('flame');
-      const bx = h.top.x, by = h.top.y - HH - 9;
+      const bx = h.top.x, by = h.top.y - HH - 15;
       ic.forEach((n, i) => { const sp = spr('icon', n), bob = running ? Math.round(Math.sin(clock * (n === 'choice' ? 5 : 2.2) + h.top.x)) : 0; c.drawImage(sp.c, Math.round(bx + (i - (ic.length - 1) / 2) * 12 - sp.ax) - cx, by - 1 + bob - Math.round(sp.ay) - cy); });
       if (s.busy && s.progress != null) bar(bx, by + 1, s.progress);
     }
