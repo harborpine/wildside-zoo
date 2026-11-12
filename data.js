@@ -170,13 +170,74 @@
   D.RANK_REP = [0, 120, 400, 1000, 2200, 4500, 8500, 14000, 22000, 32000];
   D.RANK_NAME = ['', 'Backyard Zoo', 'Local Zoo', 'Town Zoo', 'City Zoo', 'Regional Zoo', 'State Zoo', 'National Zoo', 'Famous Zoo', 'World-class Zoo', 'Legendary Zoo'];
   D.STAFF_CAP = [0, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8];
-  D.LAND = [ // extra columns you can buy
-    { cols: 11, cost: 12000,   rank: 2 },
-    { cols: 14, cost: 60000,   rank: 4 },
-    { cols: 16, cost: 300000,  rank: 6 },
-    { cols: 18, cost: 1500000, rank: 8 }
+  // Portrait map: 10 columns by 20 rows. Row 19 is the front (bottom of the screen), where the entrance is.
+  // You start with the front START_ROWS rows and buy more rows toward the back.
+  D.GRID_W = 10; D.GRID_H = 20; D.START_ROWS = 8;
+  D.LAND = [ // total rows owned after each purchase
+    { rows: 10, cost: 8000,    rank: 2 },
+    { rows: 12, cost: 40000,   rank: 3 },
+    { rows: 14, cost: 160000,  rank: 5 },
+    { rows: 17, cost: 700000,  rank: 7 },
+    { rows: 20, cost: 2500000, rank: 8 }
   ];
-  D.GRID_W = 18; D.GRID_H = 10; D.START_COLS = 8;
+  // Rough weekly income of a zoo at each rank. Optional spending (campaigns, crates, festival extras) is priced from this
+  // so that money keeps mattering as the zoo grows.
+  D.SCALE = [0, 700, 1100, 1800, 5000, 16000, 42000, 75000, 125000, 240000, 340000];
+  D.REGION_RANK = { jungle: 2, desert: 3, arctic: 5, mountain: 6, ocean: 7 }; // zoo rank needed to research a region
+  D.FAST_ROLES = ['explorer', 'leader'];                                      // roles that bring an expedition home a week sooner
+  D.SHOW_MEDALS = { gold: 1, silver: 0.85, bronze: 0.7 };                     // share of the gold bar needed for each medal
+  D.UPGRADE_MULT = [0, 2, 5, 14, 40];                                         // habitat upgrade cost = build cost x this, by current level
+  D.HOF_SCORE = 34;                                                           // review total that enters the Hall of Fame
+  D.CRITICS = [{ key: 'animals', name: 'Animals' }, { key: 'habitat', name: 'Habitat' }, { key: 'fun', name: 'Fun' }, { key: 'learning', name: 'Learning' }];
+  D.STAT_SCORE = { charm: 'fun', wit: 'learning', vigor: 'animals' };         // which review score a star animal's best stat lifts
+  D.ANIMAL_STATS = { charm: 'Charm', vigor: 'Vigor', wit: 'Wit' };
+
+  // Hiring: pay for an advert, then see who turns up. k = cost as a share of D.SCALE, q = quality bonus, star = chance of a standout.
+  D.HIRE_TIERS = [
+    { key: 'board',  name: 'Notice board', k: 0.3, n: 2, q: -3, star: 0.03, note: '2 turn up' },
+    { key: 'paper',  name: 'Newspaper ad', k: 1.0, n: 3, q: 3,  star: 0.08, note: '3 turn up, better' },
+    { key: 'agency', name: 'Agency',       k: 3.0, n: 3, q: 9,  star: 0.16, note: '3 skilled people', rank: 3 },
+    { key: 'tv',     name: 'TV appeal',    k: 8.0, n: 4, q: 16, star: 0.30, note: '4 of the best', rank: 5 }
+  ];
+  // Advertising campaigns. vis = extra visitors while it runs, rep = share of the current rank gap gained as reputation.
+  D.CAMPAIGNS = [
+    { key: 'flyers', name: 'Flyers',   k: 0.25, vis: 0.04, weeks: 4, rep: 0.006 },
+    { key: 'radio',  name: 'Radio ad', k: 0.7,  vis: 0.07, weeks: 5, rep: 0.012 },
+    { key: 'tv',     name: 'TV ad',    k: 1.5,  vis: 0.10, weeks: 6, rep: 0.022, rank: 3 },
+    { key: 'blimp',  name: 'Blimp',    k: 3.0,  vis: 0.14, weeks: 8, rep: 0.036, rank: 5 }
+  ];
+  // Optional spend at the Open Day and the Summer Festival. mult = crowd multiplier, rep = share of the rank gap.
+  D.YEARLY_SPEND = {
+    openday:  [{ key: 'none', name: 'Just open', k: 0, mult: 1, rep: 0 }, { key: 'band', name: 'Brass band', k: 0.5, mult: 1.4, rep: 0.012 }, { key: 'parade', name: 'Parade', k: 1.5, mult: 1.9, rep: 0.024 }, { key: 'gala', name: 'Fireworks', k: 4, mult: 2.6, rep: 0.04 }],
+    festival: [{ key: 'none', name: 'Stalls only', k: 0, mult: 1, rep: 0 }, { key: 'music', name: 'Live music', k: 0.5, mult: 1.4, rep: 0.012 }, { key: 'fair', name: 'Food fair', k: 1.5, mult: 1.9, rep: 0.024 }, { key: 'star', name: 'Headline act', k: 4, mult: 2.6, rep: 0.04 }]
+  };
+  D.YEARLY_NAME = { openday: 'Spring Open Day', festival: 'Summer Festival', show: 'Winter Animal Show' };
+  // Mystery crate at the trader: chance of each rarity (1 to 5), by zoo rank band (ranks 1-2, 3-4, 5-6, 7-8, 9-10).
+  D.CRATE_ODDS = [[55, 33, 10, 2, 0], [45, 33, 16, 5, 1], [35, 32, 22, 9, 2], [25, 30, 27, 14, 4], [15, 27, 31, 20, 7]];
+  D.SUPER_CHANCE = 0.12; // training: chance of a "Super!" result worth triple
+  D.LUCKY_CHANCE = 0.08; // births: chance per stat of a lucky jump
+  // Happenings (random events). w = how often, bad = a mild setback, who = the person who walks up to the gate.
+  D.HAPPENINGS = {
+    school:     { title: 'School trip',        w: 10, who: 'teacher' },
+    donor:      { title: 'A gift',             w: 9,  who: 'donor' },
+    tv:         { title: 'TV spot',            w: 9,  who: 'reporter' },
+    viral:      { title: 'Viral photo',        w: 9,  who: 'photographer' },
+    heat:       { title: 'Heatwave',           w: 8 },
+    stray:      { title: 'Stray at the gate',  w: 9,  who: 'kid' },
+    scholar:    { title: 'Visiting scientist', w: 8,  who: 'professor' },
+    coins:      { title: 'Buried coins',       w: 7,  who: 'builder' },
+    volunteers: { title: 'Volunteer week',     w: 8,  who: 'volunteer' },
+    spring:     { title: 'Spring fever',       w: 7 },
+    mentor:     { title: 'Old hand',           w: 8,  who: 'elder' },
+    sale:       { title: "Builder's deal",     w: 8,  who: 'builder' },
+    feature:    { title: 'Magazine feature',   w: 8,  who: 'reporter' },
+    storm:      { title: 'Storm',              w: 8,  bad: true },
+    cold:       { title: 'A cold',             w: 8,  bad: true, who: 'vet' },
+    escape:     { title: 'Slipped out',        w: 7,  bad: true, who: 'keeper' },
+    powercut:   { title: 'Power cut',          w: 5,  bad: true }
+  };
+  // Person kinds used by happenings ('vet' and 'keeper' are also staff roles).
+  D.WHO = ['teacher', 'donor', 'reporter', 'photographer', 'kid', 'professor', 'builder', 'volunteer', 'elder', 'vet', 'keeper'];
   // Habitat footprints on the hex grid, as axial [q, r] offsets from the anchor. They can be rotated in 60 degree steps.
   D.SHAPES = {
     savanna:  [[0, 0], [1, 0], [0, 1]],

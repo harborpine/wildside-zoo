@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Wildside Zoo</title>
+<meta name="theme-color" content="#3b2a1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Wildside Zoo">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div id="strip">
+    <div class="srow"><span id="s-date" class="date">Y1 Jan w1</span><span id="s-stars" class="rank"></span></div>
+    <div class="srow"><span class="chipm"><i class="coin"></i><span id="s-money" class="v">$0</span></span><span class="chipm"><i class="guest"></i><span id="s-vis" class="v">0/wk</span></span></div>
+  </div>
+  <div id="stage">
+    <div id="floor-wrap">
+      <canvas id="floor"></canvas>
+      <div id="placement-note"></div>
+      <div id="placement-bar"></div>
+    </div>
+    <div id="news"></div>
+    <div id="screens"></div>
+    <div id="toasts"></div>
+  </div>
+</div>
+<script src="data.js"></script>
+<script src="engine.js"></script>
+<script src="geo.js"></script>
+<script src="sprites.js" onerror="this.remove()"></script>
+<script src="render.js" onerror="this.remove()"></script>
+<script src="core.js"></script>
+<script src="menus.js" onerror="this.remove()"></script>
+<script src="moments.js" onerror="this.remove()"></script>
+<script>
+/* After the other files have loaded: let them register against ZCore. */
+(function () {
+  function go() {
+    try { if (window.ZMoments && ZMoments.init) ZMoments.init(); } catch (e) { (window.ZT && ZT.errors).push('ZMoments.init: ' + e); }
+    try { if (window.ZMenus && ZMenus.init) ZMenus.init(); } catch (e) { (window.ZT && ZT.errors).push('ZMenus.init: ' + e); }
+    ZCore.flushReports();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
+  /* Test-only: index.html?demo=1 loads the sample screens used for screenshots. Safe to delete for the App Store build. */
+  if (/[?&]demo=1/.test(location.search)) { var s = document.createElement('script'); s.src = 'test/shell-demo.js'; document.body.appendChild(s); }
+})();
+</script>
+</body>
+</html>

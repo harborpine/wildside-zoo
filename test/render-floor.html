@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Wildside Zoo: floor harness</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #14131a; overflow: hidden; }
+  #col { position: relative; width: 100%; max-width: 390px; height: 100%; margin: 0 auto; overflow: hidden; }
+  #floor { display: block; width: 100%; height: 100%; }
+  #placement-bar { position: absolute; left: 0; right: 0; bottom: 0; }
+  #placement-note { position: absolute; left: 0; right: 0; bottom: 74px; }
+</style>
+</head>
+<body>
+<div id="col"><canvas id="floor"></canvas><div id="placement-note"></div><div id="placement-bar"></div></div>
+<script>
+/* Renderer test harness (floor only). ?stub=1 skips sprites.js so the built-in flat shapes are used. ?rows=N sets owned rows.
+   A seeded Math.random keeps screenshots repeatable. */
+(function () { let s = 12345; Math.random = function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
+window.RT = { errors: [], taps: [], placed: [], cancelled: 0, log: [] };
+window.addEventListener('error', function (e) { RT.errors.push((e.filename || '').split('/').pop() + ': ' + e.message); });
+var STUB = /[?&]stub=1/.test(location.search);
+['../data.js', '../engine.js', '../geo.js'].concat(STUB ? [] : ['../sprites.js']).concat(['../render.js']).forEach(function (src) { document.write('<script src="' + src + '"><\/script>'); });
+</script>
+<script>
+(function () {
+  var D = ZD, Z = ZE, log = RT.log;
+  var S = Z.newGame();
+  S.money = 1e10; S.rp = 1e6;
+  D.BIOME_ORDER.forEach(function (b) { S.regions[b] = true; });
+  D.FAC_ORDER.forEach(function (f) { S.research['fac:' + f] = true; });
+  var m = /[?&]rows=(\d+)/.exec(location.search), rows = m ? +m[1] : 16;
+  if (S.rows != null) S.rows = Math.min(D.GRID_H, Math.max(S.rows, rows)); else if (S.cols != null) S.cols = D.GRID_W;
+  var ent = Z.entrance ? Z.entrance(S) : null;
+  var cells = [];
+  for (var r = 0; r < D.GRID_H; r++) for (var c = 0; c < D.GRID_W; c++) { var a = Z.fromOffset(c, r); if (Z.inLand(S, a[0], a[1])) cells.push({ q: a[0], r: a[1], p: ZGeo.toScreen(a[0], a[1]) }); }
+  var ex = ent ? ZGeo.toScreen(ent.q, ent.r) : { x: 240, y: 380 };
+  var occ = function () { return Z.occupancy(S); };
+  var DIRS = ZGeo.EDGES.map(function (e) { return e[0]; });
+  // habitats: nearest valid spot to a wished-for point (relative to the entrance), keeping a one-hex walkway around each
+  function placeHab(t, dx, dy) {
+    var g = occ(), best = null;
+    cells.forEach(function (cell) {
+      for (var rot = 0; rot < 6; rot++) {
+        if (!Z.canPlace(S, 'hab', t, cell.q, cell.r, rot)) continue;
+        var cs = Z.cellsOf('hab', t, cell.q, cell.r, rot), clear = true, sx = 0, sy = 0;
+        cs.forEach(function (k) { var p = ZGeo.toScreen(k[0], k[1]); sx += p.x; sy += p.y; DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (g[q + ',' + rr] || (ent && q === ent.q && rr === ent.r)) clear = false; }); });
+        if (!clear) continue;
+        var d2 = Math.pow(sx / cs.length - (ex.x + dx), 2) + Math.pow((sy / cs.length - (ex.y + dy)) * 2, 2);
+        if (!best || d2 < best.d) best = { d: d2, q: cell.q, r: cell.r, rot: rot };
+      }
+    });
+    if (!best) { log.push('no spot for ' + t); return null; }
+    var res = Z.build(S, 'hab', t, best.q, best.r, best.rot); if (!res.ok) { log.push(t + ': ' + res.msg); return null; }
+    return S.items[S.items.length - 1];
+  }
+  // facilities: a free hex touching the given habitat, preferring the side nearest the entrance
+  function placeFac(t, hab, nth) {
+    var list = [];
+    if (!hab) return null;
+    Z.cells(hab).forEach(function (k) { DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (Z.canPlace(S, 'fac', t, q, rr, 0) && !list.some(function (o) { return o.q === q && o.r === rr; })) { var p = ZGeo.toScreen(q, rr); list.push({ q: q, r: rr, d: Math.abs(p.x - ex.x) + Math.abs(p.y - ex.y) * 2 }); } }); });
+    list.sort(function (a, b) { return a.d - b.d; });
+    var pick = list[Math.min(nth || 0, list.length - 1)]; if (!pick) { log.push('no spot for ' + t); return null; }
+    var res = Z.build(S, 'fac', t, pick.q, pick.r, 0); if (!res.ok) log.push(t + ': ' + res.msg);
+    return res.ok ? S.items[S.items.length - 1] : null;
+  }
+  var sav = S.items.find(function (i) { return i.k === 'hab'; });
+  var H = { savanna: sav };
+  H.jungle = placeHab('jungle', 75, -50);
+  H.arctic = placeHab('arctic', -70, -150);
+  H.desert = placeHab('desert', 120, -130);
+  H.mythic = placeHab('mythic', 40, -230);
+  H.ocean = placeHab('ocean', -120, -250);
+  H.mountain = placeHab('mountain', 180, -240);
+  placeFac('bench', H.savanna, 1); placeFac('icecream', H.arctic, 0); placeFac('gift', H.jungle, 0); placeFac('kiosk', H.jungle, 3);
+  placeFac('photo', H.desert, 1); placeFac('fountain', H.mythic, 0); placeFac('cafe', H.ocean, 1); placeFac('restroom', H.arctic, 4); placeFac('deck', H.mountain, 0);
+  // animals: copies of a starting animal with the species, home and age changed
+  var proto = S.animals[0];
+  function addAnimal(sp, hab, o) { if (!hab || !D.SPECIES[sp]) return; var a = JSON.parse(JSON.stringify(proto)); a.id = S.nextId++; a.sp = sp; a.hab = hab.id; a.name = sp; a.sex = S.animals.length % 2 ? 'F' : 'M'; a.born = null; a.variant = false; Object.assign(a, o || {}); S.animals.push(a); if (S.book && !S.book[sp]) S.book[sp] = { variant: false, bred: false, best: 0, at: 0 }; }
+  addAnimal('giraffe', H.savanna); addAnimal('lion', H.savanna); addAnimal('zebra', H.savanna, { born: 0 });
+  ['toucan', 'jaguar', 'gorilla', 'capybara', 'sloth'].forEach(function (s) { addAnimal(s, H.jungle); });
+  ['penguin', 'penguin', 'polarbear', 'seal', 'walrus', 'arcticfox'].forEach(function (s, i) { addAnimal(s, H.arctic, i === 1 ? { born: 0 } : null); });
+  ['kangaroo', 'camel', 'emu', 'koala', 'kangaroo'].forEach(function (s, i) { addAnimal(s, H.desert, i === 4 ? { born: 0 } : null); });
+  ['unicorn', 'dragon', 'griffin', 'phoenix', 'jackalope'].forEach(function (s) { addAnimal(s, H.mythic); });
+  ['dolphin', 'turtle', 'clownfish', 'octopus', 'reefshark', 'manta'].forEach(function (s) { addAnimal(s, H.ocean); });
+  ['panda', 'redpanda', 'goat', 'snowleopard', 'yak', 'eagle'].forEach(function (s, i) { addAnimal(s, H.mountain, i === 0 ? { variant: true } : null); });
+  try { Z.refresh(S); } catch (e) { log.push('refresh: ' + e.message); }
+  try { var lead = S.staff[0]; if (H.jungle && lead) { var er = Z.startEvent(S, H.jungle.id, 'feeding', lead.id); if (!er.ok) log.push('event: ' + er.msg); } } catch (e) { log.push('event: ' + e.message); }
+  S.week = Math.max(S.week, 1); S.visitorsLast = 1400; S.reports = []; S.fx = [];
+  RT.S = S; RT.H = H;
+  ZRender.init(document.getElementById('floor'), { getState: function () { return S; }, onTap: function (t) { RT.taps.push({ q: t.q, r: t.r, item: t.item ? t.item.id : null }); } });
+  RT.place = function (spec) {
+    return ZRender.startPlacement(spec, {
+      onPlace: function (q, r, rot) { RT.placed.push({ q: q, r: r, rot: rot }); if (spec.refuse) return { ok: false, msg: 'Not enough money.' }; return spec.real ? Z.build(S, spec.kind, spec.t, q, r, rot) : { ok: true }; },
+      onCancel: function () { RT.cancelled++; }
+    });
+  };
+  RT.ready = true;
+})();
+</script>
+</body>
+</html>
