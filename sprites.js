@@ -173,6 +173,7 @@
     var x0 = -Math.round(len / 2) - (p.shift || 0), x1 = x0 + len - 1, yb = -leg - 1, yt = yb - bh + 1;
     var hd = p.hd || [1, 0], hx = x1 + Math.round(hd[0] * (j ? 0.6 : 1)), hy = yt + Math.round(hd[1] * (j ? 0.55 : 1));
     var st = p.stride || (leg > 3 ? 2 : 1), sg = sgn(f), lk = p.legK || 'A', li = p.legIn == null ? 1 : p.legIn, fo = p.farOff == null ? 2 : p.farOff;
+    if (j) { st = 1; if (fo > 1) fo = 1; }
     var nbx = x0 + li, nfx = x1 - lw + 1 - li;
     var m = { x0: x0, x1: x1, yt: yt, yb: yb, hx: hx, hy: hy, hw: hw, hh: hh, len: len, bh: bh, leg: leg, lw: lw, j: j, f: f, sg: sg, nbx: nbx, nfx: nfx };
     m.earX = hx - Math.round(hw / 4); m.earTop = hy - Math.floor((hh - 1) / 2);
@@ -182,7 +183,7 @@
       if (p.foot) P.rect(x + dx, bot - (p.footH || 1) + 1, lw + (p.footW || 0), p.footH || 1, p.foot, s);
       if (p.legFx) p.legFx(P, x + dx, top, bot, far);
     }
-    if (!p.noFar) P.part(function () { legf(nbx + fo, sg * st, true); legf(nfx - fo, -sg * st, true); }, true);
+    if (!p.noFar && !(j && len < 9)) P.part(function () { legf(nbx + fo, sg * st, true); legf(nfx - fo, -sg * st, true); }, true);
     if (p.tail) P.part(function () { tailDraw(P, o, p.tail, x0, yt + (p.tailY == null ? 2 : p.tailY), f); }, true);
     if (p.back) p.back(P, m);
     P.part(function () {
@@ -340,8 +341,8 @@
       for (var y = hy + 4; y < tl - 1; y += 2) P.sh(tx - 1, y, 2);
     });
     if (p.tusk) P.part(function () { p.tusk(P, m, hx + r - 1, hy + (j ? 2 : 3)); });
-    P.part(function () { var e = p.earS || [4, 5]; P.ell(hx - r - 1 + (p.earX || 0), hy + (p.earY || 0), j ? e[0] * 0.75 : e[0], j ? e[1] * 0.75 : e[1], 'E'); });
-    P.set(hx + 1, hy - 2, 'K'); P.set(hx + 1, hy - 1, 'K');
+    P.part(function () { var e = p.earS || [4, 5]; P.ell(hx - r - 2 + (p.earX || 0), hy + (p.earY || 0), j ? e[0] * 0.75 : e[0], j ? e[1] * 0.75 : e[1], 'E'); });
+    P.set(hx + 1, hy - 2, 'K'); P.set(hx + 1, hy - 1, 'K'); P.set(hx + 2, hy - 2, 'K'); P.set(hx + 2, hy - 1, 'K'); P.set(hx + 2, hy - 2, 'W'); P.sh(hx, hy - 3, 2); P.sh(hx + 1, hy - 3, 2); P.sh(hx + 2, hy - 3, 2);
     return m;
   }
 
@@ -393,12 +394,16 @@
     P.rect(m.hx - 1, m.hy - 4, 1, 2, 'A', 1); P.set(m.hx - 1, m.hy - 5, 'T'); P.rect(m.hx + 1, m.hy - 4, 1, 2, 'A', 1); P.set(m.hx + 1, m.hy - 5, 'T');
     P.recolor('A', 'C', function (x, y) { if (y > -4 || (x > m.hx - 1 && y < m.hy + 3)) return false; var r = Math.floor((y + 90) / 3); return (y + 90) % 3 !== 2 && (x + 90 + (r & 1) * 2) % 4 !== 3; });
   });
-  def('hyena', { A: '#cdaa72', C: '#4b3b37' }, { A: '#f1e8d6', C: '#948a80' }, function (P, o) {
-    var m = quad(P, o, { len: 13, bh: 7, leg: 6, lw: 2, head: [8, 7], hd: [2, -2], nw: 5, snout: [4, 4, 1], snoutK: 'C', ear: ['round', 2, 'A', 'C'], tail: ['bush', 5, 'C', 3], tailY: 3, nose: 0,
-      back: function (P, m) { for (var x = m.x1 - 7; x <= m.x1; x++) P.rect(x, m.yt - 2 - (x & 1), 1, 3, 'C', 1); },
-      body: function (P, m) { P.ell(m.x1 - 3, m.yt + 1, 4, 2.5, 'A'); P.clr(m.x0, m.yt); P.clr(m.x0 + 1, m.yt); P.clr(m.x0, m.yt + 1); P.clr(m.x0 + 2, m.yt); } });
-    spots(P, 'A', 'C', m.x0, m.yt, m.x1 - 1, m.yb - 1, 0.2, 7);
-    P.recolor('A', 'C', function (x, y) { return y > -3; });
+  def('hyena', { A: '#cdaa72', C: '#4b3b37', B: '#e6cf9c' }, { A: '#f1e8d6', C: '#948a80', B: '#ffffff' }, function (P, o) {
+    var m = quad(P, o, { len: 13, bh: 7, leg: 6, lw: 2, head: [8, 7], hd: [3, -2], nw: 5, snout: [4, 4, 1], snoutK: 'C', ear: ['round', 2, 'A', 'C'], tail: ['bush', 5, 'C', 3], tailY: 4, nose: 0,
+      back: function (P, m) { for (var x = m.x1 - 8; x <= m.x1 - 2; x++) P.rect(x, m.yt - 2 - (x & 1), 1, 3, 'C', 1); },
+      body: function (P, m) { // high shoulders, low sloping rump
+        P.ell(m.x1 - 3, m.yt, 4.5, 3.5, 'A');
+        for (var i = 0; i < 6; i++) P.clr(m.x0 + i, m.yt); for (i = 0; i < 4; i++) P.clr(m.x0 + i, m.yt + 1); P.clr(m.x0, m.yt + 2); P.clr(m.x0 + 1, m.yt + 2);
+        P.recolor('A', 'B', function (x, y) { return y === m.yb && x > m.x0 + 2; });
+      } });
+    spots(P, 'A', 'C', m.x0, m.yt - 3, m.x1 - 1, m.yb - 1, 0.3, 7, 1);
+    P.recolor('AB', 'C', function (x, y) { return y > -3; });
   });
   def('meerkat', { A: '#d7b07a', B: '#f4e4be', C: '#5b4433' }, { A: '#c9ccd4', B: '#f1f3f5', C: '#666b78' }, function (P, o) {
     var m = sitter(P, o, { bw: 6, bh: 10, head: [7, 6], hx: 1, ho: 1, arm: [4, 1, 'A', 3], foot: [3, 1, 'C'], belly: [4, 7, 'B'], eye: [-1, 2, -1, 1],
@@ -411,8 +416,8 @@
       pre: function (P, m) { if (!j) P.part(function () { P.ell(m.hx - 1, m.hy + 1, 6.4, 6.4, 'M'); for (var a = 0; a < 16; a++) { var t = a / 16 * 6.283; P.set(m.hx - 1 + Math.cos(t) * 7.3, m.hy + 1 + Math.sin(t) * 7.1, 'M', 2); } }); } });
     if (j) spots(P, 'A', 'C', m.x0 + 1, m.yt + 1, m.x1 - 2, m.yb - 2, 0.14, 3);
   });
-  def('elephant', { A: '#9ea4b2', E: '#878da0', C: '#5d6170', T: '#fff6dc' }, { A: '#f2b8c4', E: '#e29aac', C: '#b56a80' }, function (P, o) {
-    trunked(P, o, { len: 15, bh: 11, leg: 5, head: [10, 10], hd: [0, 1], earS: [4, 5.5],
+  def('elephant', { A: '#a3a9b8', E: '#747a90', C: '#5d6170', T: '#fff6dc' }, { A: '#f2b8c4', E: '#e29aac', C: '#b56a80' }, function (P, o) {
+    trunked(P, o, { len: 15, bh: 11, leg: 5, head: [10, 10], hd: [0, 1], earS: [3.4, 5],
       tusk: function (P, m, x, y) { if (m.j) { P.set(x + 1, y + 1, 'T', 1); return; } P.path([[x, y], [x + 3, y + 2], [x + 5, y + 1]], 'T', 0, 1); P.path([[x, y + 1], [x + 3, y + 3]], 'T', 1, 1); } });
   });
   def('cheetah', { A: '#ecba50', B: '#fcf0d0', C: '#3b2b24' }, { A: '#e8ac40', B: '#fcf0d0', C: '#2a1c18' }, function (P, o) {
@@ -439,9 +444,9 @@
   }
 
   // ---------- rainforest ----------
-  def('capybara', { A: '#a9794c', C: '#6e4a2c' }, { A: '#eedcb4', C: '#c9ae80' }, function (P, o) {
-    var m = quad(P, o, { len: 14, bh: 9, leg: 3, lw: 3, head: [8, 8], hs: 'box', hr: 2, hd: [3, 0], snout: [3, 7, 0], ear: ['round', 1, 'C'], eye: [0, -2], nose: 2, stride: 1, br: 3 });
-    P.set(m.sx - 1, m.sy1 - 1, 'C', 2); P.set(m.sx, m.sy1 - 1, 'C', 2);
+  def('capybara', { A: '#b0763f', C: '#6e4a2c' }, { A: '#eedcb4', C: '#c9ae80' }, function (P, o) {
+    var m = quad(P, o, { len: 14, bh: 9, leg: 4, lw: 3, head: [8, 8], hs: 'box', hr: 2, hd: [3, 0], snout: [4, 7, 0], ear: ['round', 1, 'C'], eye: [0, -2], nose: 2, stride: 1, br: 3 });
+    P.set(m.sx - 1, m.sy1 - 1, 'C', 2); P.set(m.sx, m.sy1 - 1, 'C', 2); P.set(m.sx - 2, m.sy1 - 1, 'C', 2);
   });
   def('macaw', { A: '#e23a34', C: '#f4c430', D: '#2f6fd8', Y: '#f3ecda', L: '#55505c' }, { A: '#2f74dc', C: '#f4c430', D: '#1d3f9a' }, function (P, o) {
     bird(P, o, { bw: 8, bh: 10, leg: 2, head: [7, 7], hd: [1, -3], beak: [3, 5, 'Y', 1, 1], wing: [5, 7, -1, 1, 'C'], tail: [8, 3, 7, 'D'],
@@ -456,15 +461,26 @@
       beakFx: function (P, m) { P.recolor('Y', 'R', function (x) { return x >= m.bx + m.bl - 1; }); P.recolor('Y', 'K', function (x) { return x === m.bx; }); } });
     P.set(m.ex - 1, m.ey, 'E'); P.set(m.ex, m.ey - 1, 'E'); P.set(m.ex + 1, m.ey, 'E');
   });
-  def('spidermonkey', { A: '#3f3947', F: '#dcb490' }, { A: '#f1ece0', F: '#e8b9a0' }, function (P, o) {
-    sitter(P, o, { bw: 7, bh: 8, head: [8, 7], ho: 2, arm: [7, 2, 'A', 1, 'F'], foot: [3, 2, 'F'], bob: 1,
-      back: function (P, m) { var u = m.sg; P.path([[m.bx + 1, -2], [m.bx - 3, -3], [m.bx - 5, -7], [m.bx - 5, -12 + u], [m.bx - 3, -14 + u], [m.bx - 2, -12 + u]], 'A', 2, 1); },
+  def('spidermonkey', { A: '#453e4e', F: '#e0b892' }, { A: '#f1ece0', F: '#e8b9a0' }, function (P, o) {
+    var m = sitter(P, o, { bw: 5, bh: 8, head: [8, 7], ho: 2, foot: [3, 2, 'F'], bob: 1,
+      back: function (P, m) { var u = m.sg; P.path([[m.bx + 1, -2], [m.bx - 3, -3], [m.bx - 5, -7], [m.bx - 5, -13 + u], [m.bx - 3, -16 + u], [m.bx - 1, -15 + u], [m.bx - 2, -13 + u]], 'A', 2, 2); },
       face: function (P, m) { P.recolor('A', 'F', function (x, y) { return Math.abs(x - m.hx - 0.5) <= 2 && y >= m.hy - 1 && y <= m.hy + 2; }); } });
+    var u = m.sg, k = o.juv ? 0.7 : 1, rx = m.bx + m.bw - 1;
+    P.part(function () { // one long arm down to the ground, the other reaching up
+      P.path([[m.bx, m.top + 2], [m.bx - 3 * k, m.top + 5], [m.bx - 4 * k, -2 - (u > 0 ? 1 : 0)]], 'A', 1, 2); P.rect(Math.round(m.bx - 4 * k) - 1, -2 - (u > 0 ? 1 : 0), 2, 2, 'F', 1);
+      P.path([[rx, m.top + 2], [rx + 3 * k, m.top], [rx + 4 * k, m.top - 5 * k + (u < 0 ? 1 : 0)]], 'A', 1, 2); P.rect(Math.round(rx + 4 * k), Math.round(m.top - 5 * k + (u < 0 ? 1 : 0)) - 1, 2, 2, 'F', 1);
+    });
   });
-  def('sloth', { A: '#a39072', F: '#f2e6c8', C: '#5a4636', T: '#ece4d0' }, { A: '#e8c860', F: '#fff4cc', C: '#9a7424' }, function (P, o) {
-    var m = sitter(P, o, { bw: 9, bh: 8, head: [9, 7], ho: 2, hx: 0, arm: [8, 3, 'A', 0, 'T'], foot: [3, 2, 'A'], eye: [-2, 2, 0, 1], br: 3,
+  def('sloth', { A: '#9c9070', F: '#f4e8c8', C: '#4e3d30', T: '#f0e8d4' }, { A: '#e8c860', F: '#fff4cc', C: '#9a7424' }, function (P, o) {
+    var m = sitter(P, o, { bw: 10, bh: 9, head: [10, 7], ho: 2, hx: 0, arm: [10, 3, 'A', -1], foot: [3, 2, 'A'], eye: [-2, 2, 0, 1], br: 3,
+      body: function (P, m) { P.recolor('A', 'A', function (x, y) { return ((x + 40) % 3 === 0) && y > m.top + 2 && (y & 1) === 0; }, 2); },
       face: function (P, m) { P.recolor('A', 'F', function (x, y) { return Math.abs(x - m.hx) <= 3 && y >= m.hy - 1 && y <= m.hy + 2; }); } });
-    P.set(m.e0 - 1, m.ey + 1, 'C'); P.set(m.e1 + 1, m.ey + 1, 'C'); P.set(m.e0 - 1, m.ey, 'C'); P.set(m.e1 + 1, m.ey, 'C'); P.set(m.hx, m.hy + 1, 'N'); P.set(m.hx - 1, m.hy + 2, 'C'); P.set(m.hx + 1, m.hy + 2, 'C');
+    // dark eye stripes sloping down and out, small nose, sleepy smile
+    P.set(m.e0 - 1, m.ey, 'C'); P.set(m.e0 - 2, m.ey + 1, 'C'); P.set(m.e0 - 1, m.ey + 1, 'C'); P.set(m.e1 + 1, m.ey, 'C'); P.set(m.e1 + 2, m.ey + 1, 'C'); P.set(m.e1 + 1, m.ey + 1, 'C');
+    P.set(m.hx, m.hy + 1, 'N'); P.set(m.hx - 1, m.hy + 2, 'C'); P.set(m.hx, m.hy + 2, 'C'); P.set(m.hx + 1, m.hy + 2, 'C');
+    // three long pale claws on each hand
+    var ax0 = m.bx - 2, ax1 = m.bx + m.bw - 1, yy;
+    for (yy = -2; yy <= -1; yy++) { P.set(ax0, yy, 'T'); P.set(ax0 + 2, yy, 'T'); P.set(ax1, yy, 'T'); P.set(ax1 + 2, yy, 'T'); }
   });
   def('tapir', { A: '#5e4b44', S: '#5e4b44', C: '#3c2e2a' }, { S: '#f3f0e8' }, function (P, o) {
     var m = quad(P, o, { len: 15, bh: 9, leg: 5, lw: 3, head: [8, 7], hd: [3, 1], snout: [4, 4, 1], ear: ['round', 1, 'A'], tail: ['stub', 2], nose: 0, br: 3,
@@ -512,8 +528,9 @@
       pre: function (P, m) { P.rr(m.hx, m.hy - 7, 2, 5, 'A', 2, 0); },
       post: function (P, m) { P.part(function () { P.rr(m.hx - 2, m.hy - 7, 2, 5, 'A', null, 0); P.rect(m.hx - 1, m.hy - 5, 1, 2, 'P', 1); }); if (!m.j && o.fr === 0) { P.set(2, m.cy + 2, 'C', 1); P.set(3, m.cy + 2, 'C', 1); } } });
   });
-  def('wombat', { A: '#8d7b6d', C: '#5e4f46' }, { A: '#e8c66c', C: '#b08a3a' }, function (P, o) {
-    quad(P, o, { len: 14, bh: 10, leg: 2, lw: 3, head: [9, 8], hs: 'box', hr: 3, hd: [1, 2], snout: [2, 4, 2], ear: ['round', 1, 'C'], bs: 'ell', nose: 2, stride: 1, legK: 'C', legIn: 2 });
+  def('wombat', { A: '#86808e', C: '#55505e', B: '#a39eac' }, { A: '#e8c66c', C: '#b08a3a', B: '#f4dc98' }, function (P, o) {
+    var m = quad(P, o, { len: 13, bh: 10, leg: 2, lw: 3, head: [9, 9], hd: [0, 2], snout: [2, 5, 2], ear: ['round', 1, 'C'], bs: 'ell', nose: 0, stride: 1, legK: 'C', legIn: 2, eye: [1, -2, 1] });
+    P.rect(m.sx - 1, m.sy0 + 1, 2, 2, 'N', 1); P.recolor('A', 'B', function (x, y) { return y <= m.yt + 1 && x < m.hx - 3; });
   });
   def('camel', { A: '#d8ac6c', C: '#a87a44' }, { A: '#f4efe2', C: '#d6cdb8' }, function (P, o) {
     var m = quad(P, o, { len: 14, bh: 7, leg: 8, lw: 2, head: [6, 5], hd: [4, -6], snout: [4, 4, 1], ear: ['round', 1], tail: ['thin', 4, 'C'], foot: 'C', nose: 0,
@@ -554,7 +571,7 @@
     P.set(m.hx + 4, m.hy, 'K');
   });
 
-  function antler(P, x, y, s, k) { P.path([[x, y], [x - 1, y - 3], [x - 1, y - 8]], k || 'T', s, 1); P.path([[x - 1, y - 3], [x + 2, y - 5]], k || 'T', s, 1); P.path([[x - 1, y - 6], [x + 2, y - 8]], k || 'T', s, 1); P.set(x - 2, y - 8, k || 'T', s); }
+  function antler(P, x, y, s, k) { k = k || 'T'; P.path([[x, y], [x - 1, y - 4], [x - 3, y - 8], [x - 3, y - 10]], k, s, 1); P.path([[x - 1, y - 3], [x + 2, y - 6], [x + 2, y - 7]], k, s, 1); P.path([[x - 2, y - 6], [x, y - 9], [x, y - 10]], k, s, 1); P.set(x - 4, y - 9, k, s); }
   function hareBody(P, o, horns) {
     var m = quad(P, o, { len: 9, bh: 7, leg: 2, lw: 3, head: [7, 6], hd: [1, -2], snout: [2, 3, 1], ear: ['long', 6, 'A', 'C'], tail: ['stub', 3, 'W'], bs: 'ell', stride: 1, noFar: 1, legIn: 0, tailY: 4,
       body: function (P, m) { P.ell(m.x0 + 3, m.yb - 2, 3.4, 3.4, 'A'); },
@@ -565,9 +582,9 @@
 
   // ---------- polar ----------
   def('hare', { A: '#f5f3ef', C: '#2d2733' }, { A: '#a4b8d4', C: '#3a4660' }, function (P, o) { hareBody(P, o, false); });
-  def('reindeer', { A: '#8b6b54', B: '#ece4d6', T: '#b08c60', C: '#4e3a2e' }, { A: '#f6f3ec', B: '#ffffff', T: '#e8d8b0', C: '#b8ae9c' }, function (P, o) {
+  def('reindeer', { A: '#8b6b54', B: '#ece4d6', T: '#9a744c', C: '#4e3a2e' }, { A: '#f6f3ec', B: '#ffffff', T: '#c8a878', C: '#b8ae9c' }, function (P, o) {
     var j = o.juv, m = quad(P, o, { len: 14, bh: 8, leg: 7, lw: 2, head: [7, 6], hd: [3, -3], nw: 5, neckK: 'B', snout: [4, 4, 1], ear: ['point', 1], tail: ['stub', 2, 'B'], foot: 'C',
-      pre: function (P, m) { if (!j) antler(P, m.hx + 3, m.hy - 2, 2); } });
+      pre: function (P, m) { if (!j) P.path([[m.hx + 3, m.hy - 2], [m.hx + 3, m.hy - 6], [m.hx + 5, m.hy - 10]], 'T', 2, 1); } });
     P.part(function () { if (j) P.rect(m.hx, m.hy - 4, 1, 2, 'T', 1); else antler(P, m.hx, m.hy - 2, 1); });
     P.recolor('A', 'B', function (x, y) { return y === m.yb && x > m.x0 + 1 && x < m.x1 - 1; });
   });
@@ -577,8 +594,9 @@
     P.rect(m.hx - 3, m.hy - 1, 2, 2, 'Y', 1); P.set(m.hx - 2, m.hy, 'K'); P.rect(m.hx + 2, m.hy - 1, 2, 2, 'Y', 1); P.set(m.hx + 2, m.hy, 'K'); P.set(m.hx, m.hy + 1, 'N'); P.set(m.hx, m.hy + 2, 'N');
     P.set(m.hx - 2, m.hy - 3, 'C'); P.set(m.hx + 1, m.hy - 3, 'C');
   });
-  def('arcticfox', { A: '#f7f6f3', C: '#c9d2e0' }, { A: '#8390a8', C: '#5a6680' }, function (P, o) {
-    quad(P, o, { len: 11, bh: 6, leg: 3, lw: 2, head: [8, 7], hd: [1, -1], snout: [3, 3, 2], ear: ['point', 2, 'A', 'C'], tail: ['bush', 8, 'A', 5], tailY: 2, stride: 1, br: 2 });
+  def('arcticfox', { A: '#f6f4ee', C: '#c2cbdb', B: '#dfe5ee' }, { A: '#8390a8', C: '#5a6680', B: '#6e7a94' }, function (P, o) {
+    var m = quad(P, o, { len: 11, bh: 6, leg: 3, lw: 2, head: [8, 7], hd: [1, -1], snout: [3, 3, 2], ear: ['point', 2, 'A', 'C'], tail: ['bush', 8, 'A', 5, 'B'], tailY: 2, stride: 1, br: 2, legK: 'B' });
+    P.recolor('A', 'C', function (x, y) { return y === m.yb && x >= m.x0 && x <= m.x1; });
   });
   def('seal', { A: '#dfe3ea', C: '#3b404e' }, { A: '#f2dc96', C: '#8a6a2c' }, function (P, o) {
     var m = blob(P, o, { len: 17, h: 7, head: [7, 7], headK: o.juv ? 'A' : 'C',
@@ -599,8 +617,12 @@
     P.set(m.hx + 1, m.hy - 1, j ? 'K' : 'W');
     if (!j) { P.rect(m.bx + m.bw - 3, m.top, 2, 2, 'Y', 1); P.rect(m.hx - 1, m.hy + 2, 2, 2, 'Y', 1); }
   }, { jpal: { A: '#aab0bd' } });
-  def('polarbear', { A: '#f8f5ec', C: '#d9d4c4' }, { A: '#f2dca4', C: '#d0b478' }, function (P, o) {
-    quad(P, o, { len: 16, bh: 10, leg: 4, lw: 4, head: [8, 7], hd: [4, 2], nw: 7, snout: [4, 4, 1], ear: ['round', 1], tail: ['stub', 2], nose: 2, stride: 1, br: 3 });
+  def('polarbear', { A: '#f5eedb', C: '#d6c8a6', B: '#e6dcc2' }, { A: '#f0d494', C: '#c8a45c', B: '#dcbc78' }, function (P, o) {
+    var m = quad(P, o, { len: 15, bh: 9, leg: 4, lw: 4, head: [8, 7], hd: [4, 2], nw: 6, snout: [4, 4, 1], ear: ['round', 1, 'C'], tail: ['stub', 2], nose: 2, stride: 1, br: 3, legK: 'B',
+      back: function (P, m) { P.ell(m.x0 + 4, m.yt + 1, 4.5, 3, 'A'); P.ell(m.x1 - 4, m.yt, 4, 2.6, 'A'); },
+      body: function (P, m) { P.recolor('A', 'C', function (x, y) { return y >= m.yb - 1; }); P.recolor('A', 'B', function (x, y) { return y === m.yb - 2; }); } });
+    P.recolor('B', 'C', function (x, y) { return y === -1; });
+    P.set(m.sx - 1, m.sy1, 'C', 2); P.set(m.sx - 2, m.sy1, 'C', 2);
   });
   def('narwhal', { A: '#b3bccb', B: '#f1f3f6', C: '#6f798c', T: '#f6eed6' }, { A: '#c9b8dc', C: '#8a70a8' }, function (P, o) {
     var m = fish(P, o, { len: 17, h: 8, lift: 3, tail: [5, 8, 'A', 2], pect: [4, 3, 3, 'C'], belly: true, eye: [4, 0, 1],
@@ -630,11 +652,15 @@
     P.part(function () { if (j) P.set(m.hx - 1, m.hy - 5, 'T'); else P.path([[m.hx - 1, m.hy - 4], [m.hx - 3, m.hy - 6], [m.hx - 3, m.hy - 8], [m.hx - 2, m.hy - 9]], 'T', 1, 1); });
     for (var x = m.hx - 3; x <= m.hx + 1; x += 2) P.set(x, m.hy - 4, 'C');
   });
-  def('takin', { A: '#dca83e', C: '#5b3e2b', T: '#3a2c28' }, { A: '#f8e07e', C: '#a87a3a' }, function (P, o) {
-    var j = o.juv, m = quad(P, o, { len: 14, bh: 9, leg: 5, lw: 3, head: [8, 8], hd: [2, 0], snout: [4, 6, 1], snoutK: 'C', ear: ['point', 1], tail: ['stub', 2], legK: 'C', nose: 0, stride: 1,
-      back: function (P, m) { P.ell(m.x1 - 4, m.yt, 4, 2.5, 'A'); } });
-    if (!j) P.part(function () { P.path([[m.hx + 1, m.hy - 4], [m.hx - 1, m.hy - 5], [m.hx - 3, m.hy - 4], [m.hx - 5, m.hy - 6]], 'T', 1, 1); P.set(m.hx, m.hy - 4, 'T'); });
+  def('takin', { A: '#dca83e', C: '#5b3e2b', T: '#2e2424', B: '#f0cc74' }, { A: '#f8e07e', C: '#a87a3a', B: '#fff0b0' }, function (P, o) {
+    var j = o.juv, m = quad(P, o, { len: 14, bh: 9, leg: 5, lw: 3, head: [8, 8], hd: [2, 0], snout: [4, 7, 1], snoutK: 'C', ear: ['point', 1], tail: ['stub', 2], legK: 'C', nose: 0, stride: 1, eye: [0, -2],
+      back: function (P, m) { P.ell(m.x1 - 4, m.yt, 4.5, 3, 'A'); },
+      body: function (P, m) { P.recolor('A', 'B', function (x, y) { return y <= m.yt + 1; }); for (var x = m.x0 + 1; x < m.x1; x += 2) P.set(x, m.yb + 1, 'A', 2); },
+      face: function (P, m) { P.recolor('A', 'C', function (x, y) { return x >= m.hx + 1 && y >= m.hy; }); } });
+    // thick dark horns: out from the brow, back, then hooked up
+    if (!j) P.part(function () { P.path([[m.hx + 1, m.hy - 4], [m.hx - 2, m.hy - 5], [m.hx - 4, m.hy - 4], [m.hx - 5, m.hy - 7]], 'T', 1, 2); }); else P.set(m.hx, m.hy - 4, 'T');
     P.recolor('A', 'C', function (x, y) { return y >= m.yb - 1 && y <= m.yb && x > m.x0 + 2 && x < m.x1 - 2; });
+    P.set(m.sx, m.sy0 + 2, 'K'); P.rect(m.sx - 2, m.sy1 + 1, 2, 2, 'C', 2);
   });
   def('redpanda', { A: '#c9562b', C: '#3b2723', D: '#f0a868' }, { A: '#f0d8a8', C: '#8a6a4a', D: '#fff4dc' }, function (P, o) {
     var m = quad(P, o, { len: 12, bh: 6, leg: 3, lw: 3, legK: 'C', head: [9, 7], hd: [1, -1], snout: [2, 3, 2], snoutK: 'W', ear: ['point', 2, 'W', 'A'], tail: ['bush', 9, 'A', 5], tailY: 2, stride: 1,
@@ -660,7 +686,7 @@
     P.rect(m.hx - 3, m.hy - 1, 2, 3, 'C', 1); P.rect(m.hx + 2, m.hy - 1, 2, 3, 'C', 1); P.set(m.hx - 2, m.hy, 'W'); P.set(m.hx + 2, m.hy, 'W'); P.set(m.hx, m.hy + 1, 'N'); P.set(m.hx, m.hy + 2, 'N', 1);
     if (!o.juv) P.part(function () { P.line(m.bx + m.bw + 1, m.top - 3, m.bx + m.bw - 3, -3, 'G', 1); P.set(m.bx + m.bw + 2, m.top - 3, 'G', 0); P.set(m.bx + m.bw + 2, m.top, 'G', 0); P.set(m.bx + m.bw - 1, m.top - 2, 'G', 0); });
   });
-  def('snowleopard', { A: '#dcdfe4', B: '#f8f9fa', C: '#4b4b5a' }, { A: '#9aa2b0', B: '#c8ccd6', C: '#32323e' }, function (P, o) {
+  def('snowleopard', { A: '#f2efe6', B: '#ffffff', C: '#3e3c4a' }, { A: '#6e7688', B: '#9aa2b4', C: '#24242e' }, function (P, o) {
     var m = quad(P, o, { len: 14, bh: 7, leg: 4, lw: 3, head: [8, 7], hd: [2, -1], snout: [3, 4, 2], snoutK: 'B', ear: ['round', 1], tail: ['cat', 9, 'A', 3], tailY: 1, br: 2 });
     rosettes(P, 'A', 'C', m.x0, -40, m.hx - 3, -3);
     P.recolor('A', 'C', function (x, y) { return x < m.x0 - 1 && (((x + y) % 3) + 3) % 3 === 0; });
@@ -769,16 +795,21 @@
     P.recolor('A', 'C', function (x, y) { return y <= m.yt + 2 && x < m.x1 - 4 && x > m.x0 && ((x + 60) % 3) === 0; });
     if (!o.juv) { P.rect(m.sx - 1, m.sy1 + 1, 1, 4, 'W', 0); P.rect(m.sx - 3, m.sy1 + 1, 1, 3, 'W', 1); } else P.set(m.sx - 1, m.sy1 + 1, 'W');
   });
-  def('triceratops', { A: '#d9924c', F: '#c8683c', B: '#f2dcae', T: '#fff4d8', C: '#a8582c' }, { A: '#d83c44', F: '#a81c34', C: '#8a1428' }, function (P, o) {
-    var j = o.juv, m = quad(P, o, { len: 16, bh: 10, leg: 4, lw: 4, head: [8, 8], hs: 'box', hr: 2, hd: [4, 3], snout: [4, 5, 2], nose: 0, stride: 1, br: 3,
-      back: function (P, m) { P.poly([[m.x0 + 2, m.yt + 2], [m.x0 - 7, m.yb - 1], [m.x0 + 2, m.yb]], 'A', 'a'); },
-      pre: function (P, m) { P.part(function () { var fr = j ? 0.7 : 1; P.ell(m.hx - 3, m.hy - 2, 3.5 * fr, 6 * fr, 'F'); for (var a = 0; a < 7; a++) { var t = 1.7 + a * 0.5; P.set(m.hx - 3 + Math.cos(t) * 3.6 * fr, m.hy - 2 - Math.sin(t) * 6 * fr, 'B', 1); } }); } });
-    P.set(m.sx, m.sy1, 'B'); P.set(m.sx, m.sy1 - 1, 'B');
-    P.part(function () {
-      if (j) { P.set(m.hx + 1, m.hy - 4, 'T'); return; }
-      P.poly([[m.hx, m.hy - 3], [m.hx + 5, m.hy - 8], [m.hx + 2, m.hy - 3]], 'T', 1); P.poly([[m.sx - 2, m.sy0], [m.sx, m.sy0 - 3], [m.sx, m.sy0]], 'T', 1);
+  def('triceratops', { A: '#d9924c', F: '#b8503c', B: '#f6e4b8', T: '#fffaf0', C: '#a8582c' }, { A: '#d83c44', F: '#8a1c3c', C: '#8a1428' }, function (P, o) {
+    var j = o.juv, m = quad(P, o, { len: 15, bh: 10, leg: 4, lw: 4, head: [9, 8], hs: 'box', hr: 2, hd: [4, 3], snout: [4, 5, 2], nose: 0, stride: 1, br: 3,
+      back: function (P, m) { P.poly([[m.x0 + 2, m.yt + 4], [m.x0 - 5, m.yb], [m.x0 + 2, m.yb]], 'A', 'a'); },
+      pre: function (P, m) { P.part(function () { // big round neck frill with a pale scalloped rim
+        var fr = j ? 0.7 : 1, cx = m.hx - 3, cy = m.hy - 3; P.ell(cx, cy, 4.2 * fr, 7 * fr, 'B'); P.ell(cx + 1, cy + 1, 3.2 * fr, 5.6 * fr, 'F');
+        for (var a = 0; a < 8; a++) { var t = 1.3 + a * 0.5; P.set(cx + Math.cos(t) * 4.4 * fr, cy - Math.sin(t) * 7.2 * fr, 'B', 0); }
+      }); } });
+    P.rect(m.sx, m.sy1 - 1, 1, 2, 'B', 1); P.set(m.sx - 1, m.sy1, 'B', 2);
+    P.part(function () { // two long brow horns and a nose horn
+      if (j) { P.set(m.hx + 1, m.hy - 5, 'T'); P.set(m.sx - 1, m.sy0 - 1, 'T'); return; }
+      P.poly([[m.hx - 1, m.hy - 3], [m.hx + 5, m.hy - 9], [m.hx + 1, m.hy - 3]], 'T', 2); P.poly([[m.hx + 1, m.hy - 3], [m.hx + 7, m.hy - 8], [m.hx + 3, m.hy - 3]], 'T', 0);
+      P.poly([[m.sx - 2, m.sy0], [m.sx, m.sy0 - 3], [m.sx, m.sy0]], 'T', 0);
     });
     P.recolor('A', 'B', function (x, y) { return y === m.yb && x > m.x0 + 1 && x < m.x1; });
+    spots(P, 'A', 'C', m.x0, m.yt, m.x1 - 6, m.yt + 3, 0.2, 6);
   });
   def('raptor', { A: '#5aa48c', B: '#f0e4b8', C: '#2f6a5a', R: '#5aa48c', T: '#fff4d8' }, { A: '#3a66c8', C: '#1c2f7a', R: '#f04a3c' }, function (P, o) {
     biped(P, o, { len: 11, bh: 6, leg: 6, lw: 2, head: [8, 5], hd: [3, -5], nw: 3, tail: [11, -2, 'A'], belly: true, arm: [3, 2, 0, 1, 1], claw: 'T', footL: 4, footK: 'C',
@@ -1341,19 +1372,18 @@
     return fin(P, 21, 8, 1, 3);
   };
   BUILD.deck = function () {
-    var P = Bp({ A: '#c89858', D: '#8a5c34', T: '#a87440', M: '#5a5a6a', C: '#a8e0f8', R: '#e8503a' });
+    var P = Bp({ A: '#e0b478', D: '#7a5230', T: '#b07c44', M: '#5a5a6a', C: '#a8e0f8', R: '#e8503a', E: '#fbf2dc', F: '#d8ccb0' });
     P.part(function () { box(P, -13, 1, 1, 1, 8, 'D', 'D', 'D'); box(P, 0, 8, 1, 1, 8, 'D', 'D', 'D'); box(P, 13, 1, 1, 1, 8, 'D', 'D', 'D'); P.line(-12, 3, -1, 1, 'D', 2); P.line(1, 1, 12, 3, 'D', 2); }, true);
     P.part(function () { var s = box(P, 13, 9, 3, 2, 2, 'T', 'D', 'A'); box(P, 11, 6, 3, 2, 5, 'T', 'D', 'A'); });
     P.part(function () {
       var o = box(P, 0, -7, 9, 9, 2, 'T', 'D', 'A'), u;
-      for (u = 4; u < 18; u += 5) P.line(o.Lx + u + 1, o.Ly - 2 + u / 2 - 1, o.Lx + u + 15, o.Ly - 2 + u / 2 - 8, 'A', 1);
+      for (u = 5; u < 18; u += 6) P.line(o.Lx + u + 1, o.Ly - 2 + u / 2 - 1, o.Lx + u + 15, o.Ly - 2 + u / 2 - 8, 'A', 2);
     });
     P.part(function () {
       var by = -9, u; // railing around the top
-      P.line(-18, by - 5, 0, by - 14, 'T', 1); P.line(0, by - 14, 17, by - 5, 'T', 1);
-      for (u = 0; u <= 18; u += 6) { P.rect(-18 + u, by - 5 + u / 2, 1, 5, 'D', 1); P.rect(17 - u, by - 5 + u / 2, 1, 5, 'D', 1); }
-      P.line(-18, by - 5, 0, by + 3, 'A', 0); P.line(0, by + 3, 7, by, 'A', 0);
-      P.rect(0, by - 1, 1, 5, 'D', 1);
+      P.line(-18, by - 5, 0, by - 14, 'F', 1); P.line(0, by - 14, 17, by - 5, 'F', 1); P.rect(0, by - 14, 1, 5, 'F', 1);
+      for (u = 0; u <= 18; u += 9) { P.rect(-18 + u, by - 5 + u / 2, 1, 5, 'E', 1); if (u < 12) P.rect(17 - u, by - 5 + u / 2, 1, 5, 'E', 1); }
+      P.line(-18, by - 5, 0, by + 4, 'E', 1); P.line(0, by + 4, 8, by, 'E', 1); P.rect(0, by + 4, 1, 5, 'E', 1); P.rect(17, by - 5, 1, 5, 'E', 1);
     });
     P.part(function () { P.rect(-4, -22, 1, 8, 'M', 1); P.rr(-6, -25, 6, 3, 'M', null, 1); P.set(-1, -24, 'C'); P.set(-6, -24, 'R'); });
     return fin(P, 20, 8, 1, 4);
@@ -1361,9 +1391,9 @@
   BUILD.gate = function () {
     var P = Bp({ A: '#e8dcc0', S: '#c4b490', Y: '#f4c838', R: '#d8404a', B: '#4a8ae0', D: '#8a7a5a', G: '#fbe68a' });
     function tower(cx, cy) { var o = box(P, cx, cy, 4, 4, 24, 'A', 'A', 'S'); for (var v = 4; v < 24; v += 5) { o.rl(0, v, 8, 1, 'S', 1); o.rr(0, v, 8, 1, 'S', 2); } o.rl(3, 14, 2, 4, 'B', 1); o.rr(3, 14, 2, 4, 'B', 2); var c = box(P, cx, cy - 24, 5, 5, 2, 'Y', 'Y', 'Y'); hip(P, c, 8, 'Y', 'Y', 0); P.rect(cx, c.apex[1] - 6, 1, 6, 'D', 1); P.poly([[cx + 1, c.apex[1] - 6], [cx + 6, c.apex[1] - 4], [cx + 1, c.apex[1] - 2]], 'R', 1); return o; }
-    P.part(function () { tower(-13, 0); });
-    P.part(function () { var o = box(P, 0, -17, 9, 2, 7, 'R', 'R', 'Y'); o.rl(0, 5, 18, 2, 'Y', 1); o.rl(0, 0, 18, 1, 'Y', 2); o.rl(7, 2, 4, 3, 'G', 1); o.fl(8, 3, 'Y', 2); o.fl(9, 3, 'Y', 2); for (var u = 1; u < 18; u += 4) { if (u < 6 || u > 11) o.fl(u, 3, 'G', 1); } });
-    P.part(function () { tower(13, 9); });
+    P.part(function () { tower(-12, -3); });
+    P.part(function () { var o = box(P, 0, -15, 8, 2, 7, 'R', 'R', 'Y'); o.rl(0, 5, 16, 2, 'Y', 1); o.rl(0, 0, 16, 1, 'Y', 2); o.rl(6, 2, 4, 3, 'G', 1); o.fl(7, 3, 'Y', 2); o.fl(8, 3, 'Y', 2); for (var u = 1; u < 16; u += 4) { if (u < 5 || u > 10) o.fl(u, 3, 'G', 1); } });
+    P.part(function () { tower(12, 9); });
     return fin(P, 22, 8, 1, 6);
   };
   BUILD.center = function () {

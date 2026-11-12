@@ -210,6 +210,7 @@
       busy = null; setTimeout(() => { syncRunning(); flushReports(); updateStrip(); }, 0);
     };
     const h = handlers[report.type] || handlers['*'];
+    if (!h && window.ZMoments) { log('report-unhandled', { type: report.type }); done(); return; }   // the real game never shows the plain card
     try { (h || defaultCard)(report, done); } catch (e) { recordError(e, 'report ' + report.type); done(); }
   }
 
@@ -242,8 +243,9 @@
     g.quarters.forEach((qq, i) => { if (i < g.quarters.length - KEEP_DETAIL_QUARTERS && qq.events) { qq.counts = countEvents(qq.events); delete qq.events; } });
   }
   function drainEngineLog() {
-    if (!S.elog || !S.elog.length) return;
-    S.elog.splice(0).forEach(e => { const o = Object.assign({}, e); o.t = 'e:' + e.t; if (o.w == null) o.w = S.week; S.glog.cur.push(o); });
+    const got = E.drainLog ? E.drainLog(S) : (S.elog || []).splice(0);
+    if (!got || !got.length) return;
+    got.forEach(e => { const o = Object.assign({}, e); o.t = 'e:' + e.t; if (o.w == null) o.w = S.week; S.glog.cur.push(o); });
     if (S.glog.cur.length > MAX_CUR_EVENTS) S.glog.cur.splice(0, S.glog.cur.length - MAX_CUR_EVENTS);
   }
   function evLine(e) { const rest = {}; for (const k in e) if (k !== 'w' && k !== 't') rest[k] = e[k]; const s = JSON.stringify(rest); return 'w' + e.w + ' ' + e.t + (s === '{}' ? '' : ' ' + s); }
@@ -307,6 +309,7 @@
     try { const raw = localStorage.getItem(SAVE_KEY); doc = raw ? JSON.parse(raw) : null; } catch (e) { doc = null; }
     if (!doc || doc.v !== SAVE_V || typeof doc.json !== 'string') return false;
     let St; try { St = E.deserialize(doc.json); } catch (e) { recordError(e, 'load'); return false; }
+    if (!St) return false;
     if (E.SAVE_VERSION && St.v !== E.SAVE_VERSION) return false;
     S = St; ensureState(S); busy = null; token++; acc = 0;
     if (doc.speed === 1 || doc.speed === 2) speed = doc.speed;
@@ -318,7 +321,7 @@
   // ------------------------------------------------------------------ new game, strip, ticks
   function afterNewState() {
     popAll(); busy = null; token++;
-    const r = R(); if (r && r.mapChanged) { try { r.mapChanged(); } catch (e) { recordError(e, 'mapChanged'); } }
+    const r = R(); if (r) { try { if (r.reset) r.reset(); if (r.mapChanged) r.mapChanged(); } catch (e) { recordError(e, 'ZRender.reset'); } }
     lastRunning = null; updateStrip(); syncRunning(); setTimeout(flushReports, 0);
   }
   function newGame(opts) {
@@ -395,8 +398,11 @@
     const g = $floor.getContext('2d'); g.fillStyle = '#6fae4f'; g.fillRect(0, 0, $floor.width, $floor.height); g.fillStyle = '#62a045';
     for (let y = 0; y < $floor.height; y += 8) for (let x = (y / 8 % 2) * 8; x < $floor.width; x += 16) g.fillRect(x, y, 8, 4);
   }
+  function applyTheme() {
+    try { const P = window.ZSprites && ZSprites.PALETTE; if (!P) return; const m = { blue: '--blue', blueDark: '--blue-d', gold: '--gold', goldDark: '--gold-d', bad: '--red', good: '--green', goodDark: '--green-d' }, st = document.documentElement.style; for (const k in m) if (typeof P[k] === 'string') st.setProperty(m[k], P[k]); } catch (e) { /* keep css defaults */ }
+  }
   function boot() {
-    build(); loadLegacy();
+    applyTheme(); build(); loadLegacy();
     if (!load()) newGame({});
     const r = R(); if (r) { try { r.init($floor, { getState: () => S, onTap: onFloorTap }); if (r.mapChanged) r.mapChanged(); } catch (e) { recordError(e, 'ZRender.init'); } }
     else { placeholderFloor(); $floor.addEventListener('click', () => onFloorTap({})); window.addEventListener('resize', placeholderFloor); }   // no renderer yet: plain green floor, tap still opens the menu

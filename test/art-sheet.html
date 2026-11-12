@@ -34,6 +34,13 @@ function animals(biome) {
     label(sp.name + '  (' + a.w + 'x' + a.h + ')   |  rare: ' + sp.variant + '  |  young', x0 + cols * CW / 2, y0 + 22, water ? '#06284a' : '#16301a');
   });
 }
+function habcheck(biome) { // every species of a biome standing on its own habitat ground: normal, rare, young
+  var list = D.SPECIES_LIST.filter(function (sp) { return sp.biome === biome; }), K = 4, CW = 660, RH = 200;
+  size(2 * CW + 20, Math.ceil(list.length / 2) * RH + 20, '#31414d');
+  list.forEach(function (sp, i) { var x0 = 10 + (i % 2) * CW, y0 = Math.floor(i / 2) * RH + 110;
+    [{}, { variant: true }, { juv: true }].forEach(function (o, n) { var x = x0 + 110 + n * 215; put(S.tile('hab:' + biome, n), x, y0, K); put(S.animal(sp.id, o), x, y0 + 12, K); });
+    label(sp.name, x0 + 325, y0 + 86, '#fff'); });
+}
 function people() {
   var kinds = S.PERSON_KINDS, K = 4, CW = 64, RH = 104;
   size(16 * CW + 20, (Math.ceil(kinds.length / 4) + 3) * RH + 20, '#d8c9a3');
@@ -161,7 +168,7 @@ function scene(which) {
 
 try {
   if (S.init) S.init();
-  if (sheet.indexOf('animals-') === 0) animals(sheet.slice(8));
+  if (sheet.indexOf('animals-') === 0) animals(sheet.slice(8)); else if (sheet.indexOf('habcheck-') === 0) habcheck(sheet.slice(9));
   else if (sheet === 'people') people(); else if (sheet === 'tiles') tiles(); else if (sheet === 'fences') fences();
   else if (sheet === 'buildings') buildings(); else if (sheet === 'patch') patch(); else if (sheet === 'extras') extras(); else if (sheet === 'scene2') scene(2); else scene(1);
 } catch (e) { window.__err.push(String(e && e.stack || e)); }

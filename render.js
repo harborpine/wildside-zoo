@@ -20,7 +20,7 @@
   let running = true, zoom = 1, N = 2, dpr = 1, devW = 0, devH = 0, cssW = 0, cssH = 0, vw = 0, vh = 0;
   const cam = { x: 0, y: 0, vx: 0, vy: 0, tx: null, ty: null, placed: false };
   let M = null, P = null, mapDirty = true, clock = 0, slowAt = 0, lastT = 0, lastWeek = null, shopTurn = 0, engineMoneyFx = false;
-  let animals = {}, walkers = [], gatePeople = {}, floaters = [], statuses = {};
+  let animals = {}, walkers = [], gatePeople = {}, floaters = [], statuses = {}, lastS = null;
   const stats = { sprites: 0, fps: 0, frameMs: 0, frames: 0, acc: 0, accMs: 0, warned: {} };
   const st = () => { try { return opts.getState ? opts.getState() : null; } catch (e) { return null; } };
 
@@ -259,6 +259,8 @@
         h.cells.forEach((c, i) => { h.cells.forEach((o, j) => { if (i !== j && DIR6.some(d => c.q + d[0] === o.q && c.r + d[1] === o.r)) c.nb.push(j); }); });
         let sx = 0; h.cells.forEach(c => { sx += c.x; }); sx /= h.cells.length;
         h.cells.forEach(c => { if (!h.top || c.y < h.top.y || (c.y === h.top.y && Math.abs(c.x - sx) < Math.abs(h.top.x - sx))) h.top = c; });
+        const behind = DIR6.filter(d => G.toScreen(d[0], d[1]).y < -HH * 0.6); let bestScore = 1e9;
+        h.cells.forEach(c => { let sc = (c.y - h.top.y) * 0.5; behind.forEach(d => { const k2 = key(c.q + d[0], c.r + d[1]); if (set[k2]) sc += 1000; else if (m.occ[k2]) sc += 60; }); if (sc < bestScore) { bestScore = sc; h.mark = c; } });
         cs.forEach(c => { const p = G.toScreen(c[0], c[1]); G.EDGES.forEach((e, ei) => { if (set[key(c[0] + e[0][0], c[1] + e[0][1])]) return; const s = spr('fence', it.t, ei); add(s, p.x, p.y, G.depth(c[0], c[1], m.fenceDy(s, ei)), { id: it.id }); }); });
       } else {
         const p = G.toScreen(it.q, it.r); add(spr('building', it.t, {}), p.x, p.y, G.depth(it.q, it.r, 0) + 0.2, { id: it.id });
@@ -267,23 +269,27 @@
     m.dests.forEach(d => { if (m.habs[d.it.id]) m.habs[d.it.id].dest = d; });
     if (ent) { const s = spr('entrance'); add(s, ent.x, ent.y, G.depth(ent.q, ent.r, typeof s.sortDy === 'number' ? s.sortDy : 0), { gate: true }); m.gate = s; }
     const standKeys = {}; m.dests.forEach(d => d.stands.forEach(s => { standKeys[s.k] = 1; }));
+    const gs = m.gate, gateBox = gs && ent ? { x0: ent.x - gs.ax - 8, x1: ent.x - gs.ax + gs.c.width + 8, y0: ent.y - gs.ay - 6, y1: ent.y - gs.ay + gs.c.height + 16 } : null;
+    const entNb = c => ent && DIR6.some(d => c.q === ent.q + d[0] && c.r === ent.r + d[1]);
+    // nothing decorative where the gate arch or its pillars would hide it (or stand in front of it), nor on the hexes touching the gate
+    const addDeco = (sp, x, y, k) => { if (gateBox && x > gateBox.x0 && x < gateBox.x1 && y > gateBox.y0 && y < gateBox.y1) return; add(sp, x, y, k); };
     const builtAbove = c => DIR6.some(d => G.toScreen(d[0], d[1]).y < -HH * 0.6 && m.occ[key(c.q + d[0], c.r + d[1])]) || (ent && Math.abs(c.x - ent.x) < W * 1.3 && Math.abs(c.y - ent.y) < HH * 3.5);
     cells.forEach(c => {
-      if (c.road || (m.occ[c.k] && c.owned)) return;
+      if (c.road || (m.occ[c.k] && c.owned) || entNb(c)) return;
       const h = hash(c.q, c.r, 11), ox = Math.round((hash(c.q, c.r, 12) - 0.5) * 18), oy = Math.round((hash(c.q, c.r, 13) - 0.5) * HH * 0.6), seed = Math.floor(h * 9973);
       if (!c.owned) { // wild land: dim trees, thicker outside the map
         if (nearRoad(c)) return;
-        const dens = c.grid ? 0.42 : 0.6; if (h < dens) add(dimmed(spr('deco', h < dens * 0.75 ? 'tree' : 'bush', seed)), c.x + ox, c.y + oy, c.y + oy);
-        if (!c.grid && hash(c.q, c.r, 14) < 0.35) add(dimmed(spr('deco', 'tree', seed + 3)), c.x - ox, c.y - oy + 2, c.y - oy + 2);
+        const dens = c.grid ? 0.42 : 0.6; if (h < dens) addDeco(dimmed(spr('deco', h < dens * 0.75 ? 'tree' : 'bush', seed)), c.x + ox, c.y + oy, c.y + oy);
+        if (!c.grid && hash(c.q, c.r, 14) < 0.35) addDeco(dimmed(spr('deco', 'tree', seed + 3)), c.x - ox, c.y - oy + 2, c.y - oy + 2);
         return;
       }
       if (ent && c.k === ent.k) return;
-      if (m.path[c.k]) { if (!standKeys[c.k] && h < 0.16) add(spr('deco', 'lamp', seed), c.x + (ox < 0 ? -17 : 17), c.y - 1, c.y - 1); return; }
+      if (m.path[c.k]) { if (!standKeys[c.k] && h < 0.16) addDeco(spr('deco', 'lamp', seed), c.x + (ox < 0 ? -17 : 17), c.y - 1, c.y - 1); return; }
       let kind = h < 0.2 ? 'tree' : h < 0.38 ? 'bush' : h < 0.6 ? 'flowers' : h < 0.68 ? 'rock' : null;
       if (kind === 'tree' && builtAbove(c)) kind = 'bush';
       if (!kind) return;
-      add(spr('deco', kind, seed), c.x + ox, c.y + oy, c.y + oy);
-      if (kind === 'flowers') add(spr('deco', 'flowers', seed + 1), c.x - Math.round(ox * 0.8) + 3, c.y - oy + 1, c.y - oy + 1);
+      addDeco(spr('deco', kind, seed), c.x + ox, c.y + oy, c.y + oy);
+      if (kind === 'flowers') addDeco(spr('deco', 'flowers', seed + 1), c.x - Math.round(ox * 0.8) + 3, c.y - oy + 1, c.y - oy + 1);
     });
     m.statics.sort((a, b) => a.key - b.key);
     // combo outlines
@@ -294,7 +300,7 @@
       m.combos.push(outlineSprite(cs, COL[ci][0], COL[ci][1]));
     });
     M = m; mapDirty = false;
-    if (!cam.placed) { cam.placed = true; if (ent) { cam.x = ent.x - vw / 2; cam.y = ent.y - vh * 0.85; } }
+    if (!cam.placed) { cam.placed = true; aimCamera(S); }
     clampCam();
     reseat(S); if (P) evalPlacement();
   }
@@ -329,6 +335,7 @@
     a.t += dt;
     if (a.wait > 0) { a.wait -= dt; a.moving = false; return; }
     const dx = a.tx - a.x, dy = a.ty - a.y, d = Math.hypot(dx, dy), sp = a.speed * (a.juv ? 1.3 : 1) * dt;
+    if (!a.moving && d > sp) { for (const id in animals) { const o = animals[id]; if (o !== a && o.hab === a.hab && o.moving) { a.wait = rnd(0.4, 1.4); return; } } } // one walker per habitat at a time, so they do not cross through each other
     if (d <= sp) {
       a.x = a.tx; a.y = a.ty; a.moving = false; a.wait = rnd(1.5, 6.5);
       const h = M.habs[a.hab]; if (!h || !h.cells[a.cell]) return; const cnt = h.cells.map(() => 0); for (const id in animals) { const o = animals[id]; if (o !== a && o.hab === a.hab && cnt[o.cell] != null) cnt[o.cell]++; }
@@ -434,6 +441,8 @@
     statuses._exp = (S.projects || []).filter(p => projectHab(S, p) == null).map(p => ({ progress: clamp((S.week - p.start) / Math.max(1, p.end - p.start), 0, 1), choice: !!p.choice }));
   }
 
+  function iconsOf(s) { const ic = []; if (s.choice) ic.push('choice'); if (s.sick) ic.push('sick'); if (s.event) ic.push('ready-event'); if (s.breed) ic.push('ready-breed'); if (s.busy && s.progress == null) ic.push('busy'); if (s.buzz) ic.push('flame'); return ic; }
+
   // ---------------------------------------------------------------- floating pop-ups
   function floatAt(x, y, icon, num, delay) { floaters.push({ x: Math.round(x), y: Math.round(y), icon: icon ? spr('icon', icon) : null, txt: num != null && isFinite(num) && Math.round(num) !== 0 ? textSprite(shortNum(num), num < 0 ? '#ff8a7a' : '#ffffff') : null, t: -(delay || 0) }); }
   function posOfItem(id) { const h = M.habs[id]; if (h) return { x: h.top.x, y: h.top.y - HH - 4 }; const it = M.items[id]; if (it) { const p = G.toScreen(it.q, it.r); return { x: p.x, y: p.y - 26 }; } return null; }
@@ -467,6 +476,14 @@
   }
 
   // ---------------------------------------------------------------- camera and screen mapping
+  function aimCamera(S) { // opening view: everything built plus the gate, centred if it fits; otherwise the gate low on the screen
+    const ent = M.ent; let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; const inc = (x, y) => { a0 = Math.min(a0, x); a1 = Math.max(a1, x); b0 = Math.min(b0, y); b1 = Math.max(b1, y); };
+    if (ent) inc(ent.x, ent.y); (S.items || []).forEach(it => itemCells(it).forEach(c => { const p = G.toScreen(c[0], c[1]); inc(p.x, p.y); }));
+    if (a0 > 1e8) return; const padT = HH + 36, padB = HH + 30, padX = HW + 12;
+    cam.x = (a1 - a0 + padX * 2 <= vw ? (a0 + a1) / 2 : ent ? ent.x : a0) - vw / 2;
+    cam.y = b1 - b0 + padT + padB <= vh ? (b0 - padT + b1 + padB) / 2 - vh / 2 : ent ? ent.y - vh * 0.85 : b0 - padT;
+    cam.vx = cam.vy = 0; cam.tx = cam.ty = null;
+  }
   function clampCam() {
     if (!M) return; const b = M.bounds, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
     cam.x = bw <= vw ? b.x0 - (vw - bw) / 2 : clamp(cam.x, b.x0, b.x1 - vw);
@@ -602,6 +619,7 @@
     if (!started) return; root.requestAnimationFrame(frame);
     const t0 = now(), dt = clamp((t - lastT) / 1000 || 0, 0, 0.1); lastT = t;
     const S = st(); if (!S || !ctx) return;
+    if (S !== lastS) { if (lastS) { clearActors(); if (P) R.stopPlacement(); } lastS = S; }
     if (!vw) resize(); if (!vw) return;
     clock += dt;
     if (mapDirty || !M || clock >= slowAt) {
@@ -675,8 +693,8 @@
     const bar = (x, y, p) => { c.fillStyle = '#1d1a22'; c.fillRect(x - 10 - cx, y - cy, 20, 4); c.fillStyle = '#4a4458'; c.fillRect(x - 9 - cx, y + 1 - cy, 18, 2); c.fillStyle = '#7be36a'; c.fillRect(x - 9 - cx, y + 1 - cy, Math.round(18 * clamp(p || 0, 0, 1)), 2); };
     for (const id in M.habs) {
       const h = M.habs[id], s = statuses[id]; if (!s) continue; if (h.top.x < L || h.top.x > Rr || h.top.y < T || h.top.y > B + 40) continue;
-      const ic = []; if (s.choice) ic.push('choice'); if (s.sick) ic.push('sick'); if (s.event) ic.push('ready-event'); if (s.breed) ic.push('ready-breed'); if (s.busy && s.progress == null) ic.push('busy'); if (s.buzz) ic.push('flame');
-      const bx = h.top.x, by = h.top.y - HH - 15;
+      const ic = iconsOf(s), mk3 = h.mark || h.top, bx = mk3.x, by = mk3.y - HH - 9;
+      if (ic.length) { const w2 = ic.length * 12 + 2; c.globalAlpha = 0.5; c.fillStyle = '#1d1a22'; c.fillRect(Math.round(bx - w2 / 2) - cx, by - 13 - cy, w2, 13); c.fillRect(Math.round(bx - w2 / 2) + 1 - cx, by - 14 - cy, w2 - 2, 15); c.globalAlpha = 1; }
       ic.forEach((n, i) => { const sp = spr('icon', n), bob = running ? Math.round(Math.sin(clock * (n === 'choice' ? 5 : 2.2) + h.top.x)) : 0; c.drawImage(sp.c, Math.round(bx + (i - (ic.length - 1) / 2) * 12 - sp.ax) - cx, by - 1 + bob - Math.round(sp.ay) - cy); });
       if (s.busy && s.progress != null) bar(bx, by + 1, s.progress);
     }
@@ -728,7 +746,8 @@
   R.debug = function () {
     return { sprites: stats.sprites, fps: stats.fps, frameMs: stats.frameMs, cam: { x: cam.x, y: cam.y }, buffer: { w: Math.round(vw), h: Math.round(vh), scale: N / dpr, deviceScale: N, dpr: dpr },
       running: running, zoom: zoom, realSprites: usingReal(), spriteGetters: spriteState(), spriteErrors: Object.assign({}, stats.warned), animals: Object.keys(animals).length, visitors: walkers.filter(w => w.staff == null).length, staff: walkers.filter(w => w.staff != null && !w.hidden).length,
-      gate: Object.keys(gatePeople).length, floaters: floaters.length, combos: M ? M.combos.length : 0, statics: M ? M.statics.length : 0, paths: M ? M.pathKeys.length : 0,
+      gate: Object.keys(gatePeople).length, gateKinds: Object.keys(gatePeople).map(k => gatePeople[k].kind), gateMarks: Object.keys(gatePeople).filter(k => gatePeople[k].mark).map(k => gatePeople[k].kind),
+      icons: (() => { const o = {}; for (const id in statuses) if (id !== '_exp') { const s2 = statuses[id]; o[id] = iconsOf(s2).concat(s2.busy && s2.progress != null ? ['bar'] : []); } return o; })(), moving: (() => { const o = {}; for (const id in animals) if (animals[id].moving) o[animals[id].hab] = (o[animals[id].hab] || 0) + 1; return o; })(), floaters: floaters.length, combos: M ? M.combos.length : 0, statics: M ? M.statics.length : 0, paths: M ? M.pathKeys.length : 0,
       placement: P ? { q: P.q, r: P.r, rot: P.rot, ok: P.ok, state: P.state, msg: P.msg, makes: P.makes, breaks: P.breaks } : null };
   };
   root.ZRender = R;

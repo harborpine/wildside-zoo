@@ -141,6 +141,33 @@ async function run(name) {
   await btn('zr-cancel').click(); ok(await page.evaluate(() => RT.S.items.length) === items0 + 1, 'repeat place did not build');
   const tp = await posOf((spots.lone || spots.free).q, (spots.lone || spots.free).r, 0, 0); await page.mouse.click(tp.x, tp.y); const lt = await lastTap(); ok(lt && lt.item != null, 'the new building is not reported by a tap');
 
+  // --- callers and happening characters at the gate; sick / choice / breed / event icons; one animal walking per habitat
+  await page.evaluate(() => ZRender.setRunning(true));
+  const setup = await page.evaluate(() => {
+    const S = RT.S, out = { hap: null };
+    ZE.debug.caller(S, 'trader'); ZE.debug.caller(S, 'headhunter');
+    for (const k of Object.keys(ZD.HAPPENINGS)) { if (!ZD.HAPPENINGS[k].who) continue; let okk = false; try { okk = ZE.debug.happening(S, k); } catch (e) { okk = false; } if (okk && S.happening && S.happening.who) { out.hap = { key: k, who: S.happening.who }; break; } }
+    S.reports = [];
+    const sickA = S.animals.find(a => a.hab === RT.H.arctic.id); sickA.sick = S.week + 5; out.sickHab = RT.H.arctic.id;
+    const pr = S.projects.find(p => p.hab != null); if (pr) { pr.choice = { key: 'test', title: 'Test', text: '', options: [{ label: 'A' }, { label: 'B' }] }; out.choiceHab = pr.hab; }
+    out.callers = ZE.callersHere(S).map(c => c.kind);
+    return out;
+  });
+  await sleep(900);
+  const chk = await page.evaluate(() => { const S = RT.S, d = ZRender.debug(), exp = {}; S.items.filter(i => i.k === 'hab').forEach(h => { const st = ZE.habStatus(S, h), e = []; if (st.choice) e.push('choice'); if (st.sick) e.push('sick'); if (st.event) e.push('ready-event'); if (st.breed) e.push('ready-breed'); if (st.busy && st.progress != null) e.push('bar'); exp[h.id] = e; }); const got = {}; Object.keys(d.icons).forEach(id => { got[id] = d.icons[id].filter(n => n !== 'flame' && n !== 'busy'); }); return { exp, got, gateKinds: d.gateKinds, gateMarks: d.gateMarks }; });
+  ok(JSON.stringify(chk.exp) === JSON.stringify(chk.got), 'on-floor icons differ from ZE.habStatus: expected ' + JSON.stringify(chk.exp) + ' got ' + JSON.stringify(chk.got));
+  const allIcons = [].concat(...Object.values(chk.got));
+  ok(setup.callers.length >= 2 && setup.callers.every(k => chk.gateKinds.includes(k)), 'callers ' + JSON.stringify(setup.callers) + ' not all at the gate: ' + JSON.stringify(chk.gateKinds));
+  if (ok(!!setup.hap, 'no happening with a character could be forced')) ok(chk.gateKinds.includes(setup.hap.who) && chk.gateMarks.includes(setup.hap.who), 'happening character ' + setup.hap.who + ' not at the gate with a mark: ' + JSON.stringify(chk.gateKinds));
+  ok((chk.got[setup.sickHab] || []).includes('sick'), 'sick icon missing'); ok(setup.choiceHab != null && (chk.got[setup.choiceHab] || []).includes('choice'), 'choice icon missing');
+  ok(allIcons.includes('ready-breed'), 'no habitat shows the breed-ready icon (the savanna pair should)'); ok(allIcons.includes('ready-event'), 'no habitat shows the event-ready icon');
+  notes.push('gate: ' + JSON.stringify(chk.gateKinds) + ' (marked: ' + JSON.stringify(chk.gateMarks) + '); icons by habitat: ' + JSON.stringify(chk.got));
+  await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 2, true), [ent.q, ent.r]); await sleep(2500); await shot('gate');
+  let maxMoving = 0; for (let i = 0; i < 40; i++) { const mv = (await dbg()).moving; Object.values(mv).forEach(n => { maxMoving = Math.max(maxMoving, n); }); await sleep(120); }
+  ok(maxMoving <= 1, 'more than one animal walking at once in a habitat: ' + maxMoving); notes.push('animals walking at once per habitat (40 samples): at most ' + maxMoving);
+  await page.evaluate(() => { const S = RT.S; S.happening = null; S.headhunt = null; S.animals.forEach(a => { a.sick = 0; }); S.projects.forEach(p => { delete p.choice; }); }); await sleep(900);
+  const after = await dbg(); ok(setup.hap && !after.gateKinds.includes(setup.hap.who) && !after.gateKinds.includes('headhunter'), 'gate people did not leave: ' + JSON.stringify(after.gateKinds)); ok(![].concat(...Object.values(after.icons)).some(n => n === 'sick' || n === 'choice'), 'sick/choice icons did not clear');
+
   // --- final state
   await sleep(300); const dEnd = await dbg(); notes.push('end: frame cost ' + dEnd.frameMs + ' ms, ' + dEnd.fps + ' fps, sprites ' + dEnd.sprites);
   const pageErrs = await page.evaluate(() => RT.errors);
@@ -151,13 +178,71 @@ async function run(name) {
   return { name, fails, notes };
 }
 
+// The real page: index.html with the Shell. Floor draws, a tap opens the menu and pauses, placement builds through ZCore, new game re-aims the camera.
+async function runShell(name) {
+  const fails = [], notes = [], sfx = name === 'chromium' ? '' : '-' + name, ok = (c, m) => { if (!c) fails.push(m); return c; };
+  const browser = await pw[name].launch({ headless: true });
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
+  const page = await ctx.newPage(), errors = [];
+  page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|ERR_FILE_NOT_FOUND/.test(m.text())) errors.push('console: ' + m.text()); });
+  page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+  try {
+    await page.goto(require('url').pathToFileURL(path.join(root, 'index.html')).href);
+    await page.waitForFunction('window.ZT && window.ZRender && document.documentElement.getAttribute("data-ready") === "1"', null, { timeout: 15000 });
+    await page.evaluate(() => { ZT.newGame({}); if (ZT.popAll) ZT.popAll(); if (ZT.flush) ZT.flush(); }); await sleep(400);
+    for (let i = 0; i < 12 && (await page.evaluate(() => ZT.stack().length)) > 0; i++) { await page.evaluate(() => ZT.popAll()); await sleep(150); }
+    await sleep(2500);
+    await page.screenshot({ path: path.join(shots, 'render-newgame' + sfx + '.png') });
+    const d = await page.evaluate(() => ZRender.debug());
+    ok(d.sprites > 20 && d.animals >= 2, 'floor not drawing in index.html: ' + d.sprites + ' sprites, ' + d.animals + ' animals'); ok(d.realSprites, 'index.html is not using the real sprites');
+    const view = await page.evaluate(() => { const S = ZT.S, b = document.getElementById('floor').getBoundingClientRect(), out = { w: b.width, h: b.height, all: true, pts: [] }; const pts = [ZE.entrance(S)]; S.items.forEach(it => ZE.cells(it).forEach(c => pts.push({ q: c[0], r: c[1] }))); pts.forEach(p => { const c = ZRender.hexToClient(p.q, p.r), inside = c.x > b.left + 30 && c.x < b.right - 30 && c.y > b.top + 50 && c.y < b.bottom - 40; if (!inside) out.all = false; out.pts.push([Math.round(c.x - b.left), Math.round(c.y - b.top)]); }); let own = 0, tot = 0; for (let y = 10; y < b.height; y += 20) for (let x = 10; x < b.width; x += 20) { const h = ZRender.clientToHex(b.left + x, b.top + y); tot++; if (ZE.inLand(S, h.q, h.r)) own++; } out.owned = Math.round(100 * own / tot); return out; });
+    ok(view.all, 'new game: the starting habitat, snack stand and gate are not all comfortably in view: ' + JSON.stringify(view.pts));
+    notes.push('index.html new game: floor ' + view.w + 'x' + Math.round(view.h) + ' CSS px, ' + d.sprites + ' sprites, owned land covers ' + view.owned + '% of the floor area; habitat, stand and gate all in view');
+    ok(await page.evaluate(() => ZT.running()), 'game should be running with no screen open');
+    // tap opens the menu and pauses
+    const b = await page.evaluate(() => { const r = document.getElementById('floor').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 3 }; });
+    await page.touchscreen.tap(b.x, b.y); await sleep(300);
+    ok(await page.evaluate(() => ZT.stack().length) > 0, 'a tap on the floor did not open a screen'); ok(!(await page.evaluate(() => ZT.running())), 'game still running with the menu open');
+    notes.push('tap opened: ' + JSON.stringify(await page.evaluate(() => ZT.stack())));
+    await page.evaluate(() => ZT.popAll()); await sleep(200);
+    // a drag does not open the menu
+    await page.mouse.move(b.x, b.y); await page.mouse.down(); await page.mouse.move(b.x - 60, b.y - 30, { steps: 5 }); await page.mouse.up(); await sleep(200);
+    ok(await page.evaluate(() => ZT.stack().length) === 0, 'a drag opened the menu');
+    // placement through ZCore
+    const spot = await page.evaluate(() => { const S = ZT.S; window.__placed = 0; window.__cancel = 0; S.money = Math.max(S.money, 50000); let best = null; for (let r = 0; r < ZD.GRID_H; r++) for (let c = 0; c < ZD.GRID_W; c++) { const a = ZE.fromOffset(c, r); if (!ZE.canPlace(S, 'fac', 'bench', a[0], r, 0)) continue; const hb = S.items.find(i => i.k === 'hab'), d2 = Math.abs(a[0] - hb.q) + Math.abs(r - hb.r); if (!best || d2 < best.d) best = { q: a[0], r: r, d: d2 }; }
+      ZRender.startPlacement({ kind: 'fac', t: 'bench', label: 'Garden Bench' }, { onPlace: (q, r, rot) => { window.__placed++; return ZT.act('build', 'fac', 'bench', q, r, rot); }, onCancel: () => { window.__cancel++; } }); ZRender.centerOn(best.q, best.r, true); return best; });
+    await sleep(300); ok(!(await page.evaluate(() => ZT.running())), 'game should pause during placement');
+    const pc = await page.evaluate(([q, r]) => ZRender.hexToClient(q, r), [spot.q, spot.r]); await page.touchscreen.tap(pc.x, pc.y); await sleep(250);
+    ok(await page.evaluate(() => ZT.stack().length) === 0, 'a tap during placement opened the menu');
+    await page.screenshot({ path: path.join(shots, 'render-shell-place' + sfx + '.png') });
+    const bar = await page.evaluate(() => Array.from(document.querySelectorAll('#placement-bar button')).map(x => { const r = x.getBoundingClientRect(); return { t: x.textContent, h: Math.round(r.height), on: r.bottom <= innerHeight && r.height > 0 }; }));
+    ok(bar.length === 3 && bar.every(x => x.h >= 56 && x.on), 'placement buttons in index.html: ' + JSON.stringify(bar)); notes.push('index.html placement: note "' + await page.evaluate(() => document.getElementById('placement-note').textContent) + '", buttons ' + JSON.stringify(bar));
+    const n0 = await page.evaluate(() => ZT.S.items.length); await page.locator('#placement-bar button.zr-place').click(); await sleep(500);
+    for (let i = 0; i < 8 && (await page.evaluate(() => ZT.stack().length)) > 0; i++) { await page.evaluate(() => ZT.popAll()); await sleep(150); }
+    ok(await page.evaluate(() => window.__placed) === 1 && await page.evaluate(() => ZT.S.items.length) === n0 + 1, 'Place did not build through ZCore'); ok(!(await page.evaluate(() => ZRender.placing())), 'still placing after a successful build');
+    const statics = await page.evaluate(() => ZRender.debug().statics); await sleep(500); ok(await page.evaluate(([q, r]) => { const S = ZT.S; return !!ZE.occupancy(S)[q + ',' + r]; }, [spot.q, spot.r]), 'bench not on the map');
+    { const stt = await page.evaluate(() => ({ run: ZT.running(), stack: ZT.stack(), busy: ZCore.busy, placing: ZRender.placing(), reports: ZT.S.reports.map(r => r.type) })); ok(stt.run, 'game should run again after placement: ' + JSON.stringify(stt)); }
+    // new game: the camera re-aims even though the Shell never calls reset()
+    await page.evaluate(() => ZRender.centerOn(-50, -50, true)); await sleep(150); const far = (await page.evaluate(() => ZRender.debug())).cam;
+    await page.evaluate(() => { ZT.newGame({}); ZT.popAll(); }); await sleep(900); for (let i = 0; i < 8 && (await page.evaluate(() => ZT.stack().length)) > 0; i++) { await page.evaluate(() => ZT.popAll()); await sleep(150); }
+    const d2 = await page.evaluate(() => ZRender.debug());
+    ok(Math.abs(d2.cam.x - d.cam.x) < 1 && Math.abs(d2.cam.y - d.cam.y) < 1 && Math.abs(d2.cam.x - far.x) + Math.abs(d2.cam.y - far.y) > 20, 'camera did not re-aim on a new game: ' + JSON.stringify([d.cam, far, d2.cam]));
+    const shellErrs = await page.evaluate(() => ZT.errors.map(String));
+    ok(errors.length === 0 && shellErrs.length === 0, 'errors in index.html: ' + JSON.stringify(errors.concat(shellErrs)).slice(0, 600));
+  } catch (e) { fails.push('crashed: ' + (e && e.stack || e)); }
+  await browser.close();
+  return { name: name + ' / index.html', fails, notes };
+}
+
 (async () => {
   let bad = 0;
   for (const n of which === 'both' ? ['chromium', 'webkit'] : [which]) {
-    let res; try { res = await run(n); } catch (e) { res = { name: n, fails: ['crashed: ' + (e && e.stack || e)], notes: [] }; }
+    for (const fn of [run, runShell]) {
+    let res; try { res = await fn(n); } catch (e) { res = { name: n, fails: ['crashed: ' + (e && e.stack || e)], notes: [] }; }
     console.log('\n=== ' + res.name + ' ===\n' + res.notes.map(x => '  ' + x).join('\n'));
     console.log(res.fails.length ? '  FAILED (' + res.fails.length + '):\n' + res.fails.map(x => '   - ' + x).join('\n') : '  ALL CHECKS PASSED');
     bad += res.fails.length;
+    }
   }
   process.exit(bad ? 1 : 0);
 })();
