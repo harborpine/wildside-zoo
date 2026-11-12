@@ -2,7 +2,7 @@
 
 Global: `ZMoments`. One IIFE, loaded last. It registers a handler for every report type when the file loads
 (`ZMoments.init()` registers them again, harmlessly). CSS is injected once as `<style id="mo-style">`, every class starts with `mo-`.
-Tests: `node test/moments-shot.js [chromium] [webkit] [--quick]` (headless; shots in `test/shots/moments-*.png`).
+Tests: `node test/moments-shot.js [chromium] [webkit] [--quick] [--only=cards,callers,happenings,yearly,reveals,yearend,realplay,reopen,inmenu]` (headless; shots in `test/shots/moments-*.png`).
 
 ## How a moment works
 
@@ -22,7 +22,7 @@ Tests: `node test/moments-shot.js [chromium] [webkit] [--quick]` (headless; shot
   habitats removed, unknown combo or VIP ids).
 * Nothing here calls an engine action except through `ZCore.act` (`resolveChoice`, `resolveHappening`, `resolveYearly`, `enterShow`,
   `buyAnimal`, `openCrate`, `hireHeadhunt`, `hireCandidate`) and `ZCore.newGame` (new zoo).
-* Test hook: `ZMoments.cur = {id, i, n, final, at}` describes the beat on screen (`final` = last beat reached).
+* Test hooks: `ZMoments.shown[type]` and `ZMoments.finished[type]` count handler calls and `done()` calls per report type; `ZMoments.cur = {id, i, n, final, at}` describes the beat on screen (`final` = last beat reached).
 
 ## Report handlers (registered by `ZMoments.init`)
 
@@ -34,7 +34,7 @@ Tests: `node test/moments-shot.js [chromium] [webkit] [--quick]` (headless; shot
 | `birth` | Failure: a short card with the chance that applied. Success: one beat per baby (twins are compressed): pixel baby, then each stat as a row `Charm | parents 41 | 47 | +6`, counting to the value, a gold row and "LUCKY +11" when the engine says `lucky`, then the rare-variant roll as its own row (`chance 6%` then `YES!` or `no`), then where it lives, and "First of its kind born here!" when `firstBred`. |
 | `review` | Four critic boxes flip from `?` to a score out of 10 one at a time (colour by score), the total counts up out of 40, a Hall of Fame beat at 34 or more, then the final card: total, fit word, money, reputation and research chips, and up to four short lines (new pairing, repeated theme, host on fire, big idea result, star animal if it still exists). |
 | `caller` | Trader, director (rows of animals with portrait, stars, New tag, Charm/Vigor/Wit numbers and a Buy button; a Mystery crate row with the odds per rarity and an Open button) or headhunter (portrait, name, role, four skill numbers, wage and fee, Hire button, greyed with the reason when the room is full or money is short). "Not now" dismisses; offers are not time limited. |
-| `combo` | Gold card: the anchor building or ground as a picture, the combo name, its bonus ("+20% draw"). Unknown ids are skipped. |
+| `combo` | Gold card: the anchor building, or an animal living in the anchor habitat, as a picture, the combo name, its bonus ("+20% draw"). Unknown ids are skipped. |
 | `rankup` | Gold card: "Rank n: name", the rank stars, the unlock lines from the engine. |
 | `secret` | Gold card for the paleo map and the mythic chart. |
 | `vip` | The `vip` person sprite, the name, money and reputation chips, the visitor boost. |
@@ -43,7 +43,7 @@ Tests: `node test/moments-shot.js [chromium] [webkit] [--quick]` (headless; shot
 | `show` | The picker (the Winter Animal Show): judged stat, the three medal scores, the best 8 animals with their judged stat, score and the medal they would win. Tapping an animal asks to confirm, then `enterShow`. "Not now" leaves the show open (reopen with `ZMoments.showShow()`). |
 | `showresult` | Score counts up against the gold bar, then the medal card (gold gets the rare frame) with money, reputation and trophy. (`show` is the picker, `showresult` is the result; `enterShow`'s result is not shown a second time.) |
 | `yearend` | Beat 1, the awards show: five boxes flip to WON (with the prize) or missed (with your figure). Final card: your place of the league ("#3 of 12"), a short table (top 3, you and your neighbours), profit, visitors, species, best review. |
-| `final` | Saves the carry-over record once (`S.flags.legacySaved`: runs, best, theme fits, combos, hall, the top 4 staff and top 4 animals as `ZCore.legacy.carry`, then `ZCore.saveLegacy()`), counts the score parts up one by one and the total. Buttons: "Start a new zoo" (name box, optional one person and one animal to bring, shows the start-money bonus, then `ZCore.newGame({zooName, staff, animal})`) and "Keep playing". |
+| `final` | Calls `ZMenus.recordLegacy()` if it exists, otherwise saves the carry-over record itself once (`S.flags.legacySaved`: runs, best, theme fits, combos, hall, the top 4 staff and top 4 animals as `ZCore.legacy.carry`, then `ZCore.saveLegacy()`), counts the score parts up one by one and the total. Buttons: "Start a new zoo" (name box, optional one person and one animal to bring, shows the start-money bonus, then `ZCore.newGame({zooName, staff, animal})`) and "Keep playing". |
 
 ## Functions for Menus
 
@@ -53,6 +53,7 @@ All take a `done` callback that is called once when the player leaves the moment
 |---|---|
 | `ZMoments.showCaller(kind, done)` | `kind` is `'trader'`, `'director'` or `'headhunter'`. Opens the same screen as the pop-up. If nobody is there (offers replaced, headhunter gone) it toasts "Nobody is here right now" and calls `done`. Use it for the rows under Animals / Staff. Buying and hiring work inside it. |
 | `ZMoments.showChoice(pid, done)` | Reopens the waiting mid-project choice of project `pid`. A stale id calls `done` at once. `ZMoments.pendingChoices()` returns the ids of every project that is waiting for an answer. |
+| `ZMoments.showHappening(done)` | Reopens the pending happening (`S.happening`) that was dismissed without an answer, with its options (or the plain card). Nothing pending: toasts and calls `done`. The engine applies the default two weeks after it arrived. |
 | `ZMoments.showShow(done)` | Reopens the Winter Show picker while `S.show` is open. |
 | `ZMoments.revealAnimal(animal, opts, done)` | Stars, unveil, name, numbers. `animal`: `{sp, variant, charm, vigor, wit}`. `opts`: `{kicker?, isNew?, hab?}` (`hab` = habitat id, or `null` for "goes to the holding pen"; leave it out to say nothing). Single card that waits for a tap. |
 | `ZMoments.revealCrate(result, done)` | Call it with the result of `ZCore.act('openCrate')` (`{animal, rarity, isNew, hab}`): the crate shakes for 1.1 s, then the animal is revealed. |

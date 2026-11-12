@@ -110,9 +110,10 @@ async function run(name) {
   const btn = cls => page.locator('#placement-bar button.' + cls);
   const nT = await tapCount();
   await page.evaluate(() => RT.place({ kind: 'fac', t: 'snack', label: 'Snack Stand' }));
-  ok(await page.evaluate(() => ZRender.placing()), 'placing() false after startPlacement'); ok(await page.locator('#placement-bar button').count() === 3, 'placement bar should hold 3 buttons');
+  ok(await page.evaluate(() => ZRender.placing()), 'placing() false after startPlacement'); ok(await page.locator('#placement-bar button').count() === 2, 'a single-hex facility should get 2 buttons (no Rotate)');
+  { const p0 = (await dbg()).placement, c0 = await posOf(p0.q, p0.r, 0, 0); ok(p0.ok, 'the ghost should start on a valid hex: ' + JSON.stringify(p0)); ok(c0.x > 20 && c0.x < c0.w - 20 && c0.y > 30 && c0.y < c0.h - 120, 'the starting ghost is not on screen: ' + JSON.stringify(c0)); notes.push('starting ghost: valid=' + p0.ok + ' at screen ' + Math.round(c0.x) + ',' + Math.round(c0.y) + ' note "' + p0.msg + '"'); }
   const sizes = await page.evaluate(() => Array.from(document.querySelectorAll('#placement-bar button')).map(b => { const r = b.getBoundingClientRect(); return { t: b.textContent, h: Math.round(r.height), w: Math.round(r.width), vis: r.height > 0 && r.bottom <= innerHeight }; }));
-  ok(sizes.every(s => s.h >= 56 && s.vis) && sizes.map(s => s.t).join() === 'Rotate,Place,Cancel', 'placement buttons wrong: ' + JSON.stringify(sizes)); notes.push('placement buttons: ' + JSON.stringify(sizes));
+  ok(sizes.every(s => s.h >= 56 && s.vis) && sizes.map(s => s.t).join() === 'Place,Cancel', 'placement buttons wrong: ' + JSON.stringify(sizes)); notes.push('placement buttons: ' + JSON.stringify(sizes));
   await tapHex(spots.free); let dp = (await dbg()).placement;
   ok(dp.q === spots.free.q && dp.r === spots.free.r && dp.ok, 'ghost did not move to the tapped free hex: ' + JSON.stringify(dp)); ok(/fits here/i.test(await note()), 'note on a free hex: "' + await note() + '"');
   await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 4, true), [spots.free.q, spots.free.r]); await sleep(250); await shot('place-valid'); notes.push('valid note: "' + await note() + '"');
@@ -124,7 +125,9 @@ async function run(name) {
   ok(await page.evaluate(() => RT.placed.length === 1 && RT.placed[0].q) === spots.free.q, 'Place did not call onPlace with the ghost hex'); ok(!(await page.evaluate(() => ZRender.placing())), 'placement should end after a successful place');
   ok(await page.evaluate(() => getComputedStyle(document.getElementById('placement-bar')).display) === 'none', 'placement bar still visible after placing');
   // rotate + cancel with a habitat
-  await page.evaluate(() => RT.place({ kind: 'hab', t: 'savanna', label: 'Savanna' })); await tapHex(spots.hab || spots.free);
+  await page.evaluate(() => RT.place({ kind: 'hab', t: 'mythic' })); ok(await page.locator('#placement-bar button.zr-rotate').count() === 0, 'a fully round habitat should not get a Rotate button'); await btn('zr-cancel').click(); await page.evaluate(() => { RT.cancelled = 0; });
+  for (const t of ['savanna', 'desert', 'arctic']) { await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 5, true), [ent.q, ent.r]); await page.evaluate(t => RT.place({ kind: 'hab', t: t }), t); await sleep(120); const p0 = (await dbg()).placement; ok(p0.ok, t + ' habitat ghost should start on a valid spot: ' + JSON.stringify(p0)); await btn('zr-cancel').click(); } await page.evaluate(() => { RT.cancelled = 0; });
+  await page.evaluate(() => RT.place({ kind: 'hab', t: 'savanna', label: 'Savanna' })); ok((await page.evaluate(() => Array.from(document.querySelectorAll('#placement-bar button')).map(b => b.textContent).join())) === 'Rotate,Place,Cancel', 'a habitat should get Rotate, Place, Cancel'); await tapHex(spots.hab || spots.free);
   const r0 = (await dbg()).placement.rot; await btn('zr-rotate').click(); await btn('zr-rotate').click(); ok((await dbg()).placement.rot === (r0 + 2) % 6, 'Rotate did not turn the ghost');
   await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 3, true), [(spots.hab || spots.free).q, (spots.hab || spots.free).r]); await sleep(250); await shot('place-habitat');
   await btn('zr-cancel').click(); ok(await page.evaluate(() => RT.cancelled) === 1 && !(await page.evaluate(() => ZRender.placing())), 'Cancel did not call onCancel and leave placement');
@@ -137,8 +140,12 @@ async function run(name) {
   // repeat mode really builds twice and the floor picks the new buildings up
   const items0 = await page.evaluate(() => RT.S.items.length);
   await page.evaluate(() => RT.place({ kind: 'fac', t: 'bench', repeat: true, real: true })); await tapHex(spots.lone || spots.free); await btn('zr-place').click();
-  ok(await page.evaluate(() => ZRender.placing()), 'repeat mode should stay in placement'); ok(/in the way/i.test(await note()), 'after a repeat place the same hex should now be taken: "' + await note() + '"');
-  await btn('zr-cancel').click(); ok(await page.evaluate(() => RT.S.items.length) === items0 + 1, 'repeat place did not build');
+  ok(await page.evaluate(() => ZRender.placing()), 'repeat mode should stay in placement');
+  { const p1 = (await dbg()).placement, was = spots.lone || spots.free; ok(p1.ok && (p1.q !== was.q || p1.r !== was.r), 'after a repeat place the ghost should hop to another valid hex: ' + JSON.stringify(p1)); ok(await btn('zr-cancel').textContent() === 'Done', 'third button should read Done after a build, reads ' + await btn('zr-cancel').textContent()); }
+  await btn('zr-place').click(); ok(await page.evaluate(() => RT.S.items.length) === items0 + 2, 'second repeat place (straight from the hopped ghost) did not build');
+  const canc0 = await page.evaluate(() => RT.cancelled); await btn('zr-cancel').click(); ok(await page.evaluate(() => RT.done) === 1 && await page.evaluate(() => RT.cancelled) === canc0 && !(await page.evaluate(() => ZRender.placing())), 'Done should call onDone (not onCancel) and leave placement');
+  await page.evaluate(() => RT.place({ kind: 'fac', t: 'bench', repeat: true, real: true })); ok(await btn('zr-cancel').textContent() === 'Cancel', 'before any build the button should read Cancel'); await btn('zr-cancel').click(); ok(await page.evaluate(() => RT.cancelled) === canc0 + 1 && await page.evaluate(() => RT.done) === 1, 'Cancel before any build should call onCancel');
+  await page.evaluate(() => RT.place({ kind: 'fac', t: 'bench', repeat: true, real: true, noDone: true })); await btn('zr-place').click(); await btn('zr-cancel').click(); ok(await page.evaluate(() => RT.cancelled) === canc0 + 2 && await page.evaluate(() => RT.S.items.length) === items0 + 3, 'without onDone, Done should fall back to onCancel');
   const tp = await posOf((spots.lone || spots.free).q, (spots.lone || spots.free).r, 0, 0); await page.mouse.click(tp.x, tp.y); const lt = await lastTap(); ok(lt && lt.item != null, 'the new building is not reported by a tap');
 
   // --- callers and happening characters at the gate; sick / choice / breed / event icons; one animal walking per habitat
@@ -211,13 +218,14 @@ async function runShell(name) {
     ok(await page.evaluate(() => ZT.stack().length) === 0, 'a drag opened the menu');
     // placement through ZCore
     const spot = await page.evaluate(() => { const S = ZT.S; window.__placed = 0; window.__cancel = 0; S.money = Math.max(S.money, 50000); let best = null; for (let r = 0; r < ZD.GRID_H; r++) for (let c = 0; c < ZD.GRID_W; c++) { const a = ZE.fromOffset(c, r); if (!ZE.canPlace(S, 'fac', 'bench', a[0], r, 0)) continue; const oc = ZE.occupancy(S); if (ZE.DIRS.some(d => oc[(a[0] + d[0]) + ',' + (r + d[1])])) continue; /* a lone spot: no combo pop-up to dismiss */ const hb = S.items.find(i => i.k === 'hab'), d2 = Math.abs(a[0] - hb.q) + Math.abs(r - hb.r); if (!best || d2 < best.d) best = { q: a[0], r: r, d: d2 }; }
-      ZRender.startPlacement({ kind: 'fac', t: 'bench', label: 'Garden Bench' }, { onPlace: (q, r, rot) => { window.__placed++; return ZT.act('build', 'fac', 'bench', q, r, rot); }, onCancel: () => { window.__cancel++; } }); ZRender.centerOn(best.q, best.r, true); return best; });
+      ZRender.startPlacement({ kind: 'fac', t: 'bench', label: 'Garden Bench' }, { onPlace: (q, r, rot) => { window.__placed++; return ZT.act('build', 'fac', 'bench', q, r, rot); }, onCancel: () => { window.__cancel++; } }); const st0 = ZRender.debug().placement; window.__startOk = st0.ok; ZRender.centerOn(best.q, best.r, true); return best; });
+    ok(await page.evaluate(() => window.__startOk), 'index.html: the ghost did not start on a valid hex');
     await sleep(300); ok(!(await page.evaluate(() => ZT.running())), 'game should pause during placement');
     const pc = await page.evaluate(([q, r]) => ZRender.hexToClient(q, r), [spot.q, spot.r]); await page.touchscreen.tap(pc.x, pc.y); await sleep(250);
     ok(await page.evaluate(() => ZT.stack().length) === 0, 'a tap during placement opened the menu');
     await page.screenshot({ path: path.join(shots, 'render-shell-place' + sfx + '.png') });
     const bar = await page.evaluate(() => Array.from(document.querySelectorAll('#placement-bar button')).map(x => { const r = x.getBoundingClientRect(); return { t: x.textContent, h: Math.round(r.height), on: r.bottom <= innerHeight && r.height > 0 }; }));
-    ok(bar.length === 3 && bar.every(x => x.h >= 56 && x.on), 'placement buttons in index.html: ' + JSON.stringify(bar)); notes.push('index.html placement: note "' + await page.evaluate(() => document.getElementById('placement-note').textContent) + '", buttons ' + JSON.stringify(bar));
+    ok(bar.length === 2 && bar.map(x => x.t).join() === 'Place,Cancel' && bar.every(x => x.h >= 56 && x.on), 'placement buttons in index.html: ' + JSON.stringify(bar)); notes.push('index.html placement: note "' + await page.evaluate(() => document.getElementById('placement-note').textContent) + '", buttons ' + JSON.stringify(bar));
     const n0 = await page.evaluate(() => ZT.S.items.length); await page.locator('#placement-bar button.zr-place').click(); await sleep(500);
     for (let i = 0; i < 8 && (await page.evaluate(() => ZT.stack().length)) > 0; i++) { await page.evaluate(() => ZT.popAll()); await sleep(150); }
     ok(await page.evaluate(() => window.__placed) === 1 && await page.evaluate(() => ZT.S.items.length) === n0 + 1, 'Place did not build through ZCore'); ok(!(await page.evaluate(() => ZRender.placing())), 'still placing after a successful build');

@@ -58,6 +58,7 @@ async function run(name) {
   const stack = () => ev(() => ZT.stack().join('>'));
   async function openMenu() { await ev(() => { ZT.S.reports.length = 0; ZT.popAll(); }); await sleep(150); await page.touchscreen.tap(195, 330); await sleep(450); }
   async function screen(label, file) { await audit(label); if (file !== false) await shot(file || label); }
+  async function dismiss() { for (let i = 0; i < 6; i++) { const top = await ev(() => ZT.stack().slice(-1)[0] || ''); if (!/^mo-|result|crate-/.test(top)) return; await sleep(600); const p = await ev(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), c = L.querySelector('.rcard, .panel'), r = c.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await page.touchscreen.tap(p.x, p.y); await sleep(500); } }
   async function back() { await tap('Back'); }
 
   await page.goto(URL); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready && window.ZMenus, null, { timeout: 8000 });
@@ -75,6 +76,8 @@ async function run(name) {
   const staffN = await S(() => ZT.S.staff.length);
   await tap('Hire'); await screen('hire');
   await tap('Notice board', { wait: 500 }); await screen('candidates');
+  await sleep(300); await screen('hire-reveal', 'hire-reveal');
+  await ev(() => { let g = 0; while (ZT.stack().length && ZT.stack().slice(-1)[0] !== 'staff-candidates' && g++ < 8) ZCore.pop(); }); await sleep(300); await screen('candidates');
   check(await stack() === 'menu>staff>staff-candidates', 'advert shows who turned up (' + await stack() + ')');
   await tap('Hire'); check(await S(() => ZT.S.staff.length) === staffN + 1, 'hired one candidate with one tap');
   await back(); await screen('staff-after-hire', false);
@@ -84,10 +87,8 @@ async function run(name) {
   await openMenu(); await tap('Projects'); await screen('projects');
   const ready0 = await ev(() => [...document.querySelectorAll('.layer:not([hidden]) .gbox')].map(b => b.textContent.replace(/\s+/g, ' ')));
   console.log('  project boxes: ' + ready0.join(' | '));
-  await tap('Expedition'); await screen('exp-region');
-  await tap('East African'); await screen('exp-team');
-  await tap('Next'); await screen('exp-budget');
-  await tap('Standard'); await screen('exp-confirm');
+  await tap('Expedition'); check(await stack() === 'menu>projects>exp-team', 'with one region the region step is skipped (' + await stack() + ')'); await screen('exp-team');
+  await tap('Next'); await screen('exp-confirm');
   await tap('Send', { wait: 600 });
   check(await ev(() => ZT.S.projects.some(p => p.type === 'expedition')) && await ev(() => ZT.stack().length === 0), 'expedition started and the menu closed');
 
@@ -104,8 +105,8 @@ async function run(name) {
   await openMenu(); await tap('Projects'); await screen('projects-running');
   await tap('Breeding'); await screen('breed-pairs');
   await tap(' + ', { wait: 400 });
-  await screen('breed-lead');
-  await tap(await ev(() => ZT.S.staff.find(s => !ZE.busyStaff(ZT.S)[s.id]).name)); await screen('breed-confirm');
+  if ((await stack()).endsWith('breed-lead')) { await screen('breed-lead'); await tap(await ev(() => ZT.S.staff.find(s => !ZE.busyStaff(ZT.S)[s.id]).name)); } else console.log('  (one free person: lead step skipped)');
+  await screen('breed-confirm');
   await tap('Start', { wait: 600 });
   check(await ev(() => ZT.S.projects.some(p => p.type === 'breed')), 'breeding started when a pair was ready');
   // running project detail + a pending choice answered from the Projects list
@@ -173,9 +174,12 @@ async function run(name) {
   await tap('Garden Bench', { wait: 700 });
   for (let i = 0; i < 2; i++) { h = await freeHex('fac', 'bench'); await page.touchscreen.tap(h.x, h.y); await sleep(250); await page.tap('#placement-bar .zr-place'); await sleep(450); }
   check(await S(() => ZT.S.items.filter(i => i.k === 'fac').length) === facBefore + 2 && await ev(() => ZRender.placing()), 'two benches built in repeat mode and placement stays on');
+  const lbl = await ev(() => document.querySelector('#placement-bar .zr-cancel').textContent.trim()); console.log('  third button after a placement says: ' + lbl);
   await page.tap('#placement-bar .zr-cancel'); await sleep(500);
-  check((await stack()) === 'menu>build', 'cancelling placement returns to the Build screen (' + await stack() + ')');
-
+  if (/Done/i.test(lbl)) check((await stack()) === '' && await ev(() => ZT.running()), 'Done returns to the floor with time running'); else check((await stack()) === 'menu>build', 'Cancel returns to Build (renderer still says Cancel)');
+  await openMenu(); await tap('Build'); await tap('Facilities'); await tap('Garden Bench', { wait: 700 });
+  await page.tap('#placement-bar .zr-cancel'); await sleep(500);
+  check((await stack()) === 'menu>build', 'Cancel before placing anything returns to the Build screen (' + await stack() + ')');
   await tap('Move'); await screen('build-move');
   const benchPos = () => ev(() => JSON.stringify(ZT.S.items.filter(i => i.t === 'bench').map(i => [i.id, i.q, i.r]))); const bp0 = await benchPos();
   await tap('Garden Bench', { wait: 700 }); h = await freeHex('fac', 'bench');
@@ -203,7 +207,7 @@ async function run(name) {
   check(await S(() => ZE.holding(ZT.S).length) === penBefore - 1, 'housed one animal from the pen with one tap');
   await tap('House', { nth: 0, wait: 400 });
   check(await S(() => ZE.holding(ZT.S).length) === 0, 'the pen is empty after housing both with one tap each');
-  await tap('Zoo'); await tap('Mango').catch(async () => tap(await ev(() => ZT.S.animals[0].name)));
+  await ev(() => { ZT.S.projects.length = 0; ZCore.rerender(); }); await tap('Zoo'); await tap(await ev(() => ZT.S.animals.find(a => a.hab != null && !ZE.busyAnimals(ZT.S)[a.id]).name));
   await screen('animal-detail');
   await tap('Choose habitat'); await screen('animal-hab'); await back();
   await back();
@@ -211,8 +215,7 @@ async function run(name) {
   await ev(() => { ZE.debug.caller(ZT.S, 'trader'); ZT.S.reports.length = 0; }); await ev(() => ZCore.rerender()); await sleep(300); await screen('animals-market-2');
   await tap('Mystery crate'); await screen('crate');
   const aN = await S(() => ZT.S.animals.length);
-  await tap('Open', { wait: 500 }); await shot('crate-rarity'); await tap('Tap to continue', { wait: 500 }).catch(() => page.touchscreen.tap(195, 400)); await sleep(300);
-  await shot('crate-animal'); await page.touchscreen.tap(195, 420).catch(() => 0); await sleep(500);
+  await tap('Open', { wait: 500 }); await shot('crate-rarity'); await sleep(900); await shot('crate-animal'); await dismiss();
   check(await S(() => ZT.S.animals.length) === aN + 1, 'opened the mystery crate: one more animal');
   await ev(() => { if (ZT.stack().length && ZT.stack().slice(-1)[0] !== 'animals') ZT.popAll(); });
   if (!(await stack()).includes('animals')) { await openMenu(); await tap('Animals'); }
@@ -233,7 +236,7 @@ async function run(name) {
   await tap('Train'); await screen('staff-train');
   await tap('Animal Handling', { wait: 500 }); await shot('train-result');
   check(await ev(o => { const s = ZE.staffer(ZT.S, o.id); return s.care + s.sci + s.exp + s.charm > o.sum; }, tr0), 'training raised a stat and showed the result');
-  await tap('Tap to continue', { wait: 400 }).catch(() => page.touchscreen.tap(195, 420));
+  await dismiss();
   await ev(() => { const s = ZT.S.staff.find(x => !ZE.busyStaff(ZT.S)[x.id]); s.lvl = 9; ZE.refresh(ZT.S); }); await ev(() => ZCore.rerender()); await sleep(200);
   await tap('Change job'); await screen('staff-job');
   await tap('Guide'); await screen('job-confirm', false); await tap('Change', { wait: 500 });

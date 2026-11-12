@@ -58,6 +58,20 @@
 | `ZRender.clientToHex(x, y)` | The hex under a client point. |
 | `ZRender.entrance()` | `{q, r}` of the gate hex the renderer is using. |
 
+## Placement flow as of the first-year test round (this replaces any older wording below)
+
+- `startPlacement(spec, { onPlace, onCancel, onDone? })`.
+- The ghost starts on a **valid** hex: the valid spot nearest the middle of the screen (the camera glides to it if it is off
+  screen). A moved item starts where it stands. If nothing fits anywhere it starts on the nearest owned hex and says why.
+- **Rotate exists only when turning changes the footprint.** Single-hex facilities and fully round habitats (Reef, Misty Isles)
+  get two buttons, Place and Cancel, which share the bar. There is never a dead button.
+- One-off placement: a successful Place leaves placement by itself.
+- Repeat placement: after each successful Place the ghost hops to the nearest hex that still fits, and the third button
+  (`button.zr-cancel`) reads **Done**. Leaving after at least one build calls `onDone` if given, otherwise `onCancel`.
+  Before any build it reads Cancel and calls `onCancel`.
+- The note is one line (no wrapping); the label prefix is dropped when the line would be long. Buttons are 56 px tall, or
+  44 px when the window is under 480 px tall (landscape phone) so they cover less floor.
+
 ## Placement mode details
 
 - The ghost starts on the owned hex nearest the middle of the screen. Tap a hex (inside the grid) to move it; drag still scrolls.

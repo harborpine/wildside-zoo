@@ -5,6 +5,8 @@
   const D = window.ZD, E = window.ZE;
   const SAVE_KEY = 'wildside-zoo-v3', LEGACY_KEY = 'wildside-zoo-v3-legacy', PREV_LOG_KEY = 'wildside-zoo-v3-prevlog';
   const SAVE_V = 3, LOG_FORMAT = 1;
+  const DEV_TOOLS = true;   // the one switch for developer-only features: Note for Claude, Copy log, Download log. Set false for a store build.
+  const LANDSCAPE = window.matchMedia ? window.matchMedia('(orientation: landscape) and (max-height: 500px) and (pointer: coarse)') : null;
   const WEEK_MS = [0, 10000, 5000];          // real milliseconds per in-game week at speed 1 and 2 (about 6.7 real hours per 20 years at the owner's pace)
   const MAP_ACTIONS = { build: 1, move: 1, remove: 1, upgrade: 1, buyLand: 1 };
   const MAX_CUR_EVENTS = 800, KEEP_DETAIL_QUARTERS = 6, MAX_ARG_LEN = 80;
@@ -12,7 +14,7 @@
   let S = null, speed = 1, acc = 0, lastT = 0, lastRunning = null, timer = 0;
   let busy = null;                          // the report currently on screen (or null)
   let busySince = 0, emptyStackSince = 0, token = 0;
-  let dirtySave = false, saveTimer = 0, saveFailedToast = false;
+  let skipReports = false, dirtySave = false, saveTimer = 0, saveFailedToast = false;
   let legacy = { runs: 0, best: 0, aff: {}, combos: {}, hall: [], carry: null };
   const errors = [];
   const handlers = {};
@@ -92,6 +94,7 @@
     if (!rows || !rows.length) l.appendChild(el('div', { cls: 'empty' }, (o && o.empty) || 'Nothing here yet.'));
     return l;
   }
+  function chipRow(items) { return el('div', { cls: 'chips' }, items); }
   function stat(label, value, kind) { return el('span', { cls: 'chip' + (kind ? ' ' + kind : '') }, el('b', label), el('span', { cls: 'v' }, value == null ? '?' : String(value))); }
   function sign(level) { const k = level == null ? 'q' : ['m2', 'm1', 'p1', 'p2'][Math.max(0, Math.min(3, level | 0))]; return el('span', { cls: 'sg ' + k }, fmt.signs(level)); }
   function stars(n, max) { max = max || 5; const w = el('span', { cls: 'stars', 'aria-label': n + ' of ' + max + ' stars' }); for (let i = 0; i < max; i++) w.appendChild(el('i', { cls: 'star' + (i < n ? '' : ' off') })); return w; }
@@ -140,10 +143,10 @@
       body.appendChild(el('div', { cls: 'btnrow' }, btn(o.no || 'No', () => api.pop(), { cls: 'ghost big' }), btn(o.yes || 'Yes', () => { api.pop(); if (onYes) onYes(); }, { cls: (o.danger ? 'danger' : 'primary') + ' big' })));
     } });
   }
-  const ui = { el, btn, grid, list, stat, img, icon, sign, stars, flames, bar, section, note, tabs, reveal, choices, toast, confirm };
+  const ui = { chipRow, el, btn, grid, list, stat, img, icon, sign, stars, flames, bar, section, note, tabs, reveal, choices, toast, confirm };
 
   // ------------------------------------------------------------------ screen stack
-  function isRunning() { return !!S && !stack.length && !busy && !placing(); }
+  function isRunning() { return !!S && !stack.length && !busy && !placing() && !(LANDSCAPE && LANDSCAPE.matches); }
   function syncRunning() { const r = isRunning(); if (r !== lastRunning) { lastRunning = r; const rr = R(); if (rr && rr.setRunning) { try { rr.setRunning(r); } catch (e) { recordError(e, 'setRunning'); } } } if (!r && !stack.length && !busy) { /* placement */ } }
 
   function renderEntry(en) {
@@ -182,7 +185,8 @@
     afterStackChange();
   }
   function pop() { if (stack.length) removeEntry(stack[stack.length - 1]); }
-  function popAll() { while (stack.length) { const en = stack[stack.length - 1]; stack.pop(); en.layer.remove(); if (en.def.onClose) { try { en.def.onClose(en.api); } catch (e) { recordError(e, 'onClose'); } } } afterStackChange(); }
+  function popAll() { if (busy) { const b = busy; busy = null; token++; if (S) { const i = S.reports.indexOf(b); if (i >= 0) S.reports.splice(i, 1); } }   // closing everything also dismisses the report being shown
+    while (stack.length) { const en = stack[stack.length - 1]; stack.pop(); en.layer.remove(); if (en.def.onClose) { try { en.def.onClose(en.api); } catch (e) { recordError(e, 'onClose'); } } } afterStackChange(); }
   function replace(def) { if (!stack.length) return push(def); const en = stack[stack.length - 1]; stack.pop(); en.layer.remove(); if (en.def.onClose) { try { en.def.onClose(en.api); } catch (e) { recordError(e, 'onClose'); } } return push(def); }
   function afterStackChange() { document.body.classList.toggle('screens-open', stack.length > 0); emptyStackSince = stack.length ? 0 : performance.now(); syncRunning(); if (!stack.length && !busy) setTimeout(flushReports, 0); }
   function rerender() { if (stack.length) renderEntry(stack[stack.length - 1]); }
@@ -209,6 +213,7 @@
       const i = S.reports.indexOf(report); if (i >= 0) S.reports.splice(i, 1);
       busy = null; setTimeout(() => { syncRunning(); flushReports(); updateStrip(); }, 0);
     };
+    if (skipReports) { done(); return; }   // test hook: ZT.skipReports = true dismisses every report at once
     const h = handlers[report.type] || handlers['*'];
     if (!h && window.ZMoments) { log('report-unhandled', { type: report.type }); done(); return; }   // the real game never shows the plain card
     try { (h || defaultCard)(report, done); } catch (e) { recordError(e, 'report ' + report.type); done(); }
@@ -270,6 +275,7 @@
     return L.join('\n');
   }
   function copyLog() {
+    if (!DEV_TOOLS) return Promise.resolve(false);
     const text = logText();
     const fallback = () => { try { const ta = el('textarea', { style: { position: 'fixed', left: '-999px', top: '0' } }); ta.value = text; document.body.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (e) { return false; } };
     const say = ok => { toast(ok ? 'Log copied (' + Math.ceil(text.length / 1024) + ' KB)' : 'Could not copy. Use Download log.', ok ? 'good' : 'bad'); return ok; };
@@ -277,14 +283,16 @@
     return Promise.resolve(say(fallback()));
   }
   function downloadLog() {
+    if (!DEV_TOOLS) return false;
     try {
       const blob = new Blob([logText()], { type: 'text/plain' }), url = URL.createObjectURL(blob), a = el('a', { href: url, download: 'wildside-zoo-log-' + (S ? S.runId : 'x') + '-w' + (S ? S.week : 0) + '.txt' });
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000); toast('Log downloaded', 'good'); return true;
     } catch (e) { toast('Could not download. Use Copy log.', 'bad'); return false; }
   }
-  function addNote(text) { text = String(text || '').trim().slice(0, 600); if (!text || !S) return false; S.glog.notes.push({ w: S.week, text }); log('note', { text }); queueSave(); toast('Note saved in the log', 'good'); return true; }
+  function addNote(text) { if (!DEV_TOOLS) return false; text = String(text || '').trim().slice(0, 600); if (!text || !S) return false; S.glog.notes.push({ w: S.week, text }); log('note', { text }); queueSave(); toast('Note saved in the log', 'good'); return true; }
   function logScreen() {
     return push({ id: 'log', title: 'Game log', render(body, api) {
+      if (!DEV_TOOLS) { body.appendChild(note('Nothing to show here.')); return; }
       body.appendChild(note('Everything you do is written down here, so it can be pasted into a chat to tune the game.'));
       body.appendChild(el('div', { cls: 'btnrow' }, btn('Copy log', () => copyLog(), { cls: 'primary big' }), btn('Download', () => downloadLog(), { cls: 'blue big' })));
       body.appendChild(note('Size: ' + Math.ceil(logText().length / 1024) + ' KB'));
@@ -411,7 +419,7 @@
   }
 
   const Core = {
-    version: '0.1', fmt, ui, WEEK_MS, errors,
+    version: '0.1', devTools: DEV_TOOLS, fmt, ui, WEEK_MS, errors,
     get S() { return S; }, get speed() { return speed; }, get legacy() { return legacy; }, get busy() { return !!busy; },
     newGame, save, load, setSpeed, act, push, pop, popAll, replace, rerender, stack: () => stack.map(e => e.id), top: () => (stack.length ? stack[stack.length - 1].api : null),
     openMenu, onReport, flushReports, running: isRunning, saveLegacy,
@@ -420,6 +428,7 @@
   };
   window.ZCore = Core;
   window.ZT = {
+    get skipReports() { return skipReports; }, set skipReports(v) { skipReports = !!v; },
     get S() { return S; }, errors, stack: Core.stack, act, newGame, openMenu, running: isRunning, setSpeed, WEEK_MS,
     tick(n) { for (let i = 0; i < (n || 1); i++) doTick(); return S ? S.week : 0; },
     popAll, flush: flushReports, logText, save, load

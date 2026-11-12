@@ -5,9 +5,10 @@ const pw = require('./pw.js');
 const ROOT = path.resolve(__dirname, '..'), URL = 'file:///' + ROOT.replace(/\\/g, '/') + '/index.html';
 const SHOTS = path.join(__dirname, 'shots'); fs.mkdirSync(SHOTS, { recursive: true });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const args = process.argv.slice(2), QUICK = args.includes('--quick');
+const args = process.argv.slice(2).filter(a => !a.startsWith('--only=')), ONLY = (process.argv.find(a => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean), QUICK = args.includes('--quick');
 const browsers = args.filter(a => a === 'chromium' || a === 'webkit'); if (!browsers.length) browsers.push('chromium', 'webkit');
 let failures = 0, warnings = 0;
+const want = n => !ONLY.length || ONLY.includes(n);   // sections: cards callers happenings yearly reveals yearend realplay reopen inmenu
 const check = (cond, msg) => { console.log((cond ? '  PASS ' : '  FAIL ') + msg); if (!cond) failures++; };
 const warn = msg => { console.log('  WARN ' + msg); warnings++; };
 
@@ -70,8 +71,10 @@ async function run(name) {
   const fresh = async (fn, arg) => { await ev(fn || (() => { ZT.newGame({}); ZT.S.money = 1e6; ZT.S.rp = 5000; ZT.S.reports.length = 0; }), arg); await sleep(150); };
   const pushReport = r => ev(r0 => { ZT.S.reports.push(r0); ZT.flush(); }, r);
 
+  const mkFound = (n, rar) => ev(({ n, rar }) => { const ids = ['lion', 'elephant', 'giraffe', 'zebra', 'tiger', 'panda'].filter(i => ZD.SPECIES[i]); const out = []; for (let i = 0; i < n; i++) { const sp = ids[i % ids.length]; out.push({ id: 900 + i, sp, rarity: rar || ZD.SPECIES[sp].rarity, isNew: i === 0, variant: i === 1, charm: 40 + i * 9, vigor: 30 + i * 7, wit: 25 + i * 11, hab: i === 2 ? null : (ZT.S.items.find(x => x.k === 'hab') || {}).id }); } return out; }, { n, rar });
   // ---------------------------------------------------------------- 1. quick cards
   console.log(' -- small cards');
+  if (want('cards')) {
   await fresh();
   await pushReport({ type: 'rankup', rank: 3, name: 'Zoo Manager', unlocks: await ev(() => ZE.rankUnlocks(3)) });
   await drive('rankup', { shots: 'rankup' }); await settled('rankup');
@@ -83,8 +86,10 @@ async function run(name) {
   await pushReport({ type: 'vip', id: 'nobody', money: 0, rep: 0, boost: 0 }); await drive('vip unknown id'); await settled('vip unknown id');
   await pushReport({ type: 'combo', id: 'does-not-exist', anchor: 1, members: [] }); await sleep(300); await settled('combo with unknown id (skipped)');
 
+  }
   // ---------------------------------------------------------------- 2. callers
   console.log(' -- callers');
+  if (want('callers')) {
   for (const kind of ['trader', 'director', 'headhunter']) {
     await fresh(k => { ZT.newGame({}); ZT.S.money = 1e6; ZT.S.rp = 5000; ZT.S.reports.length = 0; ZE.debug.caller(ZT.S, k); }, kind);
     await ev(() => ZT.flush());
@@ -111,8 +116,10 @@ async function run(name) {
     check(await ev(() => window.__cdone === true), 'caller ' + kind + ': showCaller calls done'); await ev(() => { window.__cdone = false; });
   }
 
+  }
   // ---------------------------------------------------------------- 3. every happening, every option
   console.log(' -- happenings');
+  if (want('happenings')) {
   const keys = await ev(() => Object.keys(ZD.HAPPENINGS));
   let hshots = 0;
   for (const key of keys) {
@@ -138,8 +145,10 @@ async function run(name) {
   await shot('choice-greyed');
   await page.locator('.layer:not([hidden]) .choices .btn.opt').nth(0).tap(); await sleep(500); await drive('tv free option', { shots: null }); await settled('tv free');
 
+  }
   // ---------------------------------------------------------------- 4. yearly events
   console.log(' -- yearly events');
+  if (want('yearly')) {
   for (const id of ['openday', 'festival']) {
     for (let i = 0; i < 4; i++) {
       await ev(k => { ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; ZE.debug.yearly(S, k); ZT.flush(); }, id);
@@ -168,10 +177,11 @@ async function run(name) {
   await waitStack(s => s.stack.length, 3000); await sleep(300); await tapSel('.layer:not([hidden]) .btn.ghost'); await settled('show not now');
   check(await ev(() => !!ZT.S.show && (ZMoments.showShow(), ZT.stack().length > 0)), 'show: still enterable later via ZMoments.showShow'); await ev(() => ZT.popAll()); await sleep(200);
 
+  }
   // ---------------------------------------------------------------- 5. synthetic reveals (to see rare cases) and timing
   console.log(' -- reveals');
+  if (want('reveals')) {
   await fresh();
-  const mkFound = (n, rar) => ev(({ n, rar }) => { const ids = ['lion', 'elephant', 'giraffe', 'zebra', 'tiger', 'panda'].filter(i => ZD.SPECIES[i]); const out = []; for (let i = 0; i < n; i++) { const sp = ids[i % ids.length]; out.push({ id: 900 + i, sp, rarity: rar || ZD.SPECIES[sp].rarity, isNew: i === 0, variant: i === 1, charm: 40 + i * 9, vigor: 30 + i * 7, wit: 25 + i * 11, hab: i === 2 ? null : (ZT.S.items.find(x => x.k === 'hab') || {}).id }); } return out; }, { n, rar });
   for (const n of [1, 3, 5]) {
     const found = await mkFound(n);
     await pushReport({ type: 'expedition', region: 'savanna', found, rp: 14, fragment: n === 3 ? 2 : 0, notes: ['Field notes: +14 research.'], ups: n === 5 ? ['Ada', 'Ben'] : [], staff: [] });
@@ -211,8 +221,10 @@ async function run(name) {
   await tapAway(); await sleep(400); check(await ev(() => ZMoments.cur.i === 1), 'second tap moves to the next animal');
   await ev(() => ZT.popAll()); await settled('expedition popAll mid-sequence');
 
+  }
   // ---------------------------------------------------------------- 6. year end and final score
   console.log(' -- year end, final');
+  if (want('yearend')) {
   await fresh(() => { ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; for (let i = 0; i < 47; i++) ZE.tick(S); S.reports.length = 0; ZE.tick(S); S.reports = S.reports.filter(r => r.type === 'yearend'); });
   check(await ev(() => ZT.S.reports.length === 1), 'a year end report exists after 48 weeks');
   await ev(() => ZT.flush());
@@ -232,8 +244,10 @@ async function run(name) {
   await fresh(() => { ZT.newGame({}); const S = ZT.S; S.reports.length = 0; S.week = 20 * 48 - 1; ZE.tick(S); S.reports = S.reports.filter(r => r.type === 'final'); ZT.flush(); });
   await waitStack(s => s.stack.length, 3000); await sleep(3800); await page.locator('.layer:not([hidden]) .btn.ghost').first().tap(); await settled('final: keep playing');
 
+  }
   // ---------------------------------------------------------------- 7. real play: projects, choices, results
   console.log(' -- real play');
+  if (want('realplay')) {
   const covered = {}, repSeen = {};
   async function playOut(maxTicks, optPick, shotsFor) {
     let ticks = 0, seen = [];
@@ -279,7 +293,6 @@ async function run(name) {
     }, kind);
     if (!ok) { warn('trial ' + t + ' (' + kind + ') could not start'); continue; }
     await playOut(kind === 'breed' ? 40 : kind === 'expedition' ? 24 : 8, pickFor, shotsFor);
-    { const tel = await ev(() => (ZT.S.tele && ZT.S.tele.reports) || {}); for (const k in tel) repSeen[k] = (repSeen[k] || 0) + tel[k]; }
     await settled('real trial ' + t + ' ' + kind);
     if (!QUICK && Object.keys(wantOpts).every(k => Array.from({ length: wantOpts[k] }, (_, i) => covered[k + ':' + i]).every(Boolean))) break;
   }
@@ -287,11 +300,14 @@ async function run(name) {
   console.log('  covered choice options: ' + Object.keys(covered).sort().join(' '));
   if (missing.length) warn('not reached by random play this run: ' + missing.join(' ')); else check(true, 'every project choice option was played through the screen');
   // the real expedition/birth/review reports were driven above through playOut; confirm they happened at least once each
-  console.log('  reports raised and shown in real play: ' + JSON.stringify(repSeen));
-  for (const t of ['expedition', 'birth', 'review', 'choice']) check((repSeen[t] || 0) > 0, 'real play raised and showed a ' + t + ' report (' + (repSeen[t] || 0) + ')');
+  const cnt = await ev(() => ({ shown: ZMoments.shown, finished: ZMoments.finished }));
+  console.log('  handler calls in real play (shown / finished): ' + JSON.stringify(cnt));
+  for (const t of ['expedition', 'birth', 'review', 'choice']) check((cnt.shown[t] || 0) > 0 && cnt.finished[t] === cnt.shown[t], 'real play: a real ' + t + ' report was shown and dismissed (' + (cnt.shown[t] || 0) + ' shown, ' + (cnt.finished[t] || 0) + ' dismissed)');
 
+  }
   // ---------------------------------------------------------------- 8. showChoice reopen, save and reload, hidden tab
   console.log(' -- reopen, reload, hidden tab');
+  if (want('reopen')) {
   const pid = await ev(() => { ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; const ex = S.staff.find(s => s.role === 'explorer') || S.staff[0]; const r = ZCore.act('startExpedition', 'savanna', [ex.id], 1); if (!r.ok) return null; for (let i = 0; i < 12 && !S.projects.some(p => p.choice); i++) ZE.tick(S); S.reports = S.reports.filter(r => r.type === 'choice'); return (S.projects.find(p => p.choice) || {}).id || null; });
   check(!!pid, 'a pending project choice exists for the reopen test');
   if (pid) {
@@ -322,6 +338,38 @@ async function run(name) {
   const hs = await state(); check(hs.cur && hs.cur.final, 'hidden tab: the sequence still reached its final card (' + JSON.stringify(hs.cur) + ')');
   for (let g = 0; g < 6 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); }
   await settled('hidden tab');
+
+  }
+  if (want('inmenu')) {
+    console.log(' -- called from inside an open menu screen');
+    await ev(() => { ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.rp = 5000; S.reports.length = 0; });
+    const openMenu = async () => { await ev(() => { ZCore.push({ id: 'menu-test', title: 'Test menu', render(b) { b.textContent = 'menu'; } }); }); await sleep(250); };
+    const backOnMenu = async label => { const s = await waitStack(s => s.stack.length === 1 && s.stack[0] === 'menu-test', 3000); check(!!s, label + ': returns to the menu screen (stack ' + JSON.stringify((await state()).stack) + ')'); };
+    // revealAnimal
+    await openMenu(); await ev(() => { window.__d = 0; ZMoments.revealAnimal({ sp: 'lion', charm: 50, vigor: 40, wit: 30 }, { kicker: 'Test' }, () => { window.__d++; }); });
+    await drive('revealAnimal in menu', { shots: null }); await backOnMenu('revealAnimal'); check(await ev(() => window.__d === 1), 'revealAnimal in menu: done called once');
+    await ev(() => ZT.popAll());
+    // result
+    await openMenu(); await ev(() => { window.__d = 0; ZMoments.result({ title: 'Hi', lines: ['x'], good: true }, () => { window.__d++; }); });
+    await drive('result in menu'); await backOnMenu('result'); check(await ev(() => window.__d === 1), 'result in menu: done called once');
+    await ev(() => ZT.popAll());
+    // revealHire
+    await ev(() => { ZT.S.rank = 5; ZCore.act('advertise', 1); });
+    await openMenu(); await ev(() => { window.__d = 0; ZMoments.revealHire(ZT.S.candidates, () => { window.__d++; }); });
+    await waitStack(s => s.stack.length === 2, 3000); await waitStack(s => s.cur && s.cur.final, 6000); await sleep(700);
+    await tapSel('.layer:not([hidden]) .btn.ghost'); await backOnMenu('revealHire'); check(await ev(() => window.__d === 1), 'revealHire in menu: done called once');
+    await ev(() => ZT.popAll());
+    // showHappening: dismiss a pending happening, then reopen it
+    await ev(() => { ZT.S.happening = null; ZE.debug.happening(ZT.S, 'school'); ZT.flush(); });
+    await waitStack(s => s.stack.length > 0, 3000); await sleep(400); await ev(() => ZT.popAll()); await settled('school dismissed');
+    check(await ev(() => !!ZT.S.happening && !!ZT.S.happening.options), 'a dismissed happening is still pending');
+    await openMenu(); await ev(() => { window.__d = 0; ZMoments.showHappening(() => { window.__d++; }); });
+    await waitStack(s => s.stack.length === 2, 3000); await sleep(400);
+    await drive('showHappening option 0', { pick: 0 }); await backOnMenu('showHappening'); check(await ev(() => window.__d === 1 && !ZT.S.happening), 'showHappening: answered, done once, happening cleared');
+    await ev(() => ZT.popAll());
+    await ev(() => { window.__d = 0; ZMoments.showHappening(() => { window.__d++; }); }); await sleep(200);
+    check(await ev(() => window.__d === 1 && ZT.stack().length === 0), 'showHappening with nothing pending just calls done');
+  }
 
   // ---------------------------------------------------------------- 9. errors
   const errs = await ev(() => ZT.errors.slice());

@@ -9,7 +9,7 @@
   if (!Z || !E || !D) { window.ZMoments = { init() {}, errors: ['ZCore, ZE or ZD missing'] }; return; }
   const ui = Z.ui, el = ui.el, fmt = Z.fmt;
   const S = () => Z.S;
-  const errors = [];
+  const errors = [], shown = {}, finished = {};   // shown/finished: handler calls and done() calls per report type (for tests)
 
   // ------------------------------------------------------------------ small helpers
   function rec(e, where) {
@@ -547,7 +547,8 @@
     const c = D.COMBOS.find(x => x.id === r.id);
     if (!c) { once(done)(); return null; }
     const it = E.item(S(), r.anchor); let u = null;
-    if (it) u = it.k === 'fac' ? bUrl(it.t, 3) : tUrl('hab:' + it.t, 2);
+    if (it && it.k === 'fac') u = bUrl(it.t, 3);
+    else if (it) { const an = E.inHab(S(), it.id)[0]; u = an ? aUrl(an.sp, { variant: !!an.variant }, 4) : tUrl('hab:' + it.t, 2); }
     return simpleCard('mo-combo', { tone: 'gold', kicker: 'Combo found!', img: u || iUrl('star', 8), imgCls: 'small', title: c.name, lines: [bonusLine(c)] }, done);
   }
   function secretMoment(r, done) {
@@ -740,6 +741,8 @@
   }
   function saveLegacyOnce(r) {
     const s = S(); if (!s || !s.flags || s.flags.legacySaved) return;
+    try { if (window.ZMenus && ZMenus.recordLegacy && ZMenus.recordLegacy() && s.flags.legacySaved) return; } catch (e) { rec(e, 'recordLegacy'); }
+    if (s.flags.legacySaved) return;
     try {
       s.flags.legacySaved = true;
       const L = Z.legacy, last = s.history[s.history.length - 1];
@@ -863,7 +866,8 @@
   // ------------------------------------------------------------------ registration
   function reg(type, fn) {
     Z.onReport(type, (r, done) => {
-      const d = once(done);
+      shown[type] = (shown[type] || 0) + 1;
+      const d = once(function () { finished[type] = (finished[type] || 0) + 1; done(); });
       try { fn(r, d); } catch (e) { rec(e, type); d(); }
     });
   }
@@ -887,11 +891,17 @@
   }
 
   window.ZMoments = {
-    init: init, errors: errors,
+    init: init, errors: errors, shown: shown, finished: finished,
     revealAnimal: revealAnimal, revealCrate: revealCrate, revealHire: revealHire, revealTrain: revealTrain, result: result,
     showCaller: (kind, done) => callerMoment(kind, done, false),
     showChoice: (pid, done) => choiceMoment(pid, done),
     showShow: done => showPicker(done),
+    showHappening: done => {
+      const h = S().happening;
+      if (!h) { ui.toast('Nothing is waiting'); once(done)(); return null; }
+      const rep = { type: 'happening', key: h.key, title: D.HAPPENINGS[h.key] ? D.HAPPENINGS[h.key].title : h.title, text: h.text, bad: h.bad, who: h.who, hab: h.hab, animal: h.animal, newAnimal: h.newAnimal, options: h.options };
+      return happeningMoment(rep, done);
+    },
     pendingChoices: () => (S().projects || []).filter(p => p.choice).map(p => p.id)
   };
   try { init(); } catch (e) { rec(e, 'init'); }

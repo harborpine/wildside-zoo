@@ -562,6 +562,17 @@
     }
     return { bar: bar, note: note };
   }
+  function canHere(S, q, r) { try { return !!Z.canPlace(S, P.spec.kind, P.spec.t, q, r, P.rot, P.spec.moveId); } catch (e) { return false; } }
+  function seekValid(x, y, skipCurrent) { // put the ghost on the valid hex nearest a point; if nothing fits anywhere, the nearest owned hex
+    const S = st(); if (!S || !P || !M) return false; let best = null, bd = 1e18, fall = null, fd = 1e18;
+    for (const k in M.cells) { const c = M.cells[k]; if (!c.owned || (skipCurrent && c.q === P.q && c.r === P.r)) continue; const d = (c.x - x) * (c.x - x) + (c.y - y) * (c.y - y) * 1.6; if (d < fd) { fd = d; fall = c; } if (d < bd && canHere(S, c.q, c.r)) { bd = d; best = c; } }
+    const c = best || fall; if (c) { P.q = c.q; P.r = c.r; } return !!best;
+  }
+  function showGhost() { // glide the camera only if the ghost's footprint is not comfortably on screen
+    if (!P) return; let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; Z.cellsOf(P.spec.kind, P.spec.t, P.q, P.r, P.rot).forEach(c => { const p = G.toScreen(c[0], c[1]); a0 = Math.min(a0, p.x); a1 = Math.max(a1, p.x); b0 = Math.min(b0, p.y); b1 = Math.max(b1, p.y); });
+    const barH = P.dom && P.dom.bar ? (P.dom.bar.getBoundingClientRect().height + 40) / (cssH || 1) * vh : vh * 0.2;
+    if (a0 - HW < cam.x + 4 || a1 + HW > cam.x + vw - 4 || b0 - HH - 20 < cam.y || b1 + HH > cam.y + vh - barH) { const ox = cam.x, oy = cam.y; cam.x = (a0 + a1) / 2 - vw / 2; cam.y = (b0 + b1) / 2 - vh * 0.42; clampCam(); cam.tx = cam.x; cam.ty = cam.y; cam.x = ox; cam.y = oy; cam.vx = cam.vy = 0; }
+  }
   function comboNames(list) { const out = []; list.forEach(a => { const c = D.COMBOS.find(x => x.id === a.id); const n = c ? c.name : a.id; if (out.indexOf(n) < 0) out.push(n); }); return out; }
   function evalPlacement() {
     const S = st(); if (!P || !S) return; const sp = P.spec;
@@ -585,7 +596,7 @@
     if (P.fail) { msg = P.fail; P.state = 'bad'; P.fail = null; }
     P.msg = msg;
     P.outline = outlineSprite(cs, P.state === 'bad' ? '#ff6a5c' : P.state === 'combo' ? '#ffd84a' : P.state === 'warn' ? '#ffb056' : '#ffffff');
-    if (P.dom) { P.dom.note.textContent = (sp.label ? sp.label + ': ' : '') + msg; P.dom.note.setAttribute('data-state', P.state); if (P.dom.place) { P.dom.place.setAttribute('aria-disabled', ok ? 'false' : 'true'); P.dom.place.style.opacity = ok ? '' : '0.55'; } }
+    if (P.dom) { P.dom.note.textContent = (sp.label && (sp.label + msg).length <= 34 ? sp.label + ': ' : '') + msg; P.dom.note.setAttribute('data-state', P.state); if (P.dom.place) { P.dom.place.setAttribute('aria-disabled', ok ? 'false' : 'true'); P.dom.place.style.opacity = ok ? '' : '0.55'; } }
   }
   R.startPlacement = function (spec, cbs) {
     if (P) R.stopPlacement();
@@ -593,22 +604,26 @@
     const dom = ensureDom(), moved = spec.moveId != null ? (S.items || []).find(i => i.id === spec.moveId) : null;
     P = { spec: Object.assign({}, spec), cbs: cbs || {}, q: 0, r: 0, rot: spec.rot != null ? spec.rot : moved ? moved.rot || 0 : 0, dom: dom, t: 0 };
     if (moved) { if (!P.spec.kind) P.spec.kind = moved.k; if (!P.spec.t) P.spec.t = moved.t; }
-    // start at the hex nearest the middle of the screen (a moved item starts where it stands)
-    const cx = cam.x + vw / 2, cy = cam.y + vh * 0.42; let best = null, bd = 1e18;
-    for (const k in M.cells) { const c = M.cells[k]; if (!c.grid) continue; const d = (c.x - cx) * (c.x - cx) + (c.y - cy) * (c.y - cy) * 3 + (c.owned ? 0 : 1e6); if (d < bd) { bd = d; best = c; } }
-    if (best) { P.q = best.q; P.r = best.r; }
+    // start on a VALID hex: the one nearest the middle of the screen (a moved item starts where it stands), so the first Place normally works
+    if (moved && spec.rot == null) { P.q = moved.q; P.r = moved.r; } else seekValid(cam.x + vw / 2, cam.y + vh * 0.42, false);
+    showGhost();
     dom.bar.textContent = '';
-    const b = (label, cls, fn) => { const el = document.createElement('button'); el.type = 'button'; el.textContent = label; el.className = 'zr-btn ' + cls; el.style.minHeight = '56px'; el.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); fn(); }); dom.bar.appendChild(el); return el; };
-    dom.rotate = b('Rotate', 'zr-rotate', () => { if (!P) return; P.rot = (P.rot + 1) % 6; evalPlacement(); });
+    const b = (label, cls, fn) => { const el = document.createElement('button'); el.type = 'button'; el.textContent = label; el.className = 'zr-btn ' + cls; el.style.minHeight = (root.innerHeight && root.innerHeight < 480 ? 44 : 56) + 'px'; el.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); fn(); }); dom.bar.appendChild(el); return el; };
+    // Rotate only exists when turning changes the footprint (not for single-hex facilities or fully round habitats)
+    const fp = rot => Z.cellsOf(P.spec.kind, P.spec.t, 0, 0, rot).map(c => c[0] + ',' + c[1]).sort().join(';'); let turns = false; try { turns = fp(0) !== fp(1); } catch (e) { turns = false; }
+    dom.rotate = turns ? b('Rotate', 'zr-rotate', () => { if (!P) return; P.rot = (P.rot + 1) % 6; evalPlacement(); }) : null;
     dom.place = b('Place', 'zr-place', () => {
       if (!P) return; if (!P.ok) { evalPlacement(); P.t = 0; return; }
       let res = null; try { res = P.cbs.onPlace ? P.cbs.onPlace(P.q, P.r, P.rot) : { ok: true }; } catch (e) { res = { ok: false, msg: 'That did not work.' }; }
       if (!P) return;
       if (res && res.ok === false) { P.fail = res.msg || 'Not possible.'; evalPlacement(); return; }
-      mapDirty = true; if (P.spec.repeat) { const S2 = st(); if (S2) rebuild(S2); } else R.stopPlacement();
+      mapDirty = true; if (!P.spec.repeat) { R.stopPlacement(); return; }
+      // repeat: stay in placement, hop the ghost to the nearest spot that still fits, and the third button becomes Done
+      P.count = (P.count || 0) + 1; if (P.dom.cancel) P.dom.cancel.textContent = 'Done'; const S2 = st(); if (S2) rebuild(S2);
+      const here = G.toScreen(P.q, P.r); seekValid(here.x, here.y, true); evalPlacement(); showGhost();
     });
-    dom.cancel = b('Cancel', 'zr-cancel', () => { if (!P) return; const cb = P.cbs.onCancel; R.stopPlacement(); if (cb) cb(); });
-    if (P.spec.kind !== 'hab') dom.rotate.disabled = true;
+    dom.cancel = b('Cancel', 'zr-cancel', () => { if (!P) return; const cb = P.count > 0 && P.cbs.onDone ? P.cbs.onDone : P.cbs.onCancel; R.stopPlacement(); if (cb) cb(); });
+    dom.note.style.whiteSpace = 'nowrap'; dom.note.style.overflow = 'hidden'; dom.note.style.textOverflow = 'ellipsis';
     dom.bar.classList.add('zr-on'); dom.note.classList.add('zr-on');
     evalPlacement(); return true;
   };

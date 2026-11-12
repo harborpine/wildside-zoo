@@ -21,7 +21,7 @@ async function run(name) {
   const hasRenderer = await page.evaluate(() => !!(window.ZRender && ZRender.init));
   console.log('  renderer present: ' + hasRenderer);
 
-  await page.evaluate(() => ZCore.onReport('*', (r, done) => done())); // timing tests: skip report cards
+  await page.evaluate(() => { ZT.skipReports = true; }); // timing tests: real Moments handlers would otherwise open screens as callers arrive
   // pause while the menu is open, resume after Back (fast clock so the test is short)
   await page.evaluate(() => { ZCore.WEEK_MS[1] = 300; ZCore.WEEK_MS[2] = 150; ZCore.setSpeed(1); });
   await page.touchscreen.tap(195, 420); await sleep(300);
@@ -34,7 +34,7 @@ async function run(name) {
   await sleep(1500); check(await page.evaluate(w => ZT.S.week > w, w0), 'weeks pass again after Back');
 
   if (hasRenderer) {   // placement mode pauses the clock and its bar sits inside the safe area
-    await page.evaluate(() => { const S = ZT.S; ZRender.startPlacement({ kind: 'fac', t: 'snack', label: 'Snack' }, { onPlace: () => ({ ok: true }), onCancel: () => {} }); });
+    await page.evaluate(() => { const S = ZT.S; ZRender.startPlacement({ kind: 'hab', t: 'savanna', label: 'Savanna' }, { onPlace: () => ({ ok: true }), onCancel: () => {} }); });
     await sleep(500); await shot('placement');
     check(await page.evaluate(() => ZRender.placing() && ZT.running() === false), 'placement mode pauses the clock');
     const bar = await page.evaluate(() => { const r = document.getElementById('placement-bar').getBoundingClientRect(); return { b: r.bottom, h: r.height, n: document.querySelectorAll('#placement-bar button').length }; });
@@ -61,7 +61,7 @@ async function run(name) {
   check(await page.evaluate(() => ZT.stack().join() === 'demo-list'), 'Back returns to the list');
   await page.evaluate(() => ZT.popAll());
 
-  await page.evaluate(() => { ZCore.onReport('*', null); ZCore.WEEK_MS[1] = 600000; ZCore.WEEK_MS[2] = 600000; ZCore.setSpeed(2); ZCore.setSpeed(1); });
+  await page.evaluate(() => { ZT.skipReports = false; window.__mom = window.ZMoments; window.ZMoments = undefined; ZCore.WEEK_MS[1] = 600000; ZCore.WEEK_MS[2] = 600000; ZCore.setSpeed(2); ZCore.setSpeed(1); });
   // report queue: unhandled type gets a default card, in order
   await page.evaluate(() => { ZT.S.reports.push({ type: 'mystery', title: 'First', text: 'one' }, { type: 'mystery', title: 'Second', text: 'two' }); ZT.flush(); }); await sleep(300);
   check(await page.evaluate(() => ZT.stack().join() === 'report-default' && document.querySelector('.ptitle').textContent === 'First'), 'default report card shows the first report');
@@ -90,6 +90,24 @@ async function run(name) {
   });
   check(sc.y === 0 && sc.top === 0 && !sc.over && !sc.ow, 'the page itself never scrolls');
 
+  // popAll also dismisses a report that is on screen
+  await page.evaluate(() => { window.__m2 = window.__mom; window.ZMoments = undefined; ZT.popAll(); ZT.S.reports.length = 0; ZT.S.reports.push({ type: 'mystery', title: 'X', text: 'y' }); ZT.flush(); });
+  check(await page.evaluate(() => ZT.stack().join() === 'report-default' && ZCore.busy), 'a report card is showing before popAll ' + await page.evaluate(() => JSON.stringify([ZT.stack(), ZCore.busy, ZT.S.reports.length, ZT.running()])));
+  await page.evaluate(() => { ZT.popAll(); }); await sleep(100);
+  check(await page.evaluate(() => ZT.running() === true && ZT.S.reports.length === 0), 'popAll releases a showing report so time is not left paused');
+  // compact chip row never wraps (375 px list row) and toasts stay off the title bar
+  await page.evaluate(() => { ZT.popAll(); ZDemo.show('list'); }); await sleep(300);
+  const ch = await page.evaluate(() => { const c = document.querySelector('.layer:not([hidden]) .pbody > .chips'); const tops = [...c.children].map(x => x.getBoundingClientRect().top); return { n: tops.length, same: tops.every(v => Math.abs(v - tops[0]) < 2), fits: c.scrollWidth <= c.clientWidth + 1 }; });
+  check(ch.n === 4 && ch.same && ch.fits, 'compact chip row: 3 stats and a grade on one line (' + JSON.stringify(ch) + ')');
+  await page.evaluate(() => ZCore.ui.toast('Saved', 'good')); await sleep(300);
+  const tg = await page.evaluate(() => ({ t: document.querySelector('.toast').getBoundingClientRect().top, title: document.querySelector('.layer:not([hidden]) .ptitle').getBoundingClientRect().bottom, back: document.querySelector('.layer:not([hidden]) .back').getBoundingClientRect().top }));
+  check(tg.t > tg.title && tg.t < tg.back, 'toast sits between the title bar and the Back button (' + JSON.stringify(tg) + ')'); await shot('toast-low');
+  await page.evaluate(() => { ZT.popAll(); window.ZMoments = window.__m2; });
+  // landscape phone shows the turn-upright card and pauses the clock
+  const lctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+  const lp = await lctx.newPage(); await lp.goto(URL); await lp.waitForFunction(() => window.ZT && document.documentElement.dataset.ready); await sleep(300);
+  check(await lp.evaluate(() => getComputedStyle(document.getElementById('rotate')).display !== 'none' && ZT.running() === false), 'landscape phone: turn-upright card shows and the clock is paused');
+  await shot('landscape', lp); await lctx.close();
   // idle shot after reload, then wide-screen desktop
   const dctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   const dp = await dctx.newPage(); dp.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|Access-Control-Allow-Origin|Not allowed to load local resource/.test(m.text())) consoleErrors.push('desktop: ' + m.text()); }); dp.on('pageerror', e => consoleErrors.push('desktop pageerror: ' + e.message));

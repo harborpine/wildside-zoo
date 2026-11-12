@@ -18,7 +18,7 @@
 /* Renderer test harness (floor only). ?stub=1 skips sprites.js so the built-in flat shapes are used. ?rows=N sets owned rows.
    A seeded Math.random keeps screenshots repeatable. */
 (function () { let s = 12345; Math.random = function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
-window.RT = { errors: [], taps: [], placed: [], cancelled: 0, log: [] };
+window.RT = { errors: [], taps: [], placed: [], cancelled: 0, done: 0, log: [] };
 window.addEventListener('error', function (e) { RT.errors.push((e.filename || '').split('/').pop() + ': ' + e.message); });
 var STUB = /[?&]stub=1/.test(location.search);
 ['../data.js', '../engine.js', '../geo.js'].concat(STUB ? [] : ['../sprites.js']).concat(['../render.js']).forEach(function (src) { document.write('<script src="' + src + '"><\/script>'); });
@@ -95,7 +95,8 @@ var STUB = /[?&]stub=1/.test(location.search);
   RT.place = function (spec) {
     return ZRender.startPlacement(spec, {
       onPlace: function (q, r, rot) { RT.placed.push({ q: q, r: r, rot: rot }); if (spec.refuse) return { ok: false, msg: 'Not enough money.' }; return spec.real ? Z.build(S, spec.kind, spec.t, q, r, rot) : { ok: true }; },
-      onCancel: function () { RT.cancelled++; }
+      onCancel: function () { RT.cancelled++; },
+      onDone: spec.noDone ? undefined : function () { RT.done++; }
     });
   };
   RT.ready = true;

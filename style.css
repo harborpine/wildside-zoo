@@ -44,23 +44,22 @@ i.guest::after { content: ""; position: absolute; left: 2px; top: 7px; width: 10
 
 /* ---------- screen stack ---------- */
 #screens { position: absolute; inset: 0; pointer-events: none; z-index: 20; }
-.layer { position: absolute; inset: 0; display: flex; padding: 12px calc(12px + var(--safe-r)) calc(12px + var(--safe-b)) calc(12px + var(--safe-l)); background: rgba(24, 16, 8, .55); pointer-events: auto; animation: layerin .14s ease-out; }
+.layer { position: absolute; inset: 0; display: flex; padding: 12px calc(12px + var(--safe-r)) 12px calc(12px + var(--safe-l)); background: rgba(24, 16, 8, .55); pointer-events: auto; animation: layerin .14s ease-out; }
 .layer[hidden] { display: none; }
 .layer.modal { align-items: center; justify-content: center; }
 .layer.entering .panel { pointer-events: none; }
 @keyframes layerin { from { opacity: 0; } to { opacity: 1; } }
-.panel { flex: 1; min-height: 0; margin: 3px; display: flex; flex-direction: column; background: var(--cream); position: relative;
+.panel { flex: 1; min-height: 0; min-width: 0; margin: 3px; display: flex; flex-direction: column; background: var(--cream); position: relative;
   box-shadow: 0 -3px 0 0 var(--bd), 0 3px 0 0 var(--bd), -3px 0 0 0 var(--bd), 3px 0 0 0 var(--bd), 0 8px 0 0 rgba(0,0,0,.35); }
 .modal .panel { flex: 0 1 auto; width: 100%; max-height: 100%; }
 .ptitle { flex: none; background: var(--blue); color: #fff; font-size: 19px; font-weight: 800; text-align: center; padding: 9px 12px 8px; text-shadow: 2px 2px 0 var(--blue-d), 0 0 1px var(--bd); border-bottom: 3px solid var(--bd); letter-spacing: .02em; }
-.pbody { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 12px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; touch-action: pan-y; }
+.pbody { flex: 1 1 auto; min-height: 0; min-width: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 12px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 10px; touch-action: pan-y; }
 .modal .pbody { flex: 0 1 auto; }
 .pfoot { flex: none; padding: 6px 10px 10px; border-top: 3px solid var(--bd); background: var(--cream2); }
 .pfoot .btn { width: calc(100% - 6px); }
 .defcard .ptitle, .confirm .ptitle { background: var(--orange); text-shadow: 2px 2px 0 var(--orange-d), 0 0 1px var(--bd); }
 .ctext { font-size: 16px; text-align: center; line-height: 1.4; padding: 4px 4px; }
 
-body.screens-open #news { visibility: hidden; }
 
 /* ---------- buttons ---------- */
 .btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; margin: 3px; padding: 8px 14px; border: 0; background: var(--cream2); color: var(--ink); font-weight: 800; font-size: 16px; cursor: pointer; text-align: center; line-height: 1.15;
@@ -101,7 +100,11 @@ body.screens-open #news { visibility: hidden; }
 .empty { text-align: center; color: var(--ink2); padding: 18px 8px; font-size: 15px; }
 
 /* ---------- stat chips, signs, stars, flames ---------- */
-.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chips { display: flex; flex-wrap: nowrap; gap: 3px; min-width: 0; overflow: hidden; align-items: center; }
+.chips .chip { flex: none; margin: 2px 1px; font-size: 12px; }
+.chips .chip b { padding: 3px 3px; font-size: 10px; letter-spacing: 0; }
+.chips .chip .v { padding: 3px 4px; min-width: 20px; font-size: 13px; }
+.chip.grade b { background: var(--ink); color: var(--gold); }
 .chip { display: inline-flex; align-items: stretch; font-size: 13px; line-height: 1; box-shadow: 0 0 0 2px var(--bd); background: var(--paper); margin: 2px; }
 .chip b { padding: 4px 4px; color: #fff; font-size: 11px; background: var(--ink2); text-shadow: 1px 1px 0 rgba(0,0,0,.4); display: flex; align-items: center; }
 .chip .v { padding: 4px 5px; min-width: 24px; text-align: center; font-size: 14px; display: flex; align-items: center; justify-content: center; }
@@ -154,13 +157,19 @@ body.screens-open #news { visibility: hidden; }
 .flip { animation: flip .35s steps(6) both; } @keyframes flip { 0% { transform: scaleX(1); } 50% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
 
 /* ---------- toast ---------- */
-#toasts { position: absolute; left: 12px; right: 12px; top: 10px; z-index: 40; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+#toasts { position: absolute; left: 12px; right: 12px; bottom: calc(96px + var(--safe-b)); flex-direction: column-reverse !important; z-index: 40; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .toast { background: var(--cream); color: var(--ink); padding: 9px 14px; font-size: 14px; text-align: center; max-width: 100%; margin: 3px; animation: toastin .2s steps(4), toastout .35s steps(4) 2.05s forwards;
   box-shadow: 0 -3px 0 0 var(--bd), 0 3px 0 0 var(--bd), -3px 0 0 0 var(--bd), 3px 0 0 0 var(--bd), 0 6px 0 0 rgba(0,0,0,.3); }
 .toast.good { background: #d8f4c2; } .toast.bad { background: #ffd9d2; animation-delay: 0s, 3.05s; }
-@keyframes toastin { from { transform: translateY(-14px); opacity: 0; } to { transform: none; opacity: 1; } } @keyframes toastout { to { opacity: 0; transform: translateY(-8px); } }
+@keyframes toastin { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } } @keyframes toastout { to { opacity: 0; transform: translateY(8px); } }
 
 /* ---------- wide screens: the column stays phone-width and centred; anything very short keeps the layout tidy ---------- */
 @media (min-width: 431px) { body { background: #223022 repeating-linear-gradient(45deg, rgba(255,255,255,.025) 0 8px, transparent 8px 16px); } }
 @media (max-height: 560px) { .btn.big { min-height: 52px; } .btn.gbox { min-height: 84px; } }
 @media (prefers-reduced-motion: reduce) { .pop, .flip, .layer, .toast, .rcard .hint { animation: none; } }
+
+/* ---------- portrait lock: a phone held sideways shows a card and the clock pauses (see LANDSCAPE in core.js) ---------- */
+#rotate { display: none; position: fixed; inset: 0; z-index: 100; background: var(--ink); color: var(--cream); flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; font-size: 20px; text-shadow: 2px 2px 0 #000; }
+#rotate .phone { width: 40px; height: 68px; background: var(--blue); box-shadow: 0 -4px 0 0 var(--cream), 0 4px 0 0 var(--cream), -4px 0 0 0 var(--cream), 4px 0 0 0 var(--cream), inset 0 -10px 0 rgba(0,0,0,.25); transform: rotate(90deg); animation: turn 1.6s steps(6) infinite alternate; }
+@keyframes turn { to { transform: rotate(0deg); } }
+@media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) { #rotate { display: flex; } }

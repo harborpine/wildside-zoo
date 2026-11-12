@@ -190,3 +190,17 @@ Web app: `manifest.webmanifest` (standalone, portrait), `icons/icon-180/192/512.
 * No speed control is on the top strip (the brief says nothing else there); speed lives in System.
 * Loading a save starts the clock immediately (no "paused on load" state); the first week takes 5 to 10 s anyway.
 * `index.html` loads `test/shell-demo.js` only when the address has `?demo=1`; delete that small snippet in the App Store build.
+
+## Added after the first test round
+
+* **Compact chip row.** `.chips` (or `ui.chipRow([ui.stat('Cha', 42, 'charm'), ui.stat('Vig', 37, 'vigor'), ui.stat('Wit', 25, 'wit'), ui.stat('A', 'B+', 'grade')])`) is now a single line that never wraps
+  (flex, no wrap, 3 px gap, tight chips). Use 3-letter labels (`Cha Vig Wit`; `Care Sci` and so on short too). Three stats plus a grade measure about 215 px, so they fit on one line at 375 px both
+  inside a row's `.main` and on their own line under a row (put the chip row under the row title, or as a sibling after `ui.list`). Chip kind `'grade'` gives a dark label with a gold letter. Shown in `?demo=1` (list).
+* **Toasts** now appear just above the Back button (bottom of the panel area), newest at the bottom, never over the title bar. They last about 2.4 s (3.4 s for `'bad'`).
+* **Layout:** the news line is now below `#stage`, so screens end above it and no empty band remains; the news stays visible while a screen is open. `.panel` and `.pbody` have `min-width: 0`.
+* **Portrait lock:** a phone held sideways (landscape, under 500 px tall, touch device) shows a full-screen "Turn your phone upright" card (`#rotate`) and the clock pauses. Wide desktop and tablet
+  windows keep the centred column. The manifest says `"orientation": "portrait"`.
+* **Developer-only features flag:** `const DEV_TOOLS = true;` near the top of `core.js` (exposed as `ZCore.devTools`). When false, `copyLog`, `downloadLog` and `addNote` do nothing, and the
+  Game log screen shows only "Nothing to show here." Menus should hide its Info entries for these when `ZCore.devTools` is false. Logging itself keeps running.
+* **`ZCore.popAll()`** now also dismisses a report that is on screen (it is removed from the queue and the queue moves on), so time is never left paused after `popAll`.
+* Test only: `ZT.skipReports = true` makes every report dismiss itself instantly.
