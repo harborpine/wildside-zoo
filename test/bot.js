@@ -1,4 +1,4 @@
-const D = require('../current/data.js'), Z = require('../current/engine.js');
+const D = require('../data.js'), Z = require('../engine.js');
 function run(skill, verbose) {
   const S = Z.newGame({ runs: 0 });
   const rows = [];

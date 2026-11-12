@@ -1,0 +1,35 @@
+Y1 place 12 rating 257 (top 4734) $14675 inc/wk 1731 cost/wk 755 vis/wk 205 rep 541 r3 sp 9 best 16 ev 3 exp 8 births 4 awards exhibit/rarest/breeder/explorer | staff 4 avgAnimal 32 bestBaby 33 prest 113 rp 69 habs savanna2
+Y2 place 11 rating 687 (top 4965) $35404 inc/wk 5016 cost/wk 1791 vis/wk 489 rep 1298 r4 sp 16 best 21 ev 6 exp 10 births 2 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 27 bestBaby 34 prest 116 rp 110 habs savanna3,jungle1,savanna2
+Y3 place 10 rating 1126 (top 5195) $71141 inc/wk 10699 cost/wk 3133 vis/wk 845 rep 2078 r4 sp 22 best 22 ev 13 exp 9 births 7 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 29 bestBaby 36 prest 116 rp 120 habs savanna3,jungle2,savanna3,desert1
+Y4 place 9 rating 1593 (top 5425) $137904 inc/wk 18011 cost/wk 4578 vis/wk 1200 rep 3102 r5 sp 27 best 23 ev 14 exp 9 births 8 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 32 bestBaby 39 prest 140 rp 83 habs savanna3,jungle2,savanna3,desert2,jungle2
+Y5 place 8 rating 2162 (top 5656) $103557 inc/wk 29038 cost/wk 6687 vis/wk 1793 rep 4234 r5 sp 34 best 25 ev 17 exp 8 births 9 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 33 bestBaby 41 prest 140 rp 322 habs savanna3,jungle3,savanna3,desert2,jungle3,arctic1,desert2
+Y6 place 7 rating 2815 (top 5886) $310969 inc/wk 46368 cost/wk 9323 vis/wk 2645 rep 5770 r6 sp 37 best 27 ev 22 exp 7 births 12 awards exhibit/rarest/breeder/explorer | staff 6 avgAnimal 36 bestBaby 45 prest 140 rp 154 habs savanna4,jungle4,savanna4,desert3,jungle3,arctic1,desert3
+Y7 place 6 rating 3417 (top 6116) $614090 inc/wk 62086 cost/wk 12099 vis/wk 3499 rep 7161 r6 sp 37 best 27 ev 22 exp 7 births 13 awards exhibit/rarest/breeder | staff 6 avgAnimal 36 bestBaby 50 prest 157 rp 247 habs savanna4,jungle4,savanna4,desert4,jungle4,arctic2,desert4
+Y8 place 6 rating 3936 (top 6347) $761986 inc/wk 74713 cost/wk 14762 vis/wk 4118 rep 8638 r7 sp 37 best 29 ev 23 exp 12 births 9 awards exhibit/rarest/breeder | staff 6 avgAnimal 37 bestBaby 52 prest 157 rp 456 habs savanna4,jungle4,savanna4,desert4,jungle4,arctic3,desert4,arctic3
+Y9 place 5 rating 4514 (top 6577) $424304 inc/wk 93788 cost/wk 18436 vis/wk 4642 rep 10302 r7 sp 42 best 28 ev 22 exp 14 births 9 awards exhibit/rarest/breeder/explorer | staff 6 avgAnimal 37 bestBaby 56 prest 166 rp 620 habs savanna4,jungle4,savanna4,desert4,jungle4,arctic3,desert4,arctic3,mountain2
+Y10 place 4 rating 5329 (top 6807) $1987752 inc/wk 112782 cost/wk 21045 vis/wk 5619 rep 12481 r7 sp 47 best 29 ev 29 exp 12 births 2 awards exhibit/rarest/breeder/explorer | staff 6 avgAnimal 38 bestBaby 59 prest 169 rp 532 habs savanna4,jungle4,savanna4,desert4,jungle4,arctic3,desert4,arctic3,mountain2
+Y11 place 4 rating 5880 (top 7037) $1408688 inc/wk 124812 cost/wk 24442 vis/wk 5801 rep 14355 r8 sp 49 best 29 ev 28 exp 14 births 4 awards exhibit/rarest | staff 7 avgAnimal 38 bestBaby 58 prest 169 rp 78 habs savanna4,jungle4,savanna4,desert4,jungle4,arctic3,desert4,arctic3,mountain2,mountain2
+Y12 place 3 rating 6496 (top 7268) $900041 inc/wk 151188 cost/wk 26979 vis/wk 6370 rep 16442 r8 sp 53 best 27 ev 30 exp 12 births 8 awards rarest/breeder/explorer | staff 7 avgAnimal 39 bestBaby 65 prest 175 rp 366 habs savanna4,jungle4,savanna4,desert4,jungle4,arctic3,desert4,arctic3,mountain2,mountain2,ocean1
+Y13 place 2 rating 7246 (top 7498) $803776 inc/wk 176415 cost/wk 31826 vis/wk 7073 rep 18812 r8 sp 59 best 29 ev 34 exp 11 births 4 awards exhibit/rarest/breeder/explorer | staff 7 avgAnimal 40 bestBaby 67 prest 177 rp 855 habs savanna5,jungle5,savanna5,desert4,jungle5,arctic3,desert4,arctic3,mountain2,mountain2,ocean1
+Y14 place 1 rating 8072 (top 7728) $1086985 inc/wk 201965 cost/wk 32931 vis/wk 8123 rep 21311 r8 sp 59 best 30 ev 33 exp 12 births 5 awards exhibit/rarest/zoo | staff 7 avgAnimal 41 bestBaby 70 prest 180 rp 1181 habs savanna5,jungle5,savanna5,desert5,jungle5,arctic3,desert5,arctic3,mountain2,mountain2,ocean1
+Y15 place 1 rating 9071 (top 7959) $2915818 inc/wk 256472 cost/wk 34809 vis/wk 9660 rep 24472 r9 sp 60 best 31 ev 30 exp 10 births 5 awards exhibit/rarest/breeder/zoo | staff 7 avgAnimal 41 bestBaby 76 prest 186 rp 1427 habs savanna5,jungle5,savanna5,desert5,jungle5,arctic4,desert5,arctic4,mountain2,mountain2,ocean1
+Y16 place 1 rating 9849 (top 8189) $2094340 inc/wk 292016 cost/wk 46951 vis/wk 10338 rep 27233 r9 sp 60 best 32 ev 36 exp 12 births 7 awards exhibit/rarest/breeder/zoo | staff 7 avgAnimal 42 bestBaby 78 prest 188 rp 1228 habs savanna5,jungle5,savanna5,desert5,jungle5,arctic4,desert5,arctic4,mountain3,mountain3,ocean2,paleo1
+Y17 place 1 rating 10716 (top 8419) $4271128 inc/wk 315938 cost/wk 54711 vis/wk 11083 rep 30380 r9 sp 62 best 31 ev 34 exp 10 births 4 awards rarest/explorer/zoo | staff 7 avgAnimal 42 bestBaby 81 prest 191 rp 3499 habs savanna5,jungle5,savanna5,desert5,jungle5,arctic4,desert5,arctic4,mountain3,mountain3,ocean2,paleo1,ocean1
+Y18 place 1 rating 11564 (top 8650) $6957488 inc/wk 338640 cost/wk 65900 vis/wk 11260 rep 34606 r10 sp 64 best 31 ev 32 exp 13 births 12 awards rarest/breeder/explorer/zoo | staff 8 avgAnimal 44 bestBaby 90 prest 200 rp 2264 habs savanna5,jungle5,savanna5,desert5,jungle5,arctic4,desert5,arctic4,mountain3,mountain3,ocean2,paleo1,ocean2
+Y19 place 1 rating 12688 (top 8880) $6212743 inc/wk 378662 cost/wk 67934 vis/wk 12405 rep 38835 r10 sp 64 best 32 ev 41 exp 10 births 5 awards rarest/breeder/zoo | staff 8 avgAnimal 45 bestBaby 89 prest 200 rp 5103 habs savanna5,jungle5,savanna5,desert5,jungle5,arctic5,desert5,arctic5,mountain3,mountain3,ocean2,paleo1,ocean2
+Y20 place 1 rating 13571 (top 9110) $7489870 inc/wk 386061 cost/wk 69797 vis/wk 12738 rep 43104 r10 sp 64 best 31 ev 40 exp 11 births 9 awards rarest/breeder/zoo | staff 8 avgAnimal 46 bestBaby 97 prest 207 rp 8124 habs savanna5,jungle5,savanna5,desert5,jungle5,arctic5,desert5,arctic5,mountain4,mountain3,ocean2,paleo1,ocean2
+score {"total":265396,"parts":[["Zoo rating",67855],["Final ranking",22000],["Species recorded",38400],["Rare variants",9900],["Trophies",86000],["Combos found",400],["Best exhibit review",8000],["Bank balance",32841]]}
+regions [
+  'savanna',  'jungle',
+  'desert',   'arctic',
+  'mountain', 'paleo',
+  'ocean'
+] frag 4 combos [ 'icefire' ] vips [
+  'reporter',
+  'photog',
+  'filmcrew',
+  'professor',
+  'mayor',
+  'critic',
+  'royal'
+] variants 11 elog 0 saveKB 37
