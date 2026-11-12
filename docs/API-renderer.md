@@ -30,7 +30,7 @@
     past the last owned row, so the player cannot scroll far into nothing; the limit moves back when land is bought.
 12. **Combo outlines are drawn twice:** on the ground, and again faintly over the sprites so fences never hide which tiles belong together.
 13. **Nothing in render.js hard-codes hex proportions.** Standing spots, walker offsets, decoration scatter, outlines, tints and
-    bounds all derive from `ZGeo` (re-verified after the retune to W=48, RS=28, HH=20, SH=8). All ground, including the forest
+    bounds all derive from `ZGeo` (reworked for the slanted grid: ZGeo.A, B, CORNERS, W, H, HW, HH, depth, edgeMidY; no use of RS or SH; tiles are laid in ascending screen y; the floor canvas covers every possible camera position so forest reaches the screen edges; scroll limit is the screen box of the owned hexes plus a margin; the road runs straight down the screen from the gate). All ground, including the forest
     outside the grid and the road to the gate, is drawn with whole `ZSprites.tile` hexes, so the Artist's honeycomb shows everywhere.
 
 ## Functions

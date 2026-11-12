@@ -6,7 +6,7 @@
 (function (root) {
   'use strict';
   const G = root.ZGeo, D = root.ZD, Z = root.ZE, R = {};
-  const W = G.W, RS = G.RS, HH = G.HH, SH = G.SH, HW = W / 2;
+  const W = G.W, HH = G.HH, HW = G.HW || W / 2;
   const DIR6 = G.EDGES.map(e => e[0]);
   const key = (q, r) => q + ',' + r;
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -29,13 +29,12 @@
   const fbCache = {};
   const fb = (k, make) => fbCache[k] || (fbCache[k] = make());
   const hue = (s, sat, lig) => 'hsl(' + (strHash(s) % 360) + ',' + (sat || 55) + '%,' + (lig || 55) + '%)';
-  function hexHalf(y) { // half width of a hex at pixel row y (-HH .. HH-1), matching the 2:1 lattice
-    const sl = HH - SH;
-    if (y < -SH) return Math.min(HW, Math.ceil((y + HH + 1) * HW / sl));
-    if (y >= SH) return Math.min(HW, Math.ceil((HH - y) * HW / sl));
-    return HW;
+  function hexSpan(y) { // [left, right) x extent of the hex polygon on pixel row y (-HH .. HH-1), from ZGeo.CORNERS (no symmetry assumed)
+    const yc = y + 0.5, C = G.CORNERS; let lo = 1e9, hi = -1e9;
+    for (let i = 0; i < 6; i++) { const a = C[i], b = C[(i + 1) % 6]; if ((a[1] <= yc) === (b[1] <= yc)) continue; const x = a[0] + (b[0] - a[0]) * (yc - a[1]) / (b[1] - a[1]); if (x < lo) lo = x; if (x > hi) hi = x; }
+    return hi < lo ? [0, 0] : [Math.round(lo), Math.round(hi)];
   }
-  function hexFill(x, cx, cy, col) { x.fillStyle = col; for (let y = -HH; y < HH; y++) { const h = hexHalf(y); x.fillRect(cx - h, cy + y, h * 2, 1); } }
+  function hexFill(x, cx, cy, col) { x.fillStyle = col; for (let y = -HH; y < HH; y++) { const s = hexSpan(y); if (s[1] > s[0]) x.fillRect(cx + s[0], cy + y, s[1] - s[0], 1); } }
   const FB = {
     tile: function (kind, seed) {
       kind = String(kind); const v = kind === 'grass' ? (seed || 0) % 3 : 0;
@@ -175,17 +174,28 @@
 
   function rebuild(S) {
     const m = { sig: signature(S), nodes: {}, path: {}, routes: {}, statics: [], habs: {}, items: {}, occ: {}, combos: [], dests: [], real: usingReal() };
-    // grid cells and bounds
-    const cells = []; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-    const PADC = 5, PADR = 9, grid = {};
-    for (let r = -PADR; r < D.GRID_H + PADR; r++) for (let c = -PADC; c < D.GRID_W + PADC; c++) {
-      const a = fromOffset(c, r), q = a[0], p = G.toScreen(q, r), g = inGrid(S, q, r), cell = { q: q, r: r, x: p.x, y: p.y, k: key(q, r), grid: g, owned: g && !!Z.inLand(S, q, r) };
-      cells.push(cell); grid[cell.k] = cell;
-      if (g) { x0 = Math.min(x0, p.x - HW); x1 = Math.max(x1, p.x + HW); y0 = Math.min(y0, p.y - HH); y1 = Math.max(y1, p.y + HH); }
+    // the scroll limit is the screen bounding box of the owned hexes plus a margin, so the player cannot scroll far into nothing
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, gx0 = 1e9, gy0 = 1e9, gx1 = -1e9, gy1 = -1e9;
+    for (let r = 0; r < D.GRID_H; r++) for (let c = 0; c < D.GRID_W; c++) {
+      const a = fromOffset(c, r), p = G.toScreen(a[0], a[1]); if (!inGrid(S, a[0], a[1])) continue;
+      gx0 = Math.min(gx0, p.x); gx1 = Math.max(gx1, p.x); gy0 = Math.min(gy0, p.y); gy1 = Math.max(gy1, p.y);
+      if (Z.inLand(S, a[0], a[1])) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
     }
-    // scrolling stops a little way into the unowned forest, so the player can never scroll far into nothing
-    let oy0 = 1e9; cells.forEach(c => { if (c.owned) oy0 = Math.min(oy0, c.y - HH); }); if (oy0 > 1e8) oy0 = y0;
-    m.cells = grid; m.bounds = { x0: x0 - 10, x1: x1 + 10, y0: Math.max(y0 - 44, oy0 - RS * 2 - 30), y1: y1 + 34 };
+    if (x0 > 1e8) { x0 = gx0; x1 = gx1; y0 = gy0; y1 = gy1; }
+    const bnd = m.bounds = { x0: x0 - HW - 22, x1: x1 + HW + 22, y0: y0 - HH - 62, y1: y1 + HH + 44 };
+    // the floor canvas covers everything the camera can ever show (also when the view is bigger than the scroll area), so forest
+    // tiles reach the screen edges at every scroll position
+    const covW = Math.max(vw, 430), covH = Math.max(vh, 900), slackX = Math.max(0, (covW - (bnd.x1 - bnd.x0)) / 2) + 8, slackY = Math.max(0, (covH - (bnd.y1 - bnd.y0)) / 2) + 8;
+    const fx0 = Math.floor(bnd.x0 - slackX), fy0 = Math.floor(bnd.y0 - slackY), fw = Math.ceil(bnd.x1 - bnd.x0 + slackX * 2), fh = Math.ceil(bnd.y1 - bnd.y0 + slackY * 2);
+    m.cover = { w: covW, h: covH };
+    const cells = [], grid = {}; let q0 = 1e9, q1 = -1e9, r0 = 1e9, r1 = -1e9;
+    [[fx0 - W, fy0 - W], [fx0 + fw + W, fy0 - W], [fx0 - W, fy0 + fh + W], [fx0 + fw + W, fy0 + fh + W]].forEach(p => { const a = G.toAxial(p[0], p[1]); q0 = Math.min(q0, a.q); q1 = Math.max(q1, a.q); r0 = Math.min(r0, a.r); r1 = Math.max(r1, a.r); });
+    for (let r = r0 - 1; r <= r1 + 1; r++) for (let q = q0 - 1; q <= q1 + 1; q++) {
+      const p = G.toScreen(q, r), g = inGrid(S, q, r); if (!g && (p.x < fx0 - W || p.x > fx0 + fw + W || p.y < fy0 - W || p.y > fy0 + fh + W * 2)) continue;
+      const cell = { q: q, r: r, x: p.x, y: p.y, k: key(q, r), grid: g, owned: g && !!Z.inLand(S, q, r) }; cells.push(cell); grid[cell.k] = cell;
+    }
+    cells.sort((a, b) => a.y - b.y || a.x - b.x); // back to front on screen: the order tiles must be laid so each front lip is covered
+    m.cells = grid;
     (S.items || []).forEach(it => { m.items[it.id] = it; itemCells(it).forEach(c => { m.occ[key(c[0], c[1])] = it; }); });
     // entrance
     let ent = null;
@@ -201,7 +211,11 @@
     Object.keys(m.nodes).forEach(k => { const c = m.nodes[k]; c.nb = []; DIR6.forEach(d => { const nk = key(c.q + d[0], c.r + d[1]); if (m.nodes[nk]) c.nb.push(nk); }); });
     // a short road leading in from outside the map
     m.road = [];
-    if (ent) { let q = ent.q, r = ent.r; for (let i = 0; i < 6; i++) { q -= (i % 2); r += 1; const c = grid[key(q, r)]; if (!c || c.grid) break; c.road = true; m.road.push(c); } }
+    if (ent) { // step to whichever down-screen neighbour keeps the road straight below the gate
+      const down = DIR6.filter(d => G.toScreen(d[0], d[1]).y > HH * 0.9); let q = ent.q, r = ent.r;
+      for (let i = 0; i < 40 && down.length; i++) { let best = null, bx = 0; down.forEach(d => { const nx = G.toScreen(q + d[0], r + d[1]).x; if (!best || Math.abs(nx - ent.x) < Math.abs(bx - ent.x)) { best = d; bx = nx; } }); q += best[0]; r += best[1]; const c = grid[key(q, r)]; if (!c || c.grid) break; c.road = true; m.road.push(c); }
+    }
+    const nearRoad = c => m.road.some(o => Math.abs(o.x - c.x) < W * 0.95 && Math.abs(o.y - c.y) < W * 0.95);
     // paths: shared trunks from the entrance to one side of every habitat and facility
     const order = (S.items || []).slice();
     if (ent && m.nodes[ent.k]) {
@@ -221,7 +235,7 @@
     }
     m.pathKeys = Object.keys(m.path);
     // floor canvas
-    const fx0 = Math.floor(x0 - (PADC - 1) * W), fy0 = Math.floor(y0 - (PADR - 2) * RS), fw = Math.ceil(x1 - x0 + (PADC * 2 - 2) * W), fh = Math.ceil(y1 - y0 + (PADR * 2 - 4) * RS);
+    // (floor rectangle fx0, fy0, fw, fh was worked out above with the bounds)
     const fl = document.createElement('canvas'); fl.width = fw; fl.height = fh; const fc = fl.getContext('2d');
     const lockedT = spr('tile', 'locked', 0);
     try { const pc = document.createElement('canvas'); pc.width = pc.height = 1; const px = pc.getContext('2d'); px.drawImage(lockedT.c, -Math.round(lockedT.ax), -Math.round(lockedT.ay) + 2); const d = px.getImageData(0, 0, 1, 1).data; m.bg = d[3] > 200 ? 'rgb(' + Math.round(d[0] * 0.8) + ',' + Math.round(d[1] * 0.8) + ',' + Math.round(d[2] * 0.82) + ')' : '#2c4f3a'; } catch (e) { m.bg = '#2c4f3a'; }
@@ -253,12 +267,12 @@
     m.dests.forEach(d => { if (m.habs[d.it.id]) m.habs[d.it.id].dest = d; });
     if (ent) { const s = spr('entrance'); add(s, ent.x, ent.y, G.depth(ent.q, ent.r, typeof s.sortDy === 'number' ? s.sortDy : 0), { gate: true }); m.gate = s; }
     const standKeys = {}; m.dests.forEach(d => d.stands.forEach(s => { standKeys[s.k] = 1; }));
-    const builtAbove = c => [[1, -1], [0, -1]].some(d => m.occ[key(c.q + d[0], c.r + d[1])]) || (ent && Math.abs(c.x - ent.x) < W * 1.2 && c.y > ent.y - RS * 2.5);
+    const builtAbove = c => DIR6.some(d => G.toScreen(d[0], d[1]).y < -HH * 0.6 && m.occ[key(c.q + d[0], c.r + d[1])]) || (ent && Math.abs(c.x - ent.x) < W * 1.3 && Math.abs(c.y - ent.y) < HH * 3.5);
     cells.forEach(c => {
       if (c.road || (m.occ[c.k] && c.owned)) return;
       const h = hash(c.q, c.r, 11), ox = Math.round((hash(c.q, c.r, 12) - 0.5) * 18), oy = Math.round((hash(c.q, c.r, 13) - 0.5) * HH * 0.6), seed = Math.floor(h * 9973);
       if (!c.owned) { // wild land: dim trees, thicker outside the map
-        if (ent && Math.abs(c.x - ent.x) < W * 1.3 && c.y > ent.y) return;
+        if (nearRoad(c)) return;
         const dens = c.grid ? 0.42 : 0.6; if (h < dens) add(dimmed(spr('deco', h < dens * 0.75 ? 'tree' : 'bush', seed)), c.x + ox, c.y + oy, c.y + oy);
         if (!c.grid && hash(c.q, c.r, 14) < 0.35) add(dimmed(spr('deco', 'tree', seed + 3)), c.x - ox, c.y - oy + 2, c.y - oy + 2);
         return;
@@ -292,7 +306,7 @@
     // two standing spots per hex (back-left and front-right) so a pair never stands on top of each other
     const slot = other ? 1 - other.slot : (Math.random() < 0.5 ? 0 : 1), oy = Math.round(slot ? rnd(HH * 0.12, HH * 0.4) : rnd(-HH * 0.4, -HH * 0.12));
     // keep the whole body inside the hex: wide animals stand nearer the middle
-    const bw = a.sp ? spr('animal', a.sp, { juv: a.juv }).w : 16, lim = Math.max(1, hexHalf(oy) - 3 - bw / 2), ox = Math.round((slot ? 1 : -1) * rnd(Math.min(5, lim), Math.min(12, lim)));
+    const bw = a.sp ? spr('animal', a.sp, { juv: a.juv }).w : 16, sp2 = hexSpan(oy), lo = sp2[0] + 3 + bw / 2, hi = sp2[1] - 3 - bw / 2, mid = (lo + hi) / 2, ox = Math.round(hi <= lo ? mid : slot ? rnd(mid + (hi - mid) * 0.4, hi) : rnd(lo, mid - (mid - lo) * 0.4));
     a.cell = ci; a.slot = slot; a.ox = ox; a.tx = c.x + ox; a.ty = c.y + oy;
     if (snap) { a.x = a.tx; a.y = a.ty; }
   }
@@ -466,7 +480,7 @@
     const n1 = Math.max(1, Math.round(devW / 195)), n0 = Math.max(1, Math.min(n1 - 1, Math.round(devW / 280)));
     N = zoom ? n1 : n0;
     if (canvas.width !== devW) canvas.width = devW; if (canvas.height !== devH) canvas.height = devH;
-    vw = devW / N; vh = devH / N;
+    vw = devW / N; vh = devH / N; if (M && M.cover && (vw > M.cover.w || vh > M.cover.h)) mapDirty = true;
     const bw = Math.ceil(vw) + 2, bh = Math.ceil(vh) + 2;
     if (!buf) buf = document.createElement('canvas');
     if (buf.width !== bw || buf.height !== bh) { buf.width = bw; buf.height = bh; }

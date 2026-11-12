@@ -13,17 +13,19 @@ every getter returns a fallback sprite.
    add its own.
 3. **Frame counts are 4, not 2.** `ANIMAL_FRAMES = 4` and `PERSON_FRAMES = 4`: frame 0 stands, 1 and 3 are the two strides, 2 is the
    standing pose again. Cycling `frame % 4` walks correctly; holding frame 0 stands still.
-4. **Fence `sortDy` values** are NE -HH, E 0, SE +HH, SW +HH, W 0, NW -HH (read from `ZGeo`). A plain sort on
-   `hexCentreY + sortDy` puts back fences behind and front fences in front of anything standing in the hex, and is also right for
-   people at the centre of a neighbouring hex. E and W are one sprite each (a thin upright strip), not split into halves.
-5. **`entrance()` also carries `sortDy = +HH`** so the arch draws in front of whoever walks through its hex. It is 57 px wide (a
-   little wider than one hex).
+4. **Turned grid (current geo.js: A [45,9], B [12,33], asymmetric corners).** Tiles are the true six-corner cell from `ZGeo`
+   (a pixel belongs to the hex that `ZGeo.toAxial` gives for its centre), so neighbours meet exactly. A tile is 52 x 41
+   (38 + a 3 px lip), anchor (26, 19) = the hex centre. Draw floor tiles in ascending screen y of their centres (or by r, then q)
+   so each tile covers the lip of the ones behind it.
+   **Fences** are drawn along each true edge, corner to corner. `sortDy = ZGeo.edgeMidY(edge)`: NE -12, E 4.5, SE 16.5, SW 12,
+   W -4.5, NW -16.5. Read it from the sprite. Keep animals a few pixels inside the hex so the plain sort stays right.
+5. **`entrance()` carries `sortDy = +ZGeo.HH` (19)** so the arch draws in front of whoever walks through its hex. It is an upright,
+   front-facing arch about 57 px wide and does not turn with the grid.
 6. **Water animals** hover 3 to 4 px above the anchor with a dark-blue shadow so they sit in a water tile. The narwhal brings its own
    ice-hole puddle (the polar ground is ice) and the sea otter floats on its back with a light ripple. `ZSprites.isWater(id)` says
    which species these are.
-7. **Sizes and ZGeo.** Tiles and fences are built directly from `ZGeo` numbers. Buildings, the entrance, animals, people, decorations
-   and icons were drawn for a 48 px hex; if `ZGeo.W` changes, buildings and the entrance are resized with crisp pixels to match,
-   the rest keep their size.
+7. **Sizes and ZGeo.** Tiles and fences are built from `ZGeo` tables (no `RS`/`SH`, no symmetry assumed). Buildings, the entrance,
+   animals, people, decorations and icons are upright objects with fixed pixel sizes; buildings fit inside the 52 x 38 hex box.
 8. Extra helpers beyond the contract: `buildingUrl`, `tileUrl`, `PERSON_KINDS`, `DECOS`, `BUILDING_FRAMES`, `VISITOR_SEEDS`,
    `GRASS_VARIANTS`, `FENCE_H`, `hasAnimal`, `isWater`.
 
@@ -39,7 +41,7 @@ Fences and the entrance also have `sortDy`.
 | `init()` | Bakes tiles, fences, buildings, icons and every animal's normal frames. Idempotent. Optional: all getters bake lazily and cache. The full set (every animal, variant, juvenile, frame and flip) bakes in about 0.2 s. |
 | `animal(id, {variant, juv, frame, flip})` | Anchor at the feet centre. Faces right; `flip` faces left. Unknown id: a grey generic animal. Some juveniles differ in more than size (lion cub has no mane and faint spots, harp seal pup is white, penguin chick is grey, tapir calf is striped, antlers and tusks are small or missing). |
 | `person(kind, {frame, flip, seed})` | Anchor at the feet centre. About 11 to 17 wide, 18 to 23 tall (hats and balloons add height). `seed` only matters for `visitor` (97 different visitors, `VISITOR_SEEDS`; about a quarter are children). Unknown kind: `person`. |
-| `tile(kind, seed)` | Every tile draws its own hexagon outline (darker lower and right edges, lighter upper and left edges). `grass` and `locked` have 18 looks by seed (6 details x 3 close tones, so pass a seed that differs between neighbours, e.g. a hash of q and r), `path`, `locked`, `water`, `hab:<biome>`. Exactly `ZGeo.W` wide, anchor `(W/2, HH)` at the hex centre, with a 3 px front lip below the lower edges (draw rows top to bottom so the next row covers it). Unknown kind: grass. |
+| `tile(kind, seed)` | Every tile draws its own hexagon outline (darker lower and right edges, lighter upper and left edges). `grass` and `locked` have 18 looks by seed (6 details x 3 close tones, so pass a seed that differs between neighbours, e.g. a hash of q and r), `path`, `locked`, `water`, `hab:<biome>`. `ZGeo.W` wide, anchor `(ZGeo.HW, ZGeo.HH)` at the hex centre, with a 3 px front lip below the lower edges. Unknown kind: grass. |
 | `fence(biome, edge)` | Edge 0..5 in `ZGeo.EDGES` order. Anchor at the hex centre. Has `sortDy`. Eight styles: wood rails, bamboo slats, red posts and rope, ice wall, stone wall, glass panels, steel posts with warning wires, gold railing. Unknown biome: savanna style. |
 | `building(facId, {frame})` | Every id in `ZD.FAC_ORDER`. Anchor at the hex centre. Only `fountain` animates (2 frames, `BUILDING_FRAMES`). Unknown id: a plain hut. |
 | `entrance()` | Two pillars and a green arch with a paw emblem. Anchor at the hex centre of the gate hex. |
@@ -66,7 +68,7 @@ Fences and the entrance also have `sortDy`.
 ## Checking the art
 
 - `node test/art-shot.js` renders every contact sheet to `test/shots/art-*.png` (headless). Name sheets to render only some:
-  `animals-<biome>`, `people`, `tiles`, `fences`, `buildings`, `extras`, `scene`, `scene2`.
+  `animals-<biome>`, `people`, `tiles`, `fences`, `buildings`, `extras`, `patch` (tiles at 8x), `scene`, `scene2`.
 - `node test/art-check.js` confirms every id in the contract returns its own sprite (not a fallback), that no two species are
   pixel-identical, and that variants, juveniles and walk frames differ from the base sprite.
 - `test/art-sheet.html?s=<sheet>` is the page both scripts use.

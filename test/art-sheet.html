@@ -70,8 +70,14 @@ function ring(biome, cells, x, y, k, who) {
   items.sort(function (a, b) { return a.d - b.d; });
   items.forEach(function (it) { put(it.s, it.x, it.y, k); });
 }
+function patch() { // 4 by 4 patch at 8x to check that neighbouring tiles meet exactly
+  size(1500, 1300, '#ff00ff'); var kinds = ['grass', 'path', 'hab:savanna', 'water'];
+  for (var r = 0; r < 4; r++) for (var q = 0; q < 4; q++) { var p = G.toScreen(q, r); put(S.tile(kinds[(q + r) % 4], q * 5 + r * 11), 240 + p.x * 8, 180 + p.y * 8, 8); }
+}
 function fences() {
-  var K = 3, RH = 250; size(1180, 8 * RH + 20);
+  var K = 3, RH = 250; size(1180, 8 * RH + 380);
+  ring('mythic', D.SHAPES.mythic, 300, 8 * RH + 180, K, [[S.animal('dragon', {}), 1, 0, 0, 6], [S.animal('unicorn', {}), -1, 0, 0, 4], [S.animal('phoenix', {}), 0, 1, 0, 4], [S.animal('griffin', {}), 0, -1, 0, 4], [S.person('visitor', { seed: 5 }), 0, 0, 0, 2]]);
+  ring('ocean', D.SHAPES.ocean, 820, 8 * RH + 180, K, [[S.animal('dolphin', {}), 0, 0, 0, 4], [S.animal('turtle', {}), 1, 0, 0, 4], [S.animal('octopus', {}), 0, 1, 0, 6]]);
   D.BIOME_ORDER.forEach(function (b, n) {
     var y = n * RH + 110, sp = D.SPECIES_LIST.filter(function (s) { return s.biome === b; });
     ring(b, [[0, 0]], 110, y, K, [[S.animal(sp[0].id, {}), 0, 0, 0, 4]]);
@@ -85,7 +91,7 @@ function buildings() {
   size(per * CW + 20, (Math.ceil(ids.length / per) + 1) * RH + 80);
   ids.forEach(function (id, n) { var x = 10 + (n % per) * CW + CW / 2, y = Math.floor(n / per) * RH + 170; put(S.tile('grass', n), x, y, K); put(S.building(id, {}), x, y, K); var b = S.building(id, {}); label(D.FAC[id].name + ' (' + b.w + 'x' + b.h + ')', x, y + 72); });
   var y2 = Math.ceil(ids.length / per) * RH + 200, e = S.entrance();
-  [-1, 0, 1].forEach(function (q) { put(S.tile(q ? 'grass' : 'path', q + 5), 300 + q * G.W * K, y2, K); });
+  [-1, 0, 1].forEach(function (q) { var pq = G.toScreen(q, 0); put(S.tile(q ? 'grass' : 'path', q + 5), 300 + pq.x * K, y2 + pq.y * K, K); });
   put(e, 300, y2, K); label('entrance gate (' + e.w + 'x' + e.h + ')', 300, y2 + 76);
   put(S.tile('grass', 3), 800, y2, K); put(S.building('fountain', { frame: 1 }), 800, y2, K); label('fountain frame 1', 800, y2 + 76);
   put(S.tile('grass', 3), 1000, y2, K); put(S.building('nope', {}), 1000, y2, K); label('unknown id fallback', 1000, y2 + 76);
@@ -125,7 +131,7 @@ function scene(which) {
     setc(1, 9, 'fac', { f: 'snack' }); setc(3, 9, 'fac', { f: 'bench' }); setc(4, 7, 'fac', { f: 'icecream' }); setc(3, 13, 'fac', { f: 'gift' }); setc(1, 14, 'fac', { f: 'restroom' }); setc(1, 7, 'fac', { f: 'fountain' }); setc(4, 9, 'fac', { f: 'photo' });
     setc(3, 15, 'fac', { f: 'kiosk' });
   }
-  var ox = -G.W * 0.75, oy = -G.RS * 4.6;
+  var cc = ax(2, 9), cp = G.toScreen(cc[0], cc[1]), ox = Math.round(BW / 2 - cp.x), oy = Math.round(BH / 2 - cp.y);
   function P(o) { var p = G.toScreen(o.q, o.r); return { x: p.x + ox, y: p.y + oy }; }
   var all = Object.keys(cell).map(function (k) { return cell[k]; }).sort(function (a, c2) { return a.r - c2.r || a.q - c2.q; });
   all.forEach(function (o) { var p = P(o), t = o.t === 'hab' ? 'hab:' + o.b : o.t === 'fac' ? 'grass' : o.t; var s = S.tile(t, o.q * 7 + o.r * 13); b.drawImage(s.c, Math.round(p.x - s.ax), Math.round(p.y - s.ay)); });
@@ -157,7 +163,7 @@ try {
   if (S.init) S.init();
   if (sheet.indexOf('animals-') === 0) animals(sheet.slice(8));
   else if (sheet === 'people') people(); else if (sheet === 'tiles') tiles(); else if (sheet === 'fences') fences();
-  else if (sheet === 'buildings') buildings(); else if (sheet === 'extras') extras(); else if (sheet === 'scene2') scene(2); else scene(1);
+  else if (sheet === 'buildings') buildings(); else if (sheet === 'patch') patch(); else if (sheet === 'extras') extras(); else if (sheet === 'scene2') scene(2); else scene(1);
 } catch (e) { window.__err.push(String(e && e.stack || e)); }
 window.__done = true;
 </script></body></html>

@@ -6,8 +6,8 @@
 (function (root) {
   'use strict';
   var G = root.ZGeo, D = root.ZD || {};
-  var W = G.W, HH = G.HH, SH = G.SH, HW = W / 2, RS = G.RS;
-  var U = W / 48; // unit scale: map pieces were tuned for a 48 px wide hex and stretch with ZGeo
+  var W = G.W, H = G.H, HH = G.HH, HW = G.HW;
+  var U = 1; // unit scale: map pieces were tuned for a 48 px wide hex and stretch with ZGeo
 
   // ---------- colour helpers ----------
   function rgb(c) { if (c.charAt(0) === '#') c = c.slice(1); if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2]; var n = parseInt(c, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
@@ -1023,7 +1023,8 @@
   // =====================================================================================================================
   var BIOME_IDS = ['savanna', 'jungle', 'desert', 'arctic', 'mountain', 'ocean', 'paleo', 'mythic'];
   var LIP = Math.max(2, Math.round(3 * U)), GRASS_VARIANTS = 6;
-  function inHex(x, y) { var dx = Math.abs(x + 0.5), dy = Math.abs(y + 0.5); return dx < HW && dy < HH - dx * (HH - SH) / HW; }
+  // a pixel belongs to the hex whose cell contains its centre (ZGeo's own rounding, nudged off the exact edges so neighbours never tie)
+  function inHex(x, y) { var a = G.toAxial(x + 0.513, y + 0.507); return a.q === 0 && a.r === 0; }
   var GROUND = {
     grass:    { A: '#86c94e', B: '#74b842', C: '#9ad65c', D: '#5fa238', L: '#6b4a2e', F: '#ffffff', G: '#f4d040', E: '#f08aa8' },
     path:     { A: '#e8d5a4', B: '#d6bf88', C: '#f4e6bc', D: '#c2a870', L: '#8a7450' },
@@ -1045,10 +1046,10 @@
       if (tone === 1) { tp.A = mix(pal.A, '#f4f08a', 0.1); tp.B = mix(pal.B, '#f4f08a', 0.1); tp.C = mix(pal.C, '#f4f08a', 0.1); } else if (tone === 2) { tp.A = mix(pal.A, '#2f7a4a', 0.1); tp.B = mix(pal.B, '#2f7a4a', 0.1); tp.C = mix(pal.C, '#2f7a4a', 0.1); }
       pal = tp;
     }
-    var P = new Pt(pal, W, 2 * HH + LIP, HW, HH), r = rng(seed * 31 + name.length * 7 + 5);
+    var P = new Pt(pal, W + 2, H + LIP + 2, HW + 1, HH + 1), r = rng(seed * 31 + name.length * 7 + 5);
     P.key('Z', mix(pal.A, pal.D, 0.8)); P.key('H', mix(pal.A, '#ffffff', name === 'arctic' ? 0.9 : 0.3));
     function put(px, py, k, s) { if (inHex(px, py)) P.set(px, py, k, s == null ? 1 : s); }
-    for (y = -HH; y < HH + LIP; y++) for (x = -HW; x < HW; x++) {
+    for (y = -HH - 1; y <= HH + LIP; y++) for (x = -HW - 1; x <= HW; x++) {
       if (inHex(x, y)) {
         v = h2(x, y, seed * 13 + 1); var k = 'A';
         if (name === 'path') { var a = ((x + 2 * y) % 12 + 12) % 12, b = ((x - 2 * y) % 12 + 12) % 12; k = (a < 1 || b < 1) ? 'B' : (v < 0.05 ? 'C' : v > 0.96 ? 'B' : 'A'); }
@@ -1065,7 +1066,7 @@
     }
     function tuft(tx, ty, k) { put(tx, ty, k); put(tx - 1, ty - 1, k); put(tx + 1, ty - 1, k); }
     function blot(cx, cy, rx, ry, k) { for (var by = -ry; by <= ry; by++) for (var bx = -rx; bx <= rx; bx++) if ((bx * bx) / (rx * rx + 0.3) + (by * by) / (ry * ry + 0.3) <= 1) put(cx + bx, cy + by, k); }
-    function rp(m) { return [Math.round((r() - 0.5) * (W - 14)), Math.round((r() - 0.5) * (2 * HH - (m || 10)))]; }
+    function rp(m) { return [Math.round((r() - 0.5) * (W - 14)), Math.round((r() - 0.5) * (H - (m || 10)))]; }
     var n, p;
     if (name === 'grass') {
       var gv = ((seed | 0) % GRASS_VARIANTS + GRASS_VARIANTS) % GRASS_VARIANTS;
@@ -1074,7 +1075,7 @@
       if (gv === 2) for (n = 0; n < 3; n++) { p = rp(12); put(p[0], p[1], 'F'); put(p[0] + 1, p[1] + 1, 'D'); }
       if (gv === 3) for (n = 0; n < 3; n++) { p = rp(12); put(p[0], p[1], 'G'); put(p[0], p[1] + 1, 'D'); }
       if (gv === 5) { p = rp(14); blot(p[0], p[1], 4, 2, 'C'); p = rp(12); put(p[0], p[1], 'E'); put(p[0], p[1] + 1, 'D'); }
-    } else if (name === 'locked') { for (n = 0; n < 4; n++) { p = rp(); tuft(p[0], p[1], 'D'); } for (y = -HH; y < HH; y++) for (x = -HW; x < HW; x++) if (inHex(x, y) && ((x + y * 2) % 8 + 8) % 8 === 0 && (y & 1) === 0) P.set(x, y, 'B', 1); }
+    } else if (name === 'locked') { for (n = 0; n < 4; n++) { p = rp(); tuft(p[0], p[1], 'D'); } for (y = -HH - 1; y <= HH; y++) for (x = -HW - 1; x <= HW; x++) if (inHex(x, y) && ((x + y * 2) % 8 + 8) % 8 === 0 && (y & 1) === 0) P.set(x, y, 'B', 1); }
     else if (name === 'path') { for (n = 0; n < 3; n++) { p = rp(); put(p[0], p[1], 'D'); put(p[0] + 1, p[1], 'C'); } }
     else if (name === 'water' || name === 'ocean') {
       for (n = 0; n < 5; n++) { p = rp(12); put(p[0], p[1], 'C'); put(p[0] + 1, p[1], 'C'); put(p[0] + 2, p[1], 'C'); put(p[0] + 3, p[1] + 1, 'C'); put(p[0] - 1, p[1] + 1, 'C'); }
@@ -1087,7 +1088,7 @@
     else if (name === 'mountain') { for (n = 0; n < 3; n++) { p = rp(14); put(p[0], p[1], 'D'); put(p[0] + 1, p[1] + 1, 'D'); put(p[0] + 2, p[1] + 1, 'D'); put(p[0] + 3, p[1] + 2, 'D'); } p = rp(14); blot(p[0], p[1], 4, 2, 'G'); p = rp(14); blot(p[0], p[1], 2, 1, 'C'); }
     else if (name === 'paleo') { for (n = 0; n < 2; n++) { p = rp(14); blot(p[0], p[1], 4, 2, 'D'); } for (n = 0; n < 4; n++) { p = rp(); tuft(p[0], p[1], 'G'); put(p[0], p[1] - 2, 'G'); } }
     else if (name === 'mythic') { p = rp(14); blot(p[0], p[1], 5, 2, 'B'); for (n = 0; n < 5; n++) { p = rp(); put(p[0], p[1], n % 2 ? 'G' : 'F'); if (n < 2) { put(p[0] - 1, p[1], 'C'); put(p[0] + 1, p[1], 'C'); put(p[0], p[1] - 1, 'C'); put(p[0], p[1] + 1, 'C'); } } }
-    var s = P.bake(null, true); s.ax = HW; s.ay = HH; return s;
+    var s = P.bake(null, true); s.ay -= 1; return s; // anchor = hex centre
   }
   function tile(kind, seed) {
     kind = String(kind || 'grass'); var name = kind.indexOf('hab:') === 0 ? kind.slice(4) : kind;
@@ -1112,8 +1113,8 @@
     mythic:   { type: 'gold', h: 7, P: '#f4c838', R: '#fbe68a', T: '#c06ae8' }
   };
   function drawFence(biome, e) {
-    var st = FENCES[biome] || FENCES.savanna, h = Math.round(st.h * U), P = new Pt({ A: st.P, P: st.P, R: st.R, T: st.T || st.R, B: st.B || st.P, O: mix(st.P, '#1c1226', 0.72) }, W + 16, 2 * HH + 40, HW + 8, HH + 26);
-    var side = (e === 1 || e === 4), x, y, i, n = HW;
+    var st = FENCES[biome] || FENCES.savanna, h = Math.round(st.h * U), P = new Pt({ A: st.P, P: st.P, R: st.R, T: st.T || st.R, B: st.B || st.P, O: mix(st.P, '#1c1226', 0.72) }, W + 16, H + 44, HW + 8, HH + 28);
+    var ca = G.CORNERS[G.EDGES[e][1]], cb = G.CORNERS[G.EDGES[e][2]], ddx = cb[0] - ca[0], ddy = cb[1] - ca[1], n = Math.max(Math.abs(ddx), Math.abs(ddy)), steep = Math.abs(ddy) > Math.abs(ddx), i;
     function col(px, base, u) { // one pixel column of a slanted run; u = 0..n-1 along the edge
       var post = u < 2 || u >= n - 2 || (st.type !== 'wall' && st.type !== 'glass' && Math.abs(u - n / 2 + 0.5) < 1), k;
       if (st.type === 'rail') { if (post) P.rect(px, base - h, 1, h + 1, 'P', 1); else { P.rect(px, base - h + 1, 1, 2, 'R', 1); P.set(px, base - h + 1, 'R', 0); P.rect(px, base - h + 5, 1, 1, 'R', 2); } if (post) P.set(px, base - h, 'R', 0); }
@@ -1124,20 +1125,12 @@
       else if (st.type === 'wire') { if (post) { P.rect(px, base - h, 1, h + 1, 'P', 1); P.set(px, base - h, 'T', 1); } else { P.set(px, base - h + 2, 'R', (u % 4 < 2) ? 1 : 3); P.set(px, base - h + 4, 'R', (u % 4 < 2) ? 3 : 1); P.set(px, base - h + 6, 'R', (u % 4 < 2) ? 1 : 3); } }
       else if (st.type === 'gold') { if (post) { P.rect(px, base - h, 1, h + 1, 'P', 1); P.set(px, base - h - 1, 'T', 1); } else { P.set(px, base - h + 1, 'R', 1); P.set(px, base - 1, 'P', 2); k = u % 4; P.set(px, base - h + 2 + (k === 0 ? 0 : k === 2 ? 2 : 1), 'P', 1); if (k === 1) P.set(px, base - h + 4, 'T', 0); } }
     }
-    if (!side) {
-      for (i = 0; i < n; i++) { // i = distance from the top or bottom corner
-        var up = (e === 0 || e === 5), right = (e === 0 || e === 2);
-        x = right ? i : -1 - i; y = up ? -HH + Math.ceil(i * (HH - SH) / HW - 0.001) : HH - 1 - Math.ceil(i * (HH - SH) / HW - 0.001);
-        col(x, y, i);
-      }
-    } else {
-      x = e === 1 ? HW - 2 : -HW;
-      for (y = -SH - h; y <= SH - 1; y++) { var topCap = y === -SH - h, k2 = (y < -SH || y > SH - 1 - h || st.type === 'wall') ? 'P' : 'R'; if (st.type === 'wall') k2 = 'R'; P.rect(x, y, 2, 1, k2, topCap ? 0 : 1); }
-      P.rect(x, -SH - h, 2, 1, st.type === 'wall' || st.type === 'glass' ? 'T' : 'R', st.type === 'wall' || st.type === 'glass' ? 1 : 0);
-      if (st.type === 'wire' || st.type === 'gold') { P.rect(x, -SH - h - (st.type === 'gold' ? 1 : 0), 2, 1, 'T', 1); P.rect(x, SH - 1 - h, 2, 1, 'T', 1); }
-      if (st.type === 'slat') P.rect(x, -SH - h - 1, 2, 1, 'B', 1);
+    for (i = 0; i < n; i++) { // walk the true edge from corner to corner, one pixel step at a time, keeping just inside the hex
+      var t = (i + 0.5) / n, fx = ca[0] + ddx * t, fy = ca[1] + ddy * t, len = Math.sqrt(fx * fx + fy * fy) || 1, px = Math.floor(fx - fx / len * 0.6), py = Math.floor(fy - fy / len * 0.6);
+      col(px, py, i);
+      if (steep && (i < 2 || i >= n - 2)) col(px + (fx > 0 ? -1 : 1), py, i); // corner posts stay two pixels wide on the steep edges
     }
-    var s = P.bake(null, false); s.ay -= 1; s.sortDy = [-HH, 0, HH, HH, 0, -HH][e]; s.edge = e; return s;
+    var s = P.bake(null, false); s.ay -= 1; s.sortDy = G.edgeMidY(e); s.edge = e; return s;
   }
   function fence(biome, e) { e = ((e | 0) % 6 + 6) % 6; if (!FENCES[biome]) biome = 'savanna'; return cached('f|' + biome + '|' + e, function () { return drawFence(biome, e); }); }
 

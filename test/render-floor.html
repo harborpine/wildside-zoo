@@ -69,7 +69,7 @@ var STUB = /[?&]stub=1/.test(location.search);
   var H = { savanna: sav };
   // the starting snack stand may sit right beside the gate: for the showcase move it to another free hex touching the savanna
   (function () { var sn = S.items.find(function (i) { return i.k === 'fac'; }); if (!sn || !ent || !sav || Math.abs(sn.q - ent.q) + Math.abs(sn.r - ent.r) > 2) return; var done = false; Z.cells(sav).forEach(function (k) { DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (!done && rr < ent.r - 1 && Z.canPlace(S, 'fac', sn.t, q, rr, 0, sn.id)) done = Z.move(S, sn.id, q, rr, 0).ok; }); }); })();
-  var RSU = ZGeo.RS; // wished-for spots are in hex rows above the gate, so they follow the geometry
+  var RSU = ZGeo.RS || (ZGeo.B ? ZGeo.B[1] * 0.85 : 28); // wished-for spots are in hex rows above the gate, so they follow the geometry
   H.jungle = placeHab('jungle', 80, -3.2 * RSU);
   H.arctic = placeHab('arctic', -85, -6.5 * RSU);
   H.desert = placeHab('desert', 110, -8 * RSU);
