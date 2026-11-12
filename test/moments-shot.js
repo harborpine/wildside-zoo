@@ -234,14 +234,17 @@ async function run(name) {
 
   // ---------------------------------------------------------------- 7. real play: projects, choices, results
   console.log(' -- real play');
-  const covered = {};
+  const covered = {}, repSeen = {};
   async function playOut(maxTicks, optPick, shotsFor) {
     let ticks = 0, seen = [];
-    while (ticks < maxTicks) {
+    for (;;) {
       const s = await state();
       if (s.stack.length) {
         const top = s.stack[s.stack.length - 1];
         const info = await ev(() => { const c = document.querySelector('.layer:not([hidden]) .choices'); return { choice: !!c, title: (document.querySelector('.layer:not([hidden]) .ptitle') || {}).textContent || '', key: (ZT.S.projects.find(p => p.choice) || {}).choice ? ZT.S.projects.find(p => p.choice).choice.key : null, n: c ? c.querySelectorAll('.btn.opt').length : 0 }; });
+        if (info.choice && !/mo-choice/.test(top)) {   // a happening or yearly plan met while ticking: answer the first option
+          await drive('real ' + top + ' option 0', { pick: 0, shots: null }); seen.push(top); await sleep(120); continue;
+        }
         if (info.choice && /mo-choice/.test(top)) {
           const pick = optPick(info); seen.push(info.key + ':' + pick);
           const sh = shotsFor && shotsFor(info, pick);
@@ -254,6 +257,7 @@ async function run(name) {
         }
         await sleep(120); continue;
       }
+      if (ticks >= maxTicks) break;
       await ev(() => ZT.tick(1)); ticks++; await sleep(40);
     }
     return seen;
@@ -274,7 +278,8 @@ async function run(name) {
       const lead = free[0]; const r = ZCore.act('startEvent', hab.id, 'feeding', lead.id); return !!(r && r.ok);
     }, kind);
     if (!ok) { warn('trial ' + t + ' (' + kind + ') could not start'); continue; }
-    await playOut(14, pickFor, shotsFor);
+    await playOut(kind === 'breed' ? 40 : kind === 'expedition' ? 24 : 8, pickFor, shotsFor);
+    { const tel = await ev(() => (ZT.S.tele && ZT.S.tele.reports) || {}); for (const k in tel) repSeen[k] = (repSeen[k] || 0) + tel[k]; }
     await settled('real trial ' + t + ' ' + kind);
     if (!QUICK && Object.keys(wantOpts).every(k => Array.from({ length: wantOpts[k] }, (_, i) => covered[k + ':' + i]).every(Boolean))) break;
   }
@@ -282,8 +287,8 @@ async function run(name) {
   console.log('  covered choice options: ' + Object.keys(covered).sort().join(' '));
   if (missing.length) warn('not reached by random play this run: ' + missing.join(' ')); else check(true, 'every project choice option was played through the screen');
   // the real expedition/birth/review reports were driven above through playOut; confirm they happened at least once each
-  const seenTypes = await ev(() => ZT.logText());
-  for (const t of ['expedition', 'birth', 'review']) check(new RegExp('report.*' + t, 'i').test(seenTypes) || new RegExp('"t":"report"[^\\n]*' + t).test(seenTypes) || seenTypes.indexOf(t) >= 0, 'real play raised a ' + t + ' report');
+  console.log('  reports raised and shown in real play: ' + JSON.stringify(repSeen));
+  for (const t of ['expedition', 'birth', 'review', 'choice']) check((repSeen[t] || 0) > 0, 'real play raised and showed a ' + t + ' report (' + (repSeen[t] || 0) + ')');
 
   // ---------------------------------------------------------------- 8. showChoice reopen, save and reload, hidden tab
   console.log(' -- reopen, reload, hidden tab');
@@ -315,7 +320,8 @@ async function run(name) {
   await ev(() => { delete document.hidden; delete document.visibilityState; document.dispatchEvent(new Event('visibilitychange')); });
   await sleep(300);
   const hs = await state(); check(hs.cur && hs.cur.final, 'hidden tab: the sequence still reached its final card (' + JSON.stringify(hs.cur) + ')');
-  await tapAway(); await sleep(300); await tapAway(); await sleep(300); await settled('hidden tab');
+  for (let g = 0; g < 6 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); }
+  await settled('hidden tab');
 
   // ---------------------------------------------------------------- 9. errors
   const errs = await ev(() => ZT.errors.slice());
