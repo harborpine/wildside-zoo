@@ -203,10 +203,8 @@ async function run(name) {
   const hired = await ev(() => { const r = ZCore.act('advertise', 1); return r.ok ? r.candidates.length : -1; });
   check(hired > 0, 'advertise gave candidates (' + hired + ')');
   await ev(() => { window.__hdone = false; ZMoments.revealHire(ZT.S.candidates, () => { window.__hdone = true; }); });
-  await drive('hire reveal', { shots: 'hire', noLayout: true, timed: false, onlyOne: true, scrollOk: true });
-  await sleep(300); await shot('hire-final');
-  { const lay = await layout(); if (lay && lay.small.length) warn('hire list small buttons: ' + lay.small.join(',')); }
-  await tapSel('.layer:not([hidden]) .btn.ghost'); await settled('hire reveal'); check(await ev(() => window.__hdone === true), 'revealHire calls done');
+  await drive('hire reveal', { shots: 'hire', noLayout: true, timed: true });
+  await settled('hire reveal'); check(await ev(() => window.__hdone === true), 'revealHire calls done');
   await ev(() => { window.__tdone = false; ZMoments.revealTrain(ZT.S.staff[0], { gain: 9, super: true, stat: 'care', value: 41 }, () => { window.__tdone = true; }); });
   await drive('train super', { shots: 'train-super' }); await settled('train'); check(await ev(() => window.__tdone === true), 'revealTrain calls done');
   await ev(() => { window.__rdone = false; ZMoments.result({ title: 'Test', lines: ['One line'], good: true }, () => { window.__rdone = true; }); });
@@ -357,7 +355,7 @@ async function run(name) {
     await ev(() => { ZT.S.rank = 5; ZCore.act('advertise', 1); });
     await openMenu(); await ev(() => { window.__d = 0; ZMoments.revealHire(ZT.S.candidates, () => { window.__d++; }); });
     await waitStack(s => s.stack.length === 2, 3000); await waitStack(s => s.cur && s.cur.final, 6000); await sleep(700);
-    await tapSel('.layer:not([hidden]) .btn.ghost'); await backOnMenu('revealHire'); check(await ev(() => window.__d === 1), 'revealHire in menu: done called once');
+    await sleep(600); await tapAway(); await sleep(400); await tapAway(); await backOnMenu('revealHire'); check(await ev(() => window.__d === 1), 'revealHire in menu: done called once');
     await ev(() => ZT.popAll());
     // showHappening: dismiss a pending happening, then reopen it
     await ev(() => { ZT.S.happening = null; ZE.debug.happening(ZT.S, 'school'); ZT.flush(); });
@@ -369,6 +367,18 @@ async function run(name) {
     await ev(() => ZT.popAll());
     await ev(() => { window.__d = 0; ZMoments.showHappening(() => { window.__d++; }); }); await sleep(200);
     check(await ev(() => window.__d === 1 && ZT.stack().length === 0), 'showHappening with nothing pending just calls done');
+    // winter show from inside a menu: long names fit, and the result card stays up until tapped
+    await ev(() => { const S = ZT.S; S.reports.length = 0; const long = D => D.SPECIES_LIST.slice().sort((a, b) => b.name.length - a.name.length)[0]; const sp = long(ZD); S.animals[0].sp = sp.id; S.animals[0].name = 'Tansywansy'; ZE.debug.yearly(S, 'show'); });
+    await openMenu(); await ev(() => { ZMoments.showShow(() => { window.__d = 1; }); }); await sleep(500); await shot('show-longname');
+    const ov = await ev(() => [...document.querySelectorAll('.layer:not([hidden]) .mo-row .mid *')].filter(e => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).textOverflow !== 'ellipsis').length);
+    check(ov === 0, 'show picker: no row text overflows its box (' + ov + ')');
+    await page.locator('.layer:not([hidden]) .mo-row.tap').first().tap(); await sleep(300); await tapSel('.layer .confirm .btn.primary, .layer:not([hidden]) .btn.primary'); await sleep(900);
+    check(await ev(() => ZT.stack().includes('mo-showresult')), 'showresult stays up after entering from inside a menu (' + (await ev(() => ZT.stack().join())) + ')');
+    await tapAway(); await sleep(500); await tapAway(); await sleep(400);
+    await ev(() => ZT.popAll());
+    // combo card never shows a bare tile
+    await ev(() => { const S = ZT.S; S.reports.length = 0; const h = S.items.find(i => i.k === 'hab'); S.animals.forEach(a => { a.hab = null; }); S.reports.push({ type: 'combo', id: 'picnic', anchor: h.id, members: [] }); ZT.flush(); });
+    await waitStack(s => s.stack.length > 0, 3000); await sleep(900); await shot('combo-empty-hab'); await ev(() => ZT.popAll());
   }
 
   // ---------------------------------------------------------------- 9. errors

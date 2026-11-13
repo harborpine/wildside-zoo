@@ -543,13 +543,27 @@
   function bonusLine(c) {
     return c.draw ? '+' + Math.round(c.draw * 100) + '% draw' : c.spend ? '+' + Math.round(c.spend * 100) + '% shop sales' : c.crowd ? '+' + Math.round(c.crowd * 100) + '% visitors' : c.rpMult ? '+' + Math.round(c.rpMult * 100) + '% research' : '';
   }
+  // Pictures that carry a combo: the anchor building or an animal of the anchor habitat, plus the pieces it needs. Never a bare tile.
+  function comboPics(c, it) {
+    const out = [], parts = [c.anchor].concat(c.needs || []).slice(0, 3);
+    parts.forEach((k, i) => {
+      const m = /^(hab|fac):(.+)$/.exec(k); if (!m) return;
+      if (m[1] === 'fac') { const u = bUrl(m[2], 3); if (u) out.push(u); return; }
+      let sp = null;
+      const hab = i === 0 && it && it.k === 'hab' ? it : S().items.find(x => x.k === 'hab' && x.t === m[2]);
+      const an = hab ? E.inHab(S(), hab.id)[0] : null;
+      if (an) sp = an.sp; else { const d = D.SPECIES_LIST.find(x => x.biome === m[2]); if (d) sp = d.id; }
+      const u = sp ? aUrl(sp, {}, 3) : null; if (u) out.push(u);
+    });
+    if (!out.length) { const u = iUrl('star', 6); if (u) out.push(u); }
+    return out;
+  }
   function comboMoment(r, done) {
     const c = D.COMBOS.find(x => x.id === r.id);
     if (!c) { once(done)(); return null; }
-    const it = E.item(S(), r.anchor); let u = null;
-    if (it && it.k === 'fac') u = bUrl(it.t, 3);
-    else if (it) { const an = E.inHab(S(), it.id)[0]; u = an ? aUrl(an.sp, { variant: !!an.variant }, 4) : tUrl('hab:' + it.t, 2); }
-    return simpleCard('mo-combo', { tone: 'gold', kicker: 'Combo found!', img: u || iUrl('star', 8), imgCls: 'small', title: c.name, lines: [bonusLine(c)] }, done);
+    const imgs = comboPics(c, E.item(S(), r.anchor));
+    const row = el('div', { cls: 'mo-thumbs' }, imgs.map(u => el('div', { cls: 'mo-pic' }, pic(u))));
+    return simpleCard('mo-combo', { tone: 'gold', kicker: 'Combo found!', img: row, imgCls: 'small', title: c.name, lines: [bonusLine(c)] }, done);
   }
   function secretMoment(r, done) {
     const B = D.BIOMES[r.region] || { region: 'a new region', name: '' };
@@ -665,7 +679,7 @@
       s.animals.slice().sort((a, b) => E.showScore(s, b) - E.showScore(s, a)).slice(0, 8).forEach(a => {
         const m = E.showMedal(s, a), sc = Math.round(E.showScore(s, a));
         const row = el('div', { cls: 'mo-row tap' }, el('div', { cls: 'mo-pic' }, pic(aUrl(a.sp, { variant: !!a.variant }, 3))),
-          el('div', { cls: 'mid' }, el('span', { cls: 't' }, a.name + ' · ' + animalName(a)), el('span', { cls: 's' }, label + ' ' + a[sh.stat] + ' · score ' + sc)),
+          el('div', { cls: 'mid' }, el('span', { cls: 't' }, a.name), el('span', { cls: 's', style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, animalName(a)), el('span', { cls: 's' }, label + ' ' + a[sh.stat] + ' · score ' + sc)),
           el('span', { cls: 'mo-medal ' + (m || 'none'), style: { fontSize: '14px', padding: '4px 6px', minWidth: '66px', textAlign: 'center', boxShadow: '0 0 0 2px var(--bd)' } }, m ? m : 'none'));
         row.addEventListener('click', () => ui.confirm('Enter ' + a.name + '?', () => { const r = Z.act('enterShow', a.id); if (r && r.ok) M.end(); }, { yes: 'Enter' }));
         rows.appendChild(row);
@@ -817,7 +831,7 @@
   function revealHire(candidates, done) {
     candidates = (candidates || S().candidates || []).slice();
     if (!candidates.length) { once(done)(); return null; }
-    const n = candidates.length, ms = Math.max(800, Math.min(1500, Math.floor(3300 / n))), f = Math.min(1, ms / 1500);
+    const n = candidates.length, ms = Math.max(700, Math.min(1400, Math.floor(2600 / n))), f = Math.min(1, ms / 1500);
     const steps = candidates.map((c, k) => {
       const R = D.ROLES[c.role] || { name: c.role, main: 'care' };
       return { ms: ms, anim: ms * 0.92, render(card, st) {
@@ -836,23 +850,9 @@
         card.appendChild(row);
       } };
     });
-    steps.push({ noEnd: true, anim: 300, render(card, st) {
-      card.appendChild(el('div', { cls: 'mo-kicker' }, 'Pick who to hire'));
-      const rows = el('div', { cls: 'mo-rows' });
-      const draw = () => {
-        rows.textContent = '';
-        candidates.forEach(c => {
-          const idx = S().candidates.indexOf(c), R = D.ROLES[c.role] || { name: c.role }, gone = idx < 0, full = S().staff.length >= E.staffCap(S());
-          const b = ui.btn(gone ? 'Hired' : 'Hire', () => { const r = Z.act('hireCandidate', S().candidates.indexOf(c)); if (r && r.ok) { ui.toast(c.name + ' joins the team', 'good'); draw(); } }, { cls: gone ? 'ghost' : 'primary', disabled: gone || full });
-          rows.appendChild(el('div', { cls: 'mo-row' + (c.star ? ' sel' : '') }, el('div', { cls: 'mo-pic' }, pic(pUrl(c.role, 3))), el('div', { cls: 'mid' }, el('span', { cls: 't' }, c.name + (c.star ? ' ★' : '')), el('span', { cls: 's' }, R.name), el('span', { cls: 'mo-mini small' }, [['Car', c.care], ['Sci', c.sci], ['Sco', c.exp], ['Cha', c.charm]].map(q => el('span', { cls: 'mo-m' }, el('b', { style: { background: 'var(--ink2)' } }, q[0]), String(q[1]))))), b));
-        });
-      };
-      draw(); card.appendChild(rows);
-      card.appendChild(el('div', { cls: 'mo-line' }, 'They wait a few weeks. Staff room: ' + S().staff.length + ' of ' + E.staffCap(S())));
-      card.appendChild(ui.btn('Done', () => { if (MM) MM.end(); }, { cls: 'ghost big' }));
-    } });
-    let MM = null;
-    return open('mo-hire', (body, M) => { MM = M; sequence(M, body, steps); }, done);
+    steps[steps.length - 1].ms = 0; steps[steps.length - 1].render0 = steps[steps.length - 1].render;
+    steps[steps.length - 1].render = function (card, st) { this.render0(card, st); card.appendChild(hint()); };
+    return open('mo-hire', (body, M) => sequence(M, body, steps), done);
   }
   function revealTrain(staff, res, done) {
     if (!res) { once(done)(); return null; }

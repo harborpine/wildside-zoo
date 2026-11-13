@@ -60,6 +60,8 @@
   const why = t => el('span', { cls: 'mn-why' }, t);
 
   function reveal(api, o, then) { api.replace({ id: o.id || 'result', modal: true, render(b, a2) { b.appendChild(ui.reveal(Object.assign({}, o, { onTap: () => { if (then) then(a2); else a2.pop(); } }))); } }); }
+  // Run fn once no report or reveal is on screen or waiting, so a result card is never closed by the screen that caused it.
+  function later(fn, n) { n = n || 0; const st = S(); if ((Core.busy || (st.reports && st.reports.length)) && n < 400) { setTimeout(() => later(fn, n + 1), 150); return; } fn(); }
   function openAt(fn) { Core.popAll(); open(); if (fn) fn(); }
 
   // ------------------------------------------------------------------ styles
@@ -223,7 +225,7 @@
       body.appendChild(kv('Team', p.staff.map(id => { const st = E.staffer(s, id); return st ? st.name : '?'; }).join(', ')));
       if (p.type === 'expedition') body.appendChild(kv('Spent', money(p.cost)));
       if (info.choice) body.appendChild(ui.btn('Answer', () => showChoice(pid), { cls: 'primary big' }));
-      if (p.type === 'expedition') body.appendChild(ui.btn('Call back', () => ui.confirm('Call the team back? Half the cost returns.', () => { const r = Core.act('cancelProject', pid); if (r.ok) { ui.toast('Back. ' + money(r.refund) + ' returned', 'good'); api.pop(); } }, { danger: true, yes: 'Call back' }), { cls: 'danger big', sub: 'half the cost returns' }));
+      if (p.type === 'expedition') body.appendChild(ui.btn('Call back', () => ui.confirm('Call the team back? Half the cost returns.', () => { const r = Core.act('cancelProject', pid); if (r.ok) { ui.toast('Back. ' + money(r.refund) + ' returned', 'good'); later(() => api.pop()); } }, { danger: true, yes: 'Call back' }), { cls: 'danger big', sub: 'half the cost returns' }));
     } });
   }
 
@@ -279,7 +281,7 @@
       body.appendChild(kv('Time', pn(E.expWeeks(s, region, team), 'week', 'weeks')));
       body.appendChild(ui.section('Chance to find'));
       Object.keys(o.byRarity).map(Number).sort((a, b) => a - b).forEach(r => { const p = o.byRarity[r]; if (p < 0.005) return; body.appendChild(el('div', { cls: 'mn-odd' }, starsOn(r), ui.bar(p, { cls: 'gold' }), span('p', pct(p)))); });
-      body.appendChild(ui.btn('Send', guard(() => { const r = Core.act('startExpedition', region, team, budget); if (r.ok) { Core.popAll(); ui.toast('Expedition sent', 'good'); } }), { cls: 'primary big', sub: money(cost), disabled: s.money < cost, onDisabled: () => ui.toast(needMoney(cost), 'bad') }));
+      body.appendChild(ui.btn('Send', guard(() => { const r = Core.act('startExpedition', region, team, budget); if (r.ok) { later(() => Core.popAll()); ui.toast('Expedition sent', 'good'); } }), { cls: 'primary big', sub: money(cost), disabled: s.money < cost, onDisabled: () => ui.toast(needMoney(cost), 'bad') }));
     } });
   }
 
@@ -308,7 +310,7 @@
       body.appendChild(kv('Leader', lead.name));
       body.appendChild(kv('Chance', pct(E.breedChance(s, lead))));
       body.appendChild(kv('Time', pn(E.breedWeeks(s, a.sp), 'week', 'weeks')));
-      body.appendChild(ui.btn('Start', guard(() => { const r = Core.act('startBreeding', aId, bId, leadId); if (r.ok) { Core.popAll(); ui.toast('Pair is breeding', 'good'); } }), { cls: 'primary big' }));
+      body.appendChild(ui.btn('Start', guard(() => { const r = Core.act('startBreeding', aId, bId, leadId); if (r.ok) { later(() => Core.popAll()); ui.toast('Pair is breeding', 'good'); } }), { cls: 'primary big' }));
     } });
   }
 
@@ -345,7 +347,7 @@
       body.appendChild(kv('Host', lead.name));
       body.appendChild(kv('Fit', fit == null ? 'Untried' : span('', ui.sign(fit), ' ', E.fitWord(fit))));
       body.appendChild(kv('Time', '3 weeks'));
-      body.appendChild(ui.btn('Start', guard(() => { const r = Core.act('startEvent', habId, theme, leadId); if (r.ok) { Core.popAll(); ui.toast('Event started', 'good'); } }), { cls: 'primary big', sub: money(cost), disabled: s.money < cost, onDisabled: () => ui.toast(needMoney(cost), 'bad') }));
+      body.appendChild(ui.btn('Start', guard(() => { const r = Core.act('startEvent', habId, theme, leadId); if (r.ok) { later(() => Core.popAll()); ui.toast('Event started', 'good'); } }), { cls: 'primary big', sub: money(cost), disabled: s.money < cost, onDisabled: () => ui.toast(needMoney(cost), 'bad') }));
     } });
   }
 
@@ -363,7 +365,7 @@
   function yearlyScreen() {
     push({ id: 'yearly', title: S().yearly ? S().yearly.name : 'Day', render(body, api) {
       const y = S().yearly; if (!y) { api.pop(); return; }
-      body.appendChild(ui.choices(y.options, i => { const r = Core.act('resolveYearly', i); if (r.ok) Core.popAll(); }));
+      body.appendChild(ui.choices(y.options, i => { const r = Core.act('resolveYearly', i); if (r.ok) later(() => Core.popAll()); }));
     } });
   }
   function showScreen() {
@@ -373,7 +375,7 @@
       body.appendChild(el('div', { cls: 'chips' }, [ui.stat(stat, 'judged'), ui.stat('Gold', m.gold), ui.stat('Silver', m.silver), ui.stat('Bronze', m.bronze)]));
       const an = s.animals.slice().sort((a, b) => E.showScore(s, b) - E.showScore(s, a));
       body.appendChild(rows(an.map(a => { const medal = E.showMedal(s, a); return row({ img: aUrl(a, 2), title: a.name, sub: E.animalLabel(a), right: span('mn-grade', (medal ? medal[0].toUpperCase() + medal.slice(1) : 'None') + ' ' + E.showScore(s, a)), off: E.isSick(s, a),
-        tap: () => ui.confirm('Enter ' + a.name + ' in the show?', () => { const r = Core.act('enterShow', a.id); if (r.ok) Core.popAll(); }, { yes: 'Enter' }) }); }), 'No animals.'));
+        tap: () => ui.confirm('Enter ' + a.name + ' in the show?', () => { const r = Core.act('enterShow', a.id); if (r.ok) later(() => Core.popAll()); }, { yes: 'Enter' }) }); }), 'No animals.'));
     } });
   }
 
@@ -478,7 +480,7 @@
     const s = S();
     return row({ img: aUrl(a, 2), title: a.name, sub: E.animalLabel(a) + ' · ' + a.sex + ' · ' + ageText(a),
       extra: o && o.act ? null : animalChips(a), line: o && o.act ? animalChips(a) : null,
-      right: o && o.act ? null : [span('mn-grade', E.grade(E.avg(a))), starsOn(E.sp(a).rarity), E.isSick(s, a) ? imgEl(iUrl('sick', 3), 'mn-mini') : null], tap: () => animalScreen(a.id), act: o && o.act });
+      right: o && o.act ? null : [starsOn(E.sp(a).rarity), E.isSick(s, a) ? imgEl(iUrl('sick', 3), 'mn-mini') : null], tap: () => animalScreen(a.id), act: o && o.act });
   }
   function animalsScreen(tab) {
     if (tab) animalTab = tab;
@@ -524,12 +526,12 @@
       animalCard(body, a);
       const h = a.hab == null ? null : E.item(s, a.hab);
       body.appendChild(el('div', { cls: 'center' }, (a.sex === 'F' ? 'Female' : 'Male') + ' · ' + ageText(a) + ' · ' + (h ? E.habName(s, h) : 'Holding pen') + (E.isSick(s, a) ? ' · Unwell' : '')));
-      if (!h) { const best = E.bestHab(s, a); body.appendChild(ui.btn('House', () => { const r = Core.act('autoHouse', id); if (r.ok) { ui.toast('Housed', 'good'); api.pop(); } }, { cls: 'primary big', disabled: !best, sub: best ? E.habName(s, best) : 'No room' })); }
+      if (!h) { const best = E.bestHab(s, a); body.appendChild(ui.btn('House', () => { const r = Core.act('autoHouse', id); if (r.ok) { ui.toast('Housed', 'good'); later(() => api.pop()); } }, { cls: 'primary big', disabled: !best, sub: best ? E.habName(s, best) : 'No room' })); }
       const inProj = !!E.busyAnimals(s)[id];
       body.appendChild(ui.btn('Choose habitat', () => habChooser(id), { cls: 'big', disabled: inProj, sub: inProj ? 'In a project' : '' }));
       if (h) body.appendChild(ui.btn('To holding pen', () => { const r = Core.act('moveAnimal', id, null); if (r.ok) { ui.toast('In the pen'); api.rerender(); } }, { cls: 'ghost' }));
       const v = E.animalValue(a);
-      body.appendChild(ui.btn('Sell', () => ui.confirm('Sell ' + (a.name || 'it') + ' for ' + money(v) + '?', () => { const r = Core.act('sellAnimal', id); if (r.ok) { ui.toast('Sold for ' + money(r.price), 'good'); api.pop(); } }, { danger: true, yes: 'Sell' }), { cls: 'danger', sub: money(v) }));
+      body.appendChild(ui.btn('Sell', () => ui.confirm('Sell ' + (a.name || 'it') + ' for ' + money(v) + '?', () => { const r = Core.act('sellAnimal', id); if (r.ok) { ui.toast('Sold for ' + money(r.price), 'good'); later(() => api.pop()); } }, { danger: true, yes: 'Sell' }), { cls: 'danger', sub: money(v) }));
     } });
   }
   function habChooser(id) {
@@ -538,7 +540,7 @@
       body.appendChild(rows(habs().map(h => {
         const n = E.inHab(s, h.id).length, cap = E.habCap(h), same = h.t === E.sp(a).biome, here = a.hab === h.id, full = n >= cap && !here;
         const reason = E.busyAnimals(s)[id] ? 'In a project' : !same ? 'Wrong biome' : here ? 'Lives here' : full ? 'Full' : '';
-        return row({ img: itemUrl(h), title: E.habName(s, h), sub: n + '/' + cap, extra: reason ? why(reason) : null, off: !!reason, tap: () => { const r = Core.act('moveAnimal', id, h.id); if (r.ok) { ui.toast('Moved', 'good'); api.pop(); } } });
+        return row({ img: itemUrl(h), title: E.habName(s, h), sub: n + '/' + cap, extra: reason ? why(reason) : null, off: !!reason, tap: () => { const r = Core.act('moveAnimal', id, h.id); if (r.ok) { ui.toast('Moved', 'good'); later(() => api.pop()); } } });
       }), 'No habitats.'));
     } });
   }
@@ -546,7 +548,7 @@
     push({ id: 'offer', title: 'For sale', render(body, api) {
       const s = S(), o = s.offers && s.offers.list[i]; if (!o) { api.pop(); return; }
       animalCard(body, o.a);
-      body.appendChild(ui.btn('Buy', guard(() => { const r = Core.act('buyAnimal', i); if (r.ok) { const h = r.hab != null ? E.item(s, r.hab) : null; ui.toast('Bought' + (h ? ', housed in ' + E.habName(s, h) : ', in the pen'), 'good'); api.pop(); } }), { cls: 'primary big', sub: money(o.price), disabled: s.money < o.price, onDisabled: () => ui.toast(needMoney(o.price), 'bad') }));
+      body.appendChild(ui.btn('Buy', guard(() => { const r = Core.act('buyAnimal', i); if (r.ok) { const h = r.hab != null ? E.item(s, r.hab) : null; ui.toast('Bought' + (h ? ', housed in ' + E.habName(s, h) : ', in the pen'), 'good'); later(() => api.pop()); } }), { cls: 'primary big', sub: money(o.price), disabled: s.money < o.price, onDisabled: () => ui.toast(needMoney(o.price), 'bad') }));
     } });
   }
   function crateScreen() {
@@ -604,7 +606,7 @@
       body.appendChild(ui.btn('Train', () => trainScreen(id), { cls: 'primary big', sub: wait > 0 ? 'Again in ' + pn(wait, 'week', 'weeks') : money(E.trainCost(st)) }));
       const lowLv = st.lvl < D.JOB_LEVEL;
       body.appendChild(ui.btn('Change job', () => jobScreen(id), { cls: 'big', disabled: lowLv || busy, sub: lowLv ? 'Level ' + D.JOB_LEVEL + ' needed' : busy ? 'On a project' : '' }));
-      body.appendChild(ui.btn('Let go', () => ui.confirm('Let ' + st.name + ' go for good?', () => { const r = Core.act('fire', id); if (r.ok) { ui.toast(st.name + ' left'); api.pop(); } }, { danger: true, yes: 'Let go' }), { cls: 'danger', disabled: busy, sub: busy ? 'On a project' : '' }));
+      body.appendChild(ui.btn('Let go', () => ui.confirm('Let ' + st.name + ' go for good?', () => { const r = Core.act('fire', id); if (r.ok) { ui.toast(st.name + ' left'); later(() => api.pop()); } }, { danger: true, yes: 'Let go' }), { cls: 'danger', disabled: busy, sub: busy ? 'On a project' : '' }));
     } });
   }
   function trainScreen(id) {
@@ -629,7 +631,7 @@
       body.appendChild(rows(E.jobOptions(s, st).map(o => {
         const R = D.ROLES[o.role], reason = o.lock ? 'Needs ' + R.req.map(g => g.map(x => D.ROLES[x].name).join('/')).join(' + ') : s.money < c ? needMoney(c) : '';
         return row({ img: pUrl(o.role, 3), title: R.name, sub: ROLE_TAG[o.role] || '', extra: reason ? why(reason) : null, right: money(c), off: !!reason,
-          tap: () => ui.confirm('Make ' + st.name + ' a ' + R.name + '? Back to level 1.', () => { const r = Core.act('changeJob', id, o.role); if (r.ok) { ui.toast(st.name + ' is now a ' + R.name, 'good'); api.pop(); } }, { yes: 'Change' }) });
+          tap: () => ui.confirm('Make ' + st.name + ' a ' + R.name + '? Back to level 1.', () => { const r = Core.act('changeJob', id, o.role); if (r.ok) { ui.toast(st.name + ' is now a ' + R.name, 'good'); later(() => api.pop()); } }, { yes: 'Change' }) });
       })));
     } });
   }
@@ -686,8 +688,8 @@
         { icon: iUrl('rep', 6), label: 'Ranks', sub: E.rankings(s).place + ' of ' + E.rankings(s).of, onTap: rankScreen },
         { icon: iUrl('rp', 6), label: 'Years', sub: s.history.length ? pn(s.history.length, 'year', 'years') : '', onTap: yearsScreen },
         { icon: iUrl('coin', 6), label: 'Awards', onTap: awardsScreen },
-        { icon: iUrl('m-system', 6), label: 'Log', onTap: () => Core.screens.log() }
-      ], { cols: 2 }));
+        Core.devTools ? { icon: iUrl('m-system', 6), label: 'Log', onTap: () => Core.screens.log() } : null
+      ].filter(Boolean), { cols: 2 }));
     } });
   }
   const comboFound = () => D.COMBOS.filter(c => S().combos[c.id] || S().knownCombos[c.id]).length;

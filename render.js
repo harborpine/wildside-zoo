@@ -573,6 +573,13 @@
     const barH = P.dom && P.dom.bar ? (P.dom.bar.getBoundingClientRect().height + 40) / (cssH || 1) * vh : vh * 0.2;
     if (a0 - HW < cam.x + 4 || a1 + HW > cam.x + vw - 4 || b0 - HH - 20 < cam.y || b1 + HH > cam.y + vh - barH) { const ox = cam.x, oy = cam.y; cam.x = (a0 + a1) / 2 - vw / 2; cam.y = (b0 + b1) / 2 - vh * 0.42; clampCam(); cam.tx = cam.x; cam.ty = cam.y; cam.x = ox; cam.y = oy; cam.vx = cam.vy = 0; }
   }
+  // Place is the one prominent (green) button, grey while the spot is invalid; Rotate and Cancel/Done are neutral. Set inline so it holds
+  // whichever position each button has in the bar. Colours come from the Shell's theme variables, with fallbacks.
+  function paintButtons(ok) {
+    const d = P && P.dom; if (!d) return;
+    [d.rotate, d.cancel].forEach(b => { if (!b) return; b.style.background = 'var(--cream2, #f6e2ac)'; b.style.color = 'var(--ink, #3b2a1a)'; b.style.textShadow = 'none'; });
+    if (d.place) { d.place.style.background = ok ? 'var(--green, #58b84a)' : '#b8b2a0'; d.place.style.color = ok ? '#fff' : '#efe9da'; d.place.style.textShadow = ok ? '1px 1px 0 var(--green-d, #357d2e)' : 'none'; d.place.style.opacity = ''; }
+  }
   function comboNames(list) { const out = []; list.forEach(a => { const c = D.COMBOS.find(x => x.id === a.id); const n = c ? c.name : a.id; if (out.indexOf(n) < 0) out.push(n); }); return out; }
   function evalPlacement() {
     const S = st(); if (!P || !S) return; const sp = P.spec;
@@ -596,7 +603,7 @@
     if (P.fail) { msg = P.fail; P.state = 'bad'; P.fail = null; }
     P.msg = msg;
     P.outline = outlineSprite(cs, P.state === 'bad' ? '#ff6a5c' : P.state === 'combo' ? '#ffd84a' : P.state === 'warn' ? '#ffb056' : '#ffffff');
-    if (P.dom) { P.dom.note.textContent = (sp.label && (sp.label + msg).length <= 34 ? sp.label + ': ' : '') + msg; P.dom.note.setAttribute('data-state', P.state); if (P.dom.place) { P.dom.place.setAttribute('aria-disabled', ok ? 'false' : 'true'); P.dom.place.style.opacity = ok ? '' : '0.55'; } }
+    if (P.dom) { P.dom.note.textContent = (sp.label && (sp.label + msg).length <= 34 ? sp.label + ': ' : '') + msg; P.dom.note.setAttribute('data-state', P.state); if (P.dom.place) { P.dom.place.setAttribute('aria-disabled', ok ? 'false' : 'true'); paintButtons(ok); } }
   }
   R.startPlacement = function (spec, cbs) {
     if (P) R.stopPlacement();
@@ -624,10 +631,11 @@
     });
     dom.cancel = b('Cancel', 'zr-cancel', () => { if (!P) return; const cb = P.count > 0 && P.cbs.onDone ? P.cbs.onDone : P.cbs.onCancel; R.stopPlacement(); if (cb) cb(); });
     dom.note.style.whiteSpace = 'nowrap'; dom.note.style.overflow = 'hidden'; dom.note.style.textOverflow = 'ellipsis';
+    dom.note.style.top = '8px'; dom.note.style.bottom = 'auto'; // at the top of the floor during placement, clear of the Shell's toasts above the buttons
     dom.bar.classList.add('zr-on'); dom.note.classList.add('zr-on');
     evalPlacement(); return true;
   };
-  R.stopPlacement = function () { if (!P) return; const d = P.dom; P = null; if (d) { d.bar.classList.remove('zr-on'); d.note.classList.remove('zr-on'); d.bar.textContent = ''; d.note.textContent = ''; } };
+  R.stopPlacement = function () { if (!P) return; const d = P.dom; P = null; if (d) { d.bar.classList.remove('zr-on'); d.note.classList.remove('zr-on'); d.bar.textContent = ''; d.note.textContent = ''; d.note.style.top = ''; d.note.style.bottom = ''; } };
   R.placing = () => !!P;
 
   // ---------------------------------------------------------------- drawing

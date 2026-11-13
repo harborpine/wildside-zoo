@@ -131,9 +131,15 @@ async function run(name) {
   check(await ev(() => ZT.S.yearly == null), 'Open Day plan answered from the menu');
   await ev(() => ZT.popAll());
   await ev(() => { ZE.debug.yearly(ZT.S, 'show'); ZT.S.reports.length = 0; }); await openMenu(); await tap('Projects'); await tap('Animal Show'); await screen('show');
-  await tap('Mango', { nth: 0 }).catch(async () => { await ev(() => 0); }); await sleep(200);
-  await tap('Enter', { wait: 500 }).catch(() => 0);
-  await ev(() => ZT.popAll());
+  const showName = await ev(() => ZT.S.animals[0].name); const trophies0 = await ev(() => ZT.S.show && 1);
+  await tap(showName, { nth: 0 }); await tap('Enter', { wait: 100 });
+  await sleep(900); const topNow = await stack(); await shot('show-result');
+  check(/mo-/.test(topNow.split('>').pop()) && await ev(() => ZT.S.show == null || true), 'the Winter Show result card is still on screen 1 s after Enter (' + topNow + ')');
+  await dismiss(); await sleep(1200);
+  for (let i = 0; i < 4 && (await stack()) !== ''; i++) await dismiss();
+  check((await stack()) === '', 'after the result is tapped away the menu closes by itself (' + await stack() + ')');
+
+
   await ev(() => { ZE.debug.happening(ZT.S, 'donor'); ZT.S.reports.length = 0; }); await openMenu(); await tap('Projects'); await screen('projects-happening');
   await tap('A gift'); await screen('happening-fallback', 'happening');
   if (!usedMoments) { await tap('Cash'); await sleep(300); check(await ev(() => ZT.S.happening == null), 'pending happening answered from Projects'); }
