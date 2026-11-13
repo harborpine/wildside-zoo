@@ -381,6 +381,59 @@ async function run(name) {
     await waitStack(s => s.stack.length > 0, 3000); await sleep(900); await shot('combo-empty-hab'); await ev(() => ZT.popAll());
   }
 
+  if (want('late')) {
+    console.log(' -- late-game audit: 30+ animals, 8 staff, long names, at 390x844 and 375x667');
+    const setupLate = () => ev(() => {
+      ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.rp = 5000; S.reports.length = 0; S.happening = null; S.show = null; S.yearly = null;
+      const longSp = ZD.SPECIES_LIST.slice().sort((a, b) => b.name.length - a.name.length)[0];
+      const hab = S.items.find(i => i.k === 'hab'); const base = S.animals[0];
+      while (S.animals.length < 32) S.animals.push(Object.assign({}, base, { id: 6000 + S.animals.length, sp: longSp.id, name: 'Tansywansy', charm: 40 + S.animals.length, hab: hab.id }));
+      while (S.staff.length < 8) S.staff.push(Object.assign({}, S.staff[0], { id: 7000 + S.staff.length }));
+      S.history = [{ year: 1, rating: 50, place: 7 }];
+    });
+    const cases = {
+      show: () => { ZE.debug.yearly(ZT.S, 'show'); ZT.S.reports.length = 0; ZMoments.showShow(); },
+      trader: () => { ZE.debug.caller(ZT.S, 'trader'); const O = ZT.S.offers; while (O.list.length < 7) O.list.push(Object.assign({}, O.list[0])); ZT.S.reports.length = 0; ZMoments.showCaller('trader'); },
+      director: () => { ZE.debug.caller(ZT.S, 'director'); const O = ZT.S.offers; while (O.list.length < 7) O.list.push(Object.assign({}, O.list[0])); ZT.S.reports.length = 0; ZMoments.showCaller('director'); },
+      headhunter: () => { ZE.debug.caller(ZT.S, 'headhunter'); ZT.S.reports.length = 0; ZMoments.showCaller('headhunter'); },
+      final: () => { const S = ZT.S; S.history = [{ year: 20, rating: 900, place: 3 }]; S.reports.push({ type: 'final', score: ZE.finalScore(S) }); ZT.flush(); },
+      yearend: () => { const S = ZT.S; const table = []; for (let i = 0; i < 12; i++) table.push({ name: 'Nordhaven Zoological Society ' + i, rating: 5000 - i * 100, me: i === 8 }); const awards = ['Best Exhibit', 'Rising Star', 'Fan Favourite', 'Green Award', 'Zoo of the Year'].map((n, i) => ({ id: 'a' + i, name: n, won: i % 2 === 0, mine: 'Something long about ' + n, bar: 40, prize: 12000 })); S.reports.push({ type: 'yearend', year: 7, table: table, place: 9, awards: awards, prize: 12000, stats: { income: 900000, cost: 500000, visitors: 123456, species: 40, bestReview: 36 } }); ZT.flush(); },
+      expedition: () => { const found = []; for (let i = 0; i < 5; i++) found.push({ id: 900 + i, sp: ['lion', 'elephant', 'giraffe', 'zebra', 'tiger'][i], rarity: 3, isNew: i === 0, variant: i === 1, charm: 50, vigor: 40, wit: 30, hab: null }); ZT.S.reports.push({ type: 'expedition', region: 'savanna', found: found, rp: 22, fragment: 3, notes: [], ups: ['Ada Brandt', 'Benedikt Halvorsen'], staff: [] }); ZT.flush(); },
+      review: () => { const S = ZT.S; const h = S.items.find(i => i.k === 'hab'); S.reports.push({ type: 'review', hab: h.id, biome: 'savanna', theme: 'conserve', aff: 2, fitWord: 'Amazing fit', firstTime: true, sc: {}, critics: [9, 9, 9, 9].map((n, i) => ({ key: 'k' + i, name: ['Animals', 'Habitat', 'Fun', 'Learning'][i], score: n })), total: 36, hof: true, repeat: true, fired: 2, star: { animal: 6001, stat: 'charm', score: 'fun', gain: 1.4 }, boost: { good: false, amt: -2 }, money: 82000, rep: 40, rp: 12, lead: 1 }); ZT.flush(); },
+      birth: () => { const kid = n => ({ id: 800, sp: 'zebra', name: n, hab: null, rolls: ['charm', 'vigor', 'wit'].map(st => ({ stat: st, parents: 41, value: 49, delta: 8, lucky: st === 'vigor' })), variantChance: 0.06, variant: true }); ZT.S.reports.push({ type: 'birth', fail: false, a: 1, b: 2, lead: 1, sp: 'zebra', chance: 0.7, kids: [kid('Tansywansy'), kid('Longnamed')], twins: true, firstBred: true }); ZT.flush(); },
+      hire: () => { const c = []; for (let i = 0; i < 4; i++) c.push(Object.assign({}, ZT.S.staff[0], { id: 8000 + i, name: 'Maximilian Featherstonehaugh', star: i === 1 })); ZMoments.revealHire(c); },
+      stray: () => { ZE.debug.happening(ZT.S, 'stray'); ZT.flush(); },
+      yearlyplan: () => { ZE.debug.yearly(ZT.S, 'openday'); ZT.flush(); },
+      rankup: () => { ZT.S.reports.push({ type: 'rankup', rank: 9, name: 'Zoo Legend', unlocks: ['Staff room for 12', 'More land for sale', 'Region: The Deep Reef', 'Hiring: TV appeal', 'Campaign: TV ad', 'Tickets $14'] }); ZT.flush(); }
+    };
+    for (const [w, h] of [[390, 844], [375, 667]]) {
+      await page.setViewportSize({ width: w, height: h }); await sleep(300);
+      for (const name of Object.keys(cases)) {
+        await setupLate(); await ev(fn => { new Function('return (' + fn + ')')()(); }, cases[name].toString());
+        await waitStack(s => s.stack.length > 0, 3000);
+        await waitStack(s => (s.cur && s.cur.final) || /mo-(show|caller|choice|happening|yearlyplan)/.test(s.stack[s.stack.length - 1] || ''), 6000); await sleep(2600);
+        const m = await ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); if (!l) return null; const p = l.querySelector('.panel').getBoundingClientRect(); const f = l.querySelector('.mo-foot'); const fb = f ? [...f.querySelectorAll('button')].map(b => { const r = b.getBoundingClientRect(); return { b: Math.round(r.bottom), h: Math.round(r.height), t: Math.round(r.top) }; }) : null; return { pt: Math.round(p.top), pb: Math.round(p.bottom), ih: innerHeight, fb: fb, id: l.dataset.screen }; });
+        if (!m) { check(false, name + ' @' + w + 'x' + h + ': a screen opened'); continue; }
+        const okPanel = m.pt >= 0 && m.pb <= m.ih;
+        const okFoot = !m.fb || m.fb.every(b => b.b <= m.ih && b.t >= 0 && b.h >= 55);
+        check(okPanel && okFoot, name + ' @' + w + 'x' + h + ' (' + m.id + '): panel inside the screen' + (m.fb ? ' and pinned buttons visible, 56+ px' : ' (tap anywhere to leave)') + ' ' + JSON.stringify({ pt: m.pt, pb: m.pb, fb: m.fb }));
+        await shot('late-' + name + (w === 375 ? '-small' : ''));
+        if (name === 'final') {
+          await page.locator('.mo-foot .btn.primary').first().tap(); await sleep(500);
+          const m2 = await ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); const f = l.querySelector('.mo-foot'); return { pb: Math.round(l.querySelector('.panel').getBoundingClientRect().bottom), ih: innerHeight, fb: f ? [...f.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().bottom)) : null }; });
+          check(m2.pb <= m2.ih && !!m2.fb && m2.fb.every(b => b <= m2.ih), 'new zoo screen @' + w + 'x' + h + ': buttons pinned and visible ' + JSON.stringify(m2)); await shot('late-newzoo' + (w === 375 ? '-small' : ''));
+        }
+        for (let g = 0; g < 8 && (await state()).stack.length; g++) {
+          const f = page.locator('.layer:not([hidden]) .mo-foot .btn.ghost'); const c = page.locator('.layer:not([hidden]) .choices .btn.opt');
+          if (await f.count()) await f.last().tap({ force: true }); else if (await c.count()) await c.first().tap({ force: true }); else await tapAway();
+          await sleep(450);
+        }
+        await ev(() => ZT.popAll()); await sleep(150);
+      }
+    }
+    await page.setViewportSize({ width: 390, height: 844 }); await sleep(300);
+  }
+
   // ---------------------------------------------------------------- 9. errors
   const errs = await ev(() => ZT.errors.slice());
   check(errs.length === 0, 'no captured errors inside the game (' + errs.length + ')' + (errs.length ? ': ' + errs.slice(0, 3).join(' || ') : ''));

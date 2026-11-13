@@ -2,7 +2,7 @@
 
 Global: `ZMoments`. One IIFE, loaded last. It registers a handler for every report type when the file loads
 (`ZMoments.init()` registers them again, harmlessly). CSS is injected once as `<style id="mo-style">`, every class starts with `mo-`.
-Tests: `node test/moments-shot.js [chromium] [webkit] [--quick] [--only=cards,callers,happenings,yearly,reveals,yearend,realplay,reopen,inmenu]` (headless; shots in `test/shots/moments-*.png`).
+Tests: `node test/moments-shot.js [chromium] [webkit] [--quick] [--only=late,cards,callers,happenings,yearly,reveals,yearend,realplay,reopen,inmenu]` (headless; shots in `test/shots/moments-*.png`).
 
 ## How a moment works
 
@@ -23,6 +23,8 @@ Tests: `node test/moments-shot.js [chromium] [webkit] [--quick] [--only=cards,ca
 * Nothing here calls an engine action except through `ZCore.act` (`resolveChoice`, `resolveHappening`, `resolveYearly`, `enterShow`,
   `buyAnimal`, `openCrate`, `hireHeadhunt`, `hireCandidate`) and `ZCore.newGame` (new zoo).
 * Test hooks: `ZMoments.shown[type]` and `ZMoments.finished[type]` count handler calls and `done()` calls per report type; `ZMoments.cur = {id, i, n, final, at}` describes the beat on screen (`final` = last beat reached).
+
+* **Fit rule:** content that can outgrow the screen scrolls inside the panel; exit and continue buttons are pinned below it (`M.foot`, 56 px minimum, inside the safe area) and the Winter Show header is pinned above it (`M.head`). Tested at 390x844 and 375x667 with 32 animals, 8 staff, long names (`--only=late`).
 
 ## Report handlers (registered by `ZMoments.init`)
 

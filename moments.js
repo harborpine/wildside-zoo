@@ -152,6 +152,8 @@
 .mo-medal.gold { background: var(--gold-d); } .mo-medal.silver { background: #8c97a3; } .mo-medal.bronze { background: #a8693a; } .mo-medal.none { background: #9a8a70; }
 .mo-odds { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; width: 100%; } .mo-odds span { font-size: 12px; background: var(--paper); box-shadow: 0 0 0 2px var(--line); padding: 3px 6px; }
 .mo-sec { width: 100%; }
+.mo-top { flex: none; } .mo-foot.pfoot { padding: 6px 10px calc(8px + 0px); } .mo-foot .btn { min-height: 56px; } .mo-foot .stack { gap: 4px; }
+.mo .panel { max-height: 100%; }
 .mo-input { text-align: center; font-size: 18px; }
 .mo-pick { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .mo-pick .mo-row.sel { background: #fff3b8; box-shadow: 0 0 0 3px var(--gold-d); }
@@ -170,13 +172,22 @@
     M.later = (fn, ms) => { const h = setTimeout(() => { M.timers = M.timers.filter(x => x !== h); if (M.ended) return; try { fn(); } catch (e) { rec(e, id); } }, Math.max(0, ms)); M.timers.push(h); return h; };
     M.clear = () => { M.timers.forEach(clearTimeout); M.timers = []; };
     M.end = () => { if (M.ended) return; M.ended = true; M.clear(); try { if (M.api) M.api.pop(); } catch (e) { rec(e, id + ' pop'); } d(); };
+    // Pinned parts outside the scrolling body: M.head(node) above it, M.foot(node) below it (cleared on every render).
+    const part = (kind, nodes) => {
+      const panel = M.api && M.api.el && M.api.el.querySelector('.panel'); if (!panel) return;
+      let box = panel.querySelector(':scope > .mo-' + (kind === 'head' ? 'top' : 'foot'));
+      if (!box) { box = el('div', { cls: kind === 'head' ? 'mo-top' : 'mo-foot pfoot' }); const b = panel.querySelector('.pbody'); if (kind === 'head') panel.insertBefore(box, b); else panel.appendChild(box); }
+      nodes.forEach(n => n && box.appendChild(n));
+    };
+    M.head = (...n) => part('head', n); M.foot = (...n) => part('foot', n);
+    M.clearParts = () => { try { const panel = M.api && M.api.el && M.api.el.querySelector('.panel'); if (panel) [].forEach.call(panel.querySelectorAll(':scope > .mo-top, :scope > .mo-foot'), x => x.remove()); } catch (e) { /* none */ } };
     M.rerender = () => { try { if (M.api && !M.ended) M.api.rerender(); } catch (e) { rec(e, id + ' rerender'); } };
     M.tone = t => { try { const p = M.api && M.api.el && M.api.el.querySelector('.panel'); if (p) p.classList.toggle('bad', t === 'bad'); } catch (e) { /* none */ } };
     let api = null;
     try {
       api = Z.push({
         id: id, modal: true, title: o.title, cls: 'mo ' + (o.cls || ''),
-        render(body, a) { M.clear(); M.api = a; body.textContent = ''; try { build(body, M, a); } catch (e) { rec(e, id); M.end(); } },
+        render(body, a) { M.clear(); M.api = a; M.clearParts(); body.textContent = ''; try { build(body, M, a); } catch (e) { rec(e, id); M.end(); } },
         onClose() { if (!M.ended) { M.ended = true; M.clear(); d(); } }
       });
     } catch (e) { rec(e, id + ' push'); }
@@ -611,20 +622,20 @@
       const st = S();
       if (kind === 'headhunter') {
         const h = st.headhunt;
-        if (!h) { if (M.hired) { M.end(); } else { body.appendChild(el('div', { cls: 'mo-line center' }, 'The headhunter has gone.')); body.appendChild(ui.btn('Close', () => M.end(), { cls: 'big' })); } return; }
+        if (!h) { if (M.hired) { M.end(); } else { body.appendChild(el('div', { cls: 'mo-line center' }, 'The headhunter has gone.')); M.foot(ui.btn('Close', () => M.end(), { cls: 'big' })); } return; }
         const R = D.ROLES[h.role] || { name: h.role, main: 'care' }, fee = E.headhuntFee(h), full = st.staff.length >= E.staffCap(st), poor = st.money < fee;
         const card = el('div', { cls: 'mo-card' }, el('div', { cls: 'mo-kicker' }, 'The headhunter'),
           el('div', { cls: 'mo-pic small' }, pic(pUrl(h.role, 5))), el('div', { cls: 'mo-title' }, h.name), el('div', { cls: 'mo-line hi' }, R.name + ' · level ' + (h.lvl || 1)),
           el('div', { cls: 'mo-chips' }, [['care', 'Care'], ['sci', 'Sci'], ['exp', 'Scout'], ['charm', 'Charm']].map(k => ui.stat(k[1], h[k[0]], R.main === k[0] ? 'wit' : '')) ),
           el('div', { cls: 'mo-line' }, fmt.money(E.salary(h)) + ' a week · fee ' + fmt.money(fee)));
         body.appendChild(card);
-        body.appendChild(ui.btn('Hire for ' + fmt.money(fee), () => {
+        M.foot(ui.btn('Hire for ' + fmt.money(fee), () => {
           const r = Z.act('hireHeadhunt'); if (r && r.ok) { M.hired = true; ui.toast(h.name + ' joins the team', 'good'); M.end(); }
         }, { cls: 'primary big', disabled: full || poor, sub: full ? 'Staff room is full' : poor ? 'Not enough money' : null, onDisabled: () => ui.toast(full ? 'Staff room is full' : 'Not enough money', 'bad') }));
-        body.appendChild(ui.btn('Not now', () => M.end(), { cls: 'ghost big' }));
+        M.foot(ui.btn('Not now', () => M.end(), { cls: 'ghost big' }));
         return;
       }
-      const O = st.offers; if (!O) { body.appendChild(ui.btn('Close', () => M.end(), { cls: 'big' })); return; }
+      const O = st.offers; if (!O) { M.foot(ui.btn('Close', () => M.end(), { cls: 'big' })); return; }
       const dir = O.kind === 'director';
       body.appendChild(el('div', { cls: 'mo-head' }, el('div', { cls: 'mo-pic small' }, pic(pUrl(dir ? 'director' : 'trader', 5))), el('div', { cls: 'mo-who' }, dir ? 'Visiting director' : 'Trader')));
       const rows = el('div', { cls: 'mo-rows' });
@@ -632,7 +643,7 @@
       if (!(O.list || []).length) rows.appendChild(el('div', { cls: 'mo-line center' }, 'Nothing for sale right now'));
       body.appendChild(rows);
       const cb = dir ? null : crateBlock(M); if (cb) body.appendChild(cb);
-      body.appendChild(ui.btn('Not now', () => M.end(), { cls: 'ghost big' }));
+      M.foot(ui.btn('Not now', () => M.end(), { cls: 'ghost big' }));
     }, done);
   }
 
@@ -672,11 +683,11 @@
     return open('mo-show', (body, M) => {
       const s = S(), sh = s.show; if (!sh) { M.end(); return; }
       const label = { charm: 'Charm', vigor: 'Vigor', wit: 'Wit' }[sh.stat] || sh.stat, med = E.showMedals(s);
-      body.appendChild(el('div', { cls: 'mo-card' }, el('div', { cls: 'mo-pic small' }, pic(pUrl('showrunner', 5) || iUrl('star', 8))),
+      M.head(el('div', { cls: 'mo-card', style: { padding: '8px 10px 4px' } }, el('div', { cls: 'mo-pic tiny' }, pic(pUrl('showrunner', 5) || iUrl('star', 8))),
         el('div', { cls: 'mo-line hi' }, 'Judges want ' + label + '. Pick one animal.'),
         el('div', { cls: 'mo-odds' }, el('span', 'Gold ' + (med ? med.gold : '?')), el('span', 'Silver ' + (med ? med.silver : '?')), el('span', 'Bronze ' + (med ? med.bronze : '?')))));
       const rows = el('div', { cls: 'mo-rows' });
-      s.animals.slice().sort((a, b) => E.showScore(s, b) - E.showScore(s, a)).slice(0, 8).forEach(a => {
+      s.animals.slice().sort((a, b) => E.showScore(s, b) - E.showScore(s, a)).slice(0, 12).forEach(a => {
         const m = E.showMedal(s, a), sc = Math.round(E.showScore(s, a));
         const row = el('div', { cls: 'mo-row tap' }, el('div', { cls: 'mo-pic' }, pic(aUrl(a.sp, { variant: !!a.variant }, 3))),
           el('div', { cls: 'mid' }, el('span', { cls: 't' }, a.name), el('span', { cls: 's', style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, animalName(a)), el('span', { cls: 's' }, label + ' ' + a[sh.stat] + ' · score ' + sc)),
@@ -685,7 +696,7 @@
         rows.appendChild(row);
       });
       body.appendChild(rows);
-      body.appendChild(ui.btn('Not now', () => M.end(), { cls: 'ghost big' }));
+      M.foot(ui.btn('Not now', () => M.end(), { cls: 'ghost big' }));
     }, done, { title: 'Winter Animal Show' });
   }
   function showResultMoment(r, done) {
@@ -791,7 +802,7 @@
         const btns = el('div', { cls: 'mo-sec stack' });
         btns.appendChild(ui.btn('Start a new zoo', () => { M.view = 'new'; M.rerender(); }, { cls: 'primary big', sub: 'carry-over perks' }));
         btns.appendChild(ui.btn('Keep playing', () => M.end(), { cls: 'ghost big' }));
-        st.anim(btns, t0 + 400); card.appendChild(btns);
+        M.foot(btns);
       }, noEnd: true }]);
     }, done);
   }
@@ -818,13 +829,13 @@
         row.addEventListener('click', () => { P.animal = P.animal === i ? null : i; M.rerender(); }); rows.appendChild(row); });
       body.appendChild(rows);
     }
-    body.appendChild(ui.btn('Open the gates', () => {
+    M.foot(ui.btn('Open the gates', () => {
       const opts = { zooName: (P.name || 'Wildside Zoo').trim().slice(0, 28) || 'Wildside Zoo' };
       if (carry && P.staff != null && carry.staff[P.staff]) opts.staff = carry.staff[P.staff];
       if (carry && P.animal != null && carry.animals[P.animal]) opts.animal = carry.animals[P.animal];
       M.ended = true; M.clear(); Z.newGame(opts);   // closes every screen; the old report is gone with the old zoo
     }, { cls: 'primary big' }));
-    body.appendChild(ui.btn('Back', () => { M.view = null; M.shown = false; M.i = 0; M.rerender(); }, { cls: 'ghost big' }));
+    M.foot(ui.btn('Back', () => { M.view = null; M.shown = false; M.i = 0; M.rerender(); }, { cls: 'ghost big' }));
   }
 
   // ------------------------------------------------------------------ hiring and training (called by Menus)
