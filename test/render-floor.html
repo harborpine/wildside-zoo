@@ -26,7 +26,15 @@ var STUB = /[?&]stub=1/.test(location.search);
 <script>
 (function () {
   var D = ZD, Z = ZE, log = RT.log;
-  var S = Z.newGame();
+  var BLANK = /[?&]blank=1/.test(location.search);
+  var S = BLANK ? Z.newGame() : Z.newGame(null, { starter: true }); // the demo zoo grows from the classic pre-built start
+  if (/[?&]blank=1/.test(location.search)) { // bare land, as a brand-new zoo: nothing built, nobody housed, no visitors
+    RT.simulatedBlank = S.items.length > 0; if (RT.simulatedBlank) { S.items = []; S.animals.forEach(function (a) { a.hab = null; }); S.projects = []; try { Z.refresh(S); } catch (e) { log.push('refresh: ' + e.message); } }
+    S.visitorsLast = 0; S.reports = []; S.fx = []; RT.S = S; RT.H = {};
+    ZRender.init(document.getElementById('floor'), { getState: function () { return S; }, onTap: function (t) { RT.taps.push({ q: t.q, r: t.r, item: t.item ? t.item.id : null }); } });
+    RT.place = function (spec) { return ZRender.startPlacement(spec, { onPlace: function (q, r, rot) { RT.placed.push({ q: q, r: r, rot: rot }); var res = Z.build(S, spec.kind, spec.t, q, r, rot); if (res.ok && spec.kind === 'hab') { var it = S.items[S.items.length - 1]; S.animals.forEach(function (a) { if (a.hab == null && ZD.SPECIES[a.sp].biome === spec.t) { a.hab = it.id; RT.housedByHarness = true; } }); } return res; }, onCancel: function () { RT.cancelled++; }, onDone: function () { RT.done++; } }); };
+    RT.ready = true; return;
+  }
   S.money = 1e10; S.rp = 1e6;
   D.BIOME_ORDER.forEach(function (b) { S.regions[b] = true; });
   D.FAC_ORDER.forEach(function (f) { S.research['fac:' + f] = true; });

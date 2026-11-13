@@ -178,6 +178,12 @@
   // Portrait map: 10 columns by 20 rows. Row 19 is the front (bottom of the screen), where the entrance is.
   // You start with the front START_ROWS rows and buy more rows toward the back.
   D.GRID_W = 10; D.GRID_H = 20; D.START_ROWS = 8;
+  // A new zoo is bare land. The starting money includes the price of the old free starter (a Savanna habitat and a Snack Stand),
+  // so the economy is the same once the player has built them. newGame(legacy, {starter:true}) gives the classic pre-built start.
+  D.START_KIT = [['hab', 'savanna'], ['fac', 'snack']];
+  D.START_MONEY_CLASSIC = 20000;
+  D.START_MONEY = D.START_MONEY_CLASSIC + D.BIOMES.savanna.hab + D.FAC.snack.cost; // 26,500
+  D.QUIET_WEEKS = 2; // no callers or happenings until this long after the first habitat is built
   D.LAND = [ // total rows owned after each purchase
     { rows: 10, cost: 8000,    rank: 2 },
     { rows: 12, cost: 40000,   rank: 3 },

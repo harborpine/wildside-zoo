@@ -621,8 +621,11 @@
     const c = D.COMBOS.find(x => x.id === r.id);
     if (!c) { once(done)(); return null; }
     const imgs = comboPics(c, E.item(S(), r.anchor));
-    const row = el('div', { cls: 'mo-thumbs' }, imgs.map(u => el('div', { cls: 'mo-pic' }, pic(u))));
-    return simpleCard('mo-combo', { tone: 'gold', kicker: 'Combo found!', img: row, imgCls: 'small', title: c.name, lines: [bonusLine(c)] }, done);
+    const row = el('div', { cls: 'mo-thumbs mo-combo' });
+    imgs.forEach((u, i) => { if (i) row.appendChild(el('span', { cls: 'mo-plus' }, '+')); row.appendChild(el('div', { cls: 'mo-pic' }, pic(u))); });
+    const pct = c.draw || c.spend || c.crowd || c.rpMult || 0, ic = c.spend ? 'coin' : c.rpMult ? 'rp' : 'visitors';
+    const badge = el('div', { cls: 'mo-chips' }, el('span', { cls: 'mo-chip mo-gain' }, el('b', '='), sym(ic, '', bonusLine(c), 4), el('b', '+' + Math.round(pct * 100) + '%')));
+    return simpleCard('mo-combo', { tone: 'gold', rare: true, kicker: 'Combo!', img: row, imgCls: 'small', title: c.name, lines: [badge] }, done);
   }
   function secretMoment(r, done) {
     const B = D.BIOMES[r.region] || { region: 'a new region', name: '' };

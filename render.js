@@ -20,7 +20,7 @@
   let running = true, zoom = 1, N = 2, dpr = 1, devW = 0, devH = 0, cssW = 0, cssH = 0, vw = 0, vh = 0;
   const cam = { x: 0, y: 0, vx: 0, vy: 0, tx: null, ty: null, placed: false };
   let M = null, P = null, mapDirty = true, clock = 0, slowAt = 0, lastT = 0, lastWeek = null, shopTurn = 0, engineMoneyFx = false;
-  let animals = {}, walkers = [], gatePeople = {}, floaters = [], statuses = {}, lastS = null;
+  let animals = {}, walkers = [], gatePeople = {}, floaters = [], statuses = {}, lastS = null, animalsSeeded = false;
   const stats = { sprites: 0, fps: 0, frameMs: 0, frames: 0, acc: 0, accMs: 0, warned: {} };
   const st = () => { try { return opts.getState ? opts.getState() : null; } catch (e) { return null; } };
 
@@ -273,10 +273,11 @@
     const gs = m.gate, gateBox = gs && ent ? { x0: ent.x - gs.ax - 8, x1: ent.x - gs.ax + gs.c.width + 8, y0: ent.y - gs.ay - 6, y1: ent.y - gs.ay + gs.c.height + 16 } : null;
     const entNb = c => ent && DIR6.some(d => c.q === ent.q + d[0] && c.r === ent.r + d[1]);
     // nothing decorative where the gate arch or its pillars would hide it (or stand in front of it), nor on the hexes touching the gate
-    const addDeco = (sp, x, y, k) => { if (gateBox && x > gateBox.x0 && x < gateBox.x1 && y > gateBox.y0 && y < gateBox.y1) return; add(sp, x, y, k); };
+    let decoCell = null;
+    const addDeco = (sp, x, y, k) => { if (gateBox && x > gateBox.x0 && x < gateBox.x1 && y > gateBox.y0 && y < gateBox.y1) return; add(sp, x, y, k, { ck: decoCell, tall: sp.c.height > 22 }); };
     const builtAbove = c => DIR6.some(d => G.toScreen(d[0], d[1]).y < -HH * 0.6 && m.occ[key(c.q + d[0], c.r + d[1])]) || (ent && Math.abs(c.x - ent.x) < W * 1.3 && Math.abs(c.y - ent.y) < HH * 3.5);
     cells.forEach(c => {
-      if (c.road || (m.occ[c.k] && c.owned) || entNb(c)) return;
+      decoCell = c.k; if (c.road || (m.occ[c.k] && c.owned) || entNb(c)) return;
       const h = hash(c.q, c.r, 11), ox = Math.round((hash(c.q, c.r, 12) - 0.5) * 18), oy = Math.round((hash(c.q, c.r, 13) - 0.5) * HH * 0.6), seed = Math.floor(h * 9973);
       if (!c.owned) { // wild land: dim trees, thicker outside the map
         if (nearRoad(c)) return;
@@ -327,13 +328,15 @@
         a = animals[an.id] = { id: an.id, hab: an.hab, sig: sig, x: 0, y: 0, cell: null, wait: rnd(0, 4), t: rnd(0, 9), flip: Math.random() < 0.5, moving: false, speed: rnd(6, 9), sp: an.sp, juv: Z.isJuv ? !!Z.isJuv(S, an) : false };
         const cnt = h.cells.map(() => 0); for (const id in animals) { const o = animals[id]; if (o !== a && o.hab === an.hab && o.cell != null && cnt[o.cell] != null) cnt[o.cell]++; }
         let ci = 0; cnt.forEach((n, i) => { if (n < cnt[ci]) ci = i; }); placeInCell(a, h, ci, true);
+        if (animalsSeeded) { a.hop = 1.3; a.wait = 1.4; floatAt(a.x, a.y - 18, 'heart', null, 0.15 + Math.random() * 0.3); }
       }
       a.sp = an.sp; a.variant = !!an.variant; a.juv = Z.isJuv ? !!Z.isJuv(S, an) : false;
     });
     for (const id in animals) if (!seen[id]) delete animals[id];
+    animalsSeeded = true;
   }
   function stepAnimal(a, dt) {
-    a.t += dt;
+    a.t += dt; if (a.hop > 0) a.hop -= dt;
     if (a.wait > 0) { a.wait -= dt; a.moving = false; return; }
     const dx = a.tx - a.x, dy = a.ty - a.y, d = Math.hypot(dx, dy), sp = a.speed * (a.juv ? 1.3 : 1) * dt;
     if (!a.moving && d > sp) { for (const id in animals) { const o = animals[id]; if (o !== a && o.hab === a.hab && o.moving) { a.wait = rnd(0.4, 1.4); return; } } } // one walker per habitat at a time, so they do not cross through each other
@@ -354,7 +357,12 @@
   function planWalker(w) {
     if (w.staff != null) {
       if (w.post != null) { const h = M.habs[w.post], d = h && h.dest; if (d && d.main && goTo(w, d.main.k, { cx: d.main.cx, cy: d.main.cy, wait: 1e9 })) return; w.wait = 3; return; }
-      const hs = M.dests.filter(d => d.main && d.it.k === 'hab' && d.it.id !== w.last); if (!hs.length) { w.wait = 5; return; }
+      const hs = M.dests.filter(d => d.main && d.it.k === 'hab' && d.it.id !== w.last);
+      if (!hs.length) { // no habitat yet: potter about just inside the gate so the team is visible
+        const near = []; if (M.ent && M.nodes[M.ent.k]) M.nodes[M.ent.k].nb.forEach(k => { near.push(k); M.nodes[k].nb.forEach(k2 => { if (k2 !== M.ent.k && near.indexOf(k2) < 0) near.push(k2); }); });
+        const pool = near.filter(k => k !== w.node && M.nodes[k].y <= M.ent.y); if (!pool.length || !goTo(w, pick(pool))) { w.wait = 4; return; }
+        w.wp[w.wp.length - 1].wait = rnd(3, 7); return;
+      }
       const d = pick(hs), s = pick(d.stands); w.last = d.it.id; if (!goTo(w, s.k, { cx: s.cx, cy: s.cy, wait: rnd(4, 9) })) w.wait = 3; return;
     }
     if (w.left > 0) {
@@ -398,7 +406,8 @@
     const seen = {};
     (S.staff || []).forEach(s => {
       seen[s.id] = 1; let w = walkers.find(x => x.staff === s.id);
-      if (!w) { if (!M.pathKeys.length) return; w = newWalker(s.role, s.id); w.staff = s.id; w.speed = rnd(10, 13); const n = M.nodes[pick(M.pathKeys)]; w.node = n.k; w.x = n.x + w.ox; w.y = n.y + w.oy; w.wait = rnd(0, 2); walkers.push(w); }
+      if (!w) { if (!M.pathKeys.length) return; w = newWalker(s.role, s.id); w.staff = s.id; w.speed = rnd(10, 13); let startK = pick(M.pathKeys); if (M.pathKeys.length < 2 && M.ent && M.nodes[M.ent.k]) { const inside = M.nodes[M.ent.k].nb.filter(k => M.nodes[k].y < M.ent.y); if (inside.length) startK = inside[walkers.filter(x => x.staff != null).length % inside.length]; } // bare land: start just inside the gate, apart from each other
+      const n = M.nodes[startK]; w.node = n.k; w.x = n.x + w.ox; w.y = n.y + w.oy; w.wait = rnd(0, 2); walkers.push(w); }
       w.kind = s.role; const p = busy[s.id], hid = p ? projectHab(S, p) : null, post = p && hid != null && M.habs[hid] ? hid : null;
       w.hidden = !!p && post == null;
       if (post !== w.post) { w.post = post; w.wp = []; w.wait = 0.01; if (first && post != null) { const d = M.habs[post].dest; if (d && d.main) { const n = M.nodes[d.main.k]; w.node = n.k; w.x = n.x + w.ox; w.y = n.y + w.oy; } } }
@@ -482,6 +491,7 @@
     const ent = M.ent; let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; const inc = (x, y) => { a0 = Math.min(a0, x); a1 = Math.max(a1, x); b0 = Math.min(b0, y); b1 = Math.max(b1, y); };
     if (ent) inc(ent.x, ent.y); (S.items || []).forEach(it => itemCells(it).forEach(c => { const p = G.toScreen(c[0], c[1]); inc(p.x, p.y); }));
     if (a0 > 1e8) return; const padT = HH + 36, padB = HH + 30, padX = HW + 12;
+    if (ent && !(S.items || []).length) { cam.x = ent.x - vw / 2; cam.y = ent.y - vh * 0.82; cam.vx = cam.vy = 0; cam.tx = cam.ty = null; return; } // bare land: owned land fills the view, gate near the bottom
     cam.x = (a1 - a0 + padX * 2 <= vw ? (a0 + a1) / 2 : ent ? ent.x : a0) - vw / 2;
     cam.y = b1 - b0 + padT + padB <= vh ? (b0 - padT + b1 + padB) / 2 - vh / 2 : ent ? ent.y - vh * 0.85 : b0 - padT;
     cam.vx = cam.vy = 0; cam.tx = cam.ty = null;
@@ -694,12 +704,13 @@
     }
     // one depth-sorted list
     const L = cx - 40, Rr = cx + bw + 40, T = cy - 10, B = cy + bh + 60, moveId = P ? P.spec.moveId : null;
-    for (let i = 0; i < M.statics.length; i++) { const e = M.statics[i]; if (e.x < L || e.x > Rr || e.y < T || e.y > B) continue; if (moveId != null && e.id === moveId) { list.push({ s: e.s, x: e.x, y: e.y, key: e.key, a: 0.35 }); continue; } list.push(e); }
+    let under = null; if (P && P.cells) { under = {}; P.cells.forEach(cell => { under[key(cell.q, cell.r)] = 1; }); P.cells.forEach(cell => DIR6.forEach(d => { const k2 = key(cell.q + d[0], cell.r + d[1]); if (G.toScreen(d[0], d[1]).y > 0 && !under[k2]) under[k2] = 2; })); } // (2 = the hex is just in front of the ghost: only tall things there are hidden) // decorations under the ghost are hidden so they never fight a placement
+    for (let i = 0; i < M.statics.length; i++) { const e = M.statics[i]; if (e.x < L || e.x > Rr || e.y < T || e.y > B) continue; if (under && e.ck && under[e.ck] && (under[e.ck] === 1 || e.tall)) continue; if (moveId != null && e.id === moveId) { list.push({ s: e.s, x: e.x, y: e.y, key: e.key, a: 0.35 }); continue; } list.push(e); }
     const AF = frames('ANIMAL_FRAMES'), PF = frames('PERSON_FRAMES');
     for (const id in animals) {
       const a = animals[id]; if (a.x < L || a.x > Rr || a.y < T || a.y > B) continue;
       const fr = a.moving && running && AF > 1 ? Math.floor(a.t * 6) % AF : 0;
-      list.push({ s: spr('animal', a.sp, { variant: a.variant, juv: a.juv, frame: fr, flip: a.flip }), x: a.x, y: a.y, key: a.y + 0.1, a: 1 });
+      list.push({ s: spr('animal', a.sp, { variant: a.variant, juv: a.juv, frame: fr, flip: a.flip }), x: a.x, y: a.y - (a.hop > 0 ? Math.round(Math.abs(Math.sin(a.hop * 9)) * 5) : 0), key: a.y + 0.1, a: 1 });
     }
     const person = w => {
       if (w.hidden || w.x < L || w.x > Rr || w.y < T || w.y > B) return;
@@ -740,7 +751,7 @@
   }
 
   // ---------------------------------------------------------------- public API
-  function clearActors() { mapDirty = true; cam.placed = false; animals = {}; walkers = []; gatePeople = {}; floaters = []; lastWeek = null; }
+  function clearActors() { mapDirty = true; cam.placed = false; animalsSeeded = false; animals = {}; walkers = []; gatePeople = {}; floaters = []; lastWeek = null; }
   R.init = function (cv, o) {
     canvas = cv; opts = o || {}; ctx = canvas.getContext('2d');
     canvas.style.touchAction = 'none'; canvas.style.imageRendering = 'pixelated'; canvas.style.userSelect = 'none'; canvas.style.webkitUserSelect = 'none'; canvas.style.webkitTouchCallout = 'none';
@@ -771,6 +782,8 @@
   R.debug = function () {
     return { sprites: stats.sprites, fps: stats.fps, frameMs: stats.frameMs, cam: { x: cam.x, y: cam.y }, buffer: { w: Math.round(vw), h: Math.round(vh), scale: N / dpr, deviceScale: N, dpr: dpr },
       running: running, zoom: zoom, realSprites: usingReal(), spriteGetters: spriteState(), spriteErrors: Object.assign({}, stats.warned), animals: Object.keys(animals).length, visitors: walkers.filter(w => w.staff == null).length, staff: walkers.filter(w => w.staff != null && !w.hidden).length,
+      inHab: (() => { let n = 0; for (const id in animals) { const a = animals[id], h = M && M.habs[a.hab]; if (h && h.cells.some(c => { const t = G.toAxial(a.x, a.y); return t.q === c.q && t.r === c.r; })) n++; } return n; })(), hopping: Object.keys(animals).filter(id => animals[id].hop > 0).length,
+      staffAt: walkers.filter(w => w.staff != null && !w.hidden).map(w => [Math.round(w.x), Math.round(w.y)]), gateXY: M && M.ent ? [M.ent.x, M.ent.y] : null,
       gate: Object.keys(gatePeople).length, gateKinds: Object.keys(gatePeople).map(k => gatePeople[k].kind), gateArrived: Object.keys(gatePeople).filter(k => !gatePeople[k].wp.length).length, gateMarks: Object.keys(gatePeople).filter(k => gatePeople[k].mark).map(k => gatePeople[k].kind),
       icons: (() => { const o = {}; for (const id in statuses) if (id !== '_exp') { const s2 = statuses[id]; o[id] = iconsOf(s2).concat(s2.busy && s2.progress != null ? ['bar'] : []); } return o; })(), moving: (() => { const o = {}; for (const id in animals) if (animals[id].moving) o[animals[id].hab] = (o[animals[id].hab] || 0) + 1; return o; })(), floaters: floaters.length, combos: M ? M.combos.length : 0, statics: M ? M.statics.length : 0, paths: M ? M.pathKeys.length : 0,
       placement: P ? { q: P.q, r: P.r, rot: P.rot, ok: P.ok, state: P.state, msg: P.msg, makes: P.makes, breaks: P.breaks } : null };

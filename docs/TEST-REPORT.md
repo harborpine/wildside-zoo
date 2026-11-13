@@ -1,5 +1,94 @@
 # Wildside Zoo: test report (Tester)
 
+# ROUND 4 (bare-land start and the placing tutorial)
+
+moments.js was unchanged for 12 minutes (last change 15:43, first pop-up-heavy run 15:55) before the full-year runs.
+
+## Summary
+
+**Did the new opening plus a full first year from bare land play cleanly by touch on both engines: YES.** Title, New zoo, name, tutorial Yes, all 6 steps by doing what each says (placing by tapping hexes and Place), then on by touch on the real clock at speed 2 to the year-end screen: Chromium and WebKit at 390x753, 0 findings, 0 console errors, 0 game errors (about 405 s each). The opening alone also passes at 375x553 on both engines. Edge cases (Skip at each step, reload at each step, title mid-tutorial, snack before habitat, remove the habitat, delete the slot being played) all behave and nothing errored. The wrong-order test on bare land (every box, expedition, event, breeding, house, hire, research, advertise, market, placement and cancel, 20 weeks of waiting, then build) never errored, dead-ended or punished.
+
+Suites, all pass: rules-check, bot 0.8, art-check, render-shot both (the bare land variant too), shell-shot, menus-shot, menus-title, menus-hire (hire is 6 taps, ends on one list). Also pass: tester-extra, tester-years (3 years, 0 findings, 17 expeditions, 12 events, 12 year-end beats), tester-sizes, tester-symbols. tester-fit is clean at all seven sizes; at 320x568 it finds two layout problems (R4-1). I did not run moments-shot.
+
+New scripts: `tester-first5.js` (rewritten: opening, tutorial, then the full year; `node test/tester-first5.js webkit 390 753 full`), `tester-blank.js` (B), `tester-edge.js` (C). Logs: `test/shots/tester-r4-*.txt`.
+
+## A. The new opening
+
+- **The land really is bare:** 0 items, 2 zebras in the pen, $26,500, `open` false, no visitors (strip shows `0/wk`), nothing on the floor but the gate and two staff, news line "Build a Savanna habitat to open."
+- **Strip vs everything:** the coach strip sits at y 63-107 on the floor and 117-161 inside a screen. During placement the placement note is above it and the buttons below; I measured no overlap of the strip with the note, the buttons or the thing to tap at 390x753 or 375x553. While placing, the strip text changes to "Tap a spot, then Place."
+- **First ghost:** valid ("Savanna: Fits here."), well inside the visible floor (y 356 at 390x753, 258 at 375x553), clear of the strip and the buttons.
+- **Zebras move in:** after Place, two hearts float up for about 1.6 s (zebras hop), toast "Savanna built, 2 moved in", news "Wildside Zoo is open!". Step 3's text appears about 2.8 s after Place, so the move-in is never covered. `tester-cr-f5-390x753-08-zebras-moving-in-a.png`.
+- **Bench "beside it":** at 390x753 on both engines a natural player's tap (a free hex beside the Snack Stand) completes the Safari Picnic: the first pop-up a player ever sees is the combo card, picture only: zebra + stand + bench = person +20%. It reads clearly without words. **But at 375x553 on both engines the same natural tap does not complete it** ("Fits here."), although the default ghost (just tap Place) always says "Completes Safari Picnic!" (finding R4-2).
+- **Event flag:** up on the habitat for step 5 (`ready-event` and `ready-breed` icons); the event starts; the star-pick choice that follows is the only pop-up between steps 5 and 6. Nothing random interrupted the tutorial (the quiet weeks work).
+- **Tutorial length:** about 25 s end to end when played quickly.
+- **Year one from the same zoo:** clean on both engines (6 expeditions, 2 events, 2 breedings, pen housing; year-end screen reached). Year end money about $26k to $27k, so the start money is not idle.
+
+## B. Tutorial No, wrong order on bare land
+
+- **Is it obvious what to do first?** Yes: on the very first menu **Build is highlighted** (soft white glow) and the news line says "Build a Savanna habitat to open." Animals shows a badge (2) and the pen row says "Build a habitat first." / "Needs habitat".
+- **What each wrong move did:** Projects shows "Event: Build a habitat" and "Breeding: None ready"; expedition works (and brings finds to the pen); House all says "No room", House says "Needs habitat" (greyed, no toast, nothing happens); Market says "Nobody is selling."; Upgrade, Move and Remove say "No habitats yet." / "Nothing to move." / "Nothing to remove."; Buy land says "Needs rank 2"; placement then Cancel returns to the Build menu; a Snack Stand can be placed before any habitat; hiring and research work. Waiting 20 weeks at speed 2 with no habitat: money unchanged (no costs), no pop-ups of its own (only the expedition I had sent), strip stays `0/wk`. Then building the habitat: zebras moved in, "Wildside Zoo is open!". No errors anywhere.
+- **Only oddity:** Advertise lets you buy Flyers ($200) with no habitat ("Flyers campaign started", 0 visitors): a harmless wasted spend (R4-5).
+
+## C. Edge cases (`tester-edge.js`, Chromium)
+
+- **Skip at each step:** the strip disappears and the tutorial is off every time (Skip is 56x44), game fine. (My "step 5" case was really step 4, the last step auto-finishes.)
+- **Reload at each step:** reload goes to the title; tapping the slot returns the same step and the same buildings every time.
+- **Title mid-tutorial:** the strip is hidden on the title and resumes at the same step.
+- **Snack stand before the habitat:** works; the strip keeps asking for the habitat; once the habitat is placed it skips straight to the bench step (the snack is already there). Good.
+- **Remove the habitat mid-tutorial:** the zebras go back to the pen, the zoo closes, tutorial stays on its step; rebuilding re-houses them. Two polish points (R4-3).
+- **Delete the slot being played:** from the title, confirm "Delete ... for good?" (No really cancels); slot becomes empty; a new zoo can start in it at once.
+
+## D. As the owner would
+
+- **Bare start: inviting or empty?** It looks like a calm green field with a gate, which is inviting, and the payoff comes fast: the habitat appears, the zebras hop in with hearts, the news line announces the opening. What feels slightly empty: you never see the two waiting zebras before the habitat exists (the pen is not shown on the floor), and there are no visitors or animals until step 2 is done.
+- **Every tutorial line clear in a glance?** Yes: all six are 5 to 8 words ("Tap your land to open the menu.", "Build, Habitats: place a Savanna home.", "Now place a Snack Stand.", "Place a Garden Bench beside it.", "Flag on the habitat: hold an event.", "That's it. Tap the zoo any time."). The only soft spot is "beside it" (R4-2).
+- **"Mostly just placing stuff"?** Yes: 3 of the 6 steps are placing something, the first two minutes are menu, place, watch, place, place, one event. About 25 s of play.
+- **Taps from New zoo to a working zoo with habitat, snack stand and bench:** about 21: 3 on the title screens (slot, Next, Yes), 1 to open the menu from the land, 4 for the habitat (Build, Habitats, Savanna, Place), 6 for the snack stand (land, Build, Facilities, Snack Stand, Place, Done), 7 for the bench (land, Build, Facilities, Garden Bench, hex, Place, Done). Counting the event tutorial step it is 29 to 30.
+
+## New findings by owner (round 4)
+
+**Menus (`menus.js`)**
+- **R4-1 (polish). 320x568 only: rows break.** Steps: bare start, Animals, Pen tab at 320 x 568. The "House / Needs habitat" button takes the row width and squeezes the animal's name to one letter (name box 10 px wide); on the Staff screen the skill numbers run off the right edge (to 330 and 337 px). 375 px and up are fine. `tester-cr-fit320x568-Animals.png`.
+- **R4-2 (polish). "Place a Garden Bench beside it." does not always complete the combo.** The default ghost completes Safari Picnic, but a natural tap on a free hex beside the Snack Stand completes it only on some layouts (it did at 390x753, not at 375x553). The first combo is the best moment of the tutorial, so say "next to the habitat and the stand" or "tap Place" so it is not missed.
+- **R4-5 (polish). Advertise is open with no habitat:** Flyers can be bought for $200 with no visitors. Disable it or say "Open first".
+
+**Shell (`core.js`) / Rules**
+- **R4-3 (polish). Stale text after removing the only habitat:** news still says "Wildside Zoo is open!" while the zoo is closed, and the tutorial strip still shows "Now place a Snack Stand." with no habitat (it does not step back to the habitat step).
+
+**Renderer (`render.js`)**
+- **R4-4 (polish). The two waiting zebras are not visible on bare land** (no pen on the floor), so a new player has no sense they exist until they hop in.
+
+No new Moments, Artist or Rules findings.
+
+## Round 3 findings: status
+
+| # | Finding | Status |
+|---|---|---|
+| R3-1 | star pick and happenings in words | **Fixed** (no stat words in pop-ups; labels now sit beside icons) |
+| R3-2 | sex as letters M/F in trader rows | **Fixed** |
+| R3-3 | times and wages in words | **Partly:** lists use the clock icon; pop-up prose still says "1 week late", "4 weeks" (fine as prose) |
+| R3-4 | microscope and microphone unreadable | **Improved:** redrawn, and the staff screen now shows icon + name + number, so it is readable |
+| R3-5 | bronze medal looks like a sack | **Not re-checked** |
+| R3-6 | Years chips unlabeled | **Fixed** (Events, Trips, Births, Trophies) |
+| R3-7 | legend incomplete | **Not re-checked in detail** |
+| R3-8 | title slot cards | **Not re-checked** (only empty slots seen; portraits not looked at) |
+| R3-9 | two hire lists back to back | **Fixed** (ends on one list; 6 taps) |
+| R3-10 | blank strip and news bands on the title | **Not fixed** (still dark bands at the top and bottom of the title and new-zoo screens) |
+| R3-11 | title scrolls at small sizes | **Fixed** (no scroll at all 8 sizes; 320x568 title fits) |
+| R3-12 | idle money | **Not fixed** for the classic start ($226k at year 4 start); the bare start ended year one with about $26k |
+
+## Still untested
+
+- Real touch drag in WebKit; a real iPhone with Safari's bars; Add to Home Screen.
+- `tester-edge.js` and the full opening at 375x553 on a real device; edge cases on WebKit (only Chromium).
+- Buying land, years 5 to 20, the carry-over card and final score screen; years 2 to 4 from a bare start (years ran from the classic start).
+- The title slot cards with portraits (R3-8), the bronze medal (R3-5) and the legend (R3-7) were not re-checked.
+- Whether a real first-time player finds "beside it" clear; whether the bare start feels inviting is my judgement from screenshots.
+
+---
+
+# ROUND 3 (previous section)
+
 # ROUND 3 (title screen, save slots, tutorial, fit, symbols)
 
 moments.js was unchanged for 13 minutes before I started its pop-up-heavy runs (last change 12:23, runs began about 12:50), so everything below ran on the finished symbol switch.

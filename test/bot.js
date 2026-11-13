@@ -5,8 +5,15 @@ const D = require('../data.js'), Z = require('../engine.js');
 // For tuning: BOT_OFF=campaign,crate,yearly,choices,happenings switches off the bot's use of those systems.
 const OFF = {}; (process.env.BOT_OFF || '').split(',').forEach(k => { if (k) OFF[k] = true; });
 
-function run(skill, verbose) {
-  const S = Z.newGame({ runs: 0 });
+// Start: by default the bot begins on bare land and builds the starter (Savanna habitat, Snack Stand) itself in week 0.
+// BOT_START=classic (or opts.classic) uses the pre-built start instead.
+function run(skill, verbose, opts) {
+  const classic = (opts && opts.classic) || process.env.BOT_START === 'classic';
+  const S = Z.newGame({ runs: 0 }, { starter: classic });
+  if (!classic) {
+    const at = Z.starterSpots(), a = Z.build(S, 'hab', 'savanna', at.hab.q, at.hab.r, 0), b = Z.build(S, 'fac', 'snack', at.snack.q, at.snack.r, 0);
+    if (!a.ok || !b.ok || a.housed !== 2 || S.money !== D.START_MONEY_CLASSIC) throw new Error('bot: could not build the starter on bare land');
+  }
   const rows = [], idle = [], reviews = {}, seen = {}, haps = {}, choices = { asked: 0, answered: 0 };
   const count = (o, k) => { o[k] = (o[k] || 0) + 1; };
   const must = (r, what) => { if (!r || !r.ok) throw new Error('bot: ' + what + ' refused: ' + (r && r.msg)); return r; };

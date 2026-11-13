@@ -173,7 +173,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       body.appendChild(fitGrid([
         { icon: iUrl('m-projects', 6), label: 'Projects', badge: waiting || false, onTap: projectsScreen },
         { icon: iUrl('m-build', 6), label: 'Build', onTap: buildScreen },
-        { icon: iUrl('m-animals', 6), label: 'Animals', badge: pen || false, onTap: () => animalsScreen('zoo') },
+        { icon: iUrl('m-animals', 6), label: 'Animals', badge: pen || false, onTap: () => animalsScreen(!habs().length && pen ? 'pen' : 'zoo') },
         { icon: iUrl('m-staff', 6), label: 'Staff', badge: (s.candidates && s.candidates.length) || s.headhunt ? true : false, onTap: staffScreen },
         { icon: iUrl('m-research', 6), label: 'Research', onTap: researchScreen },
         { icon: iUrl('m-info', 6), label: 'Info', onTap: infoScreen },
@@ -249,7 +249,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       body.appendChild(ui.section('Start'));
       const ex = expStatus(), pairs = pairList().filter(x => !x.why), free = E.freeStaff(s).length;
       const evs = eventHabs().filter(x => !x.why), cost = E.eventCost(s);
-      const evWhy = evs.length ? (!free ? 'No one free' : s.money < cost ? needMoney(cost) : '') : 'None ready';
+      const evWhy = evs.length ? (!free ? 'No one free' : s.money < cost ? needMoney(cost) : '') : (habs().length ? 'None ready' : 'Build a habitat');
       const camps = E.campaigns(s), runningC = camps.filter(c => c.weeksLeft > 0).length;
       body.appendChild(fitGrid([
         { icon: pUrl('explorer', 5), label: 'Expedition', sub: ex.why, disabled: !ex.ok, onTap: expStart },
@@ -448,7 +448,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     push({ id: 'build-habs', title: 'Habitats', render(body) {
       const s = S();
       body.appendChild(rows(D.BIOME_ORDER.filter(b => s.regions[b]).map(b => {
-        const c = E.habBuildCost(s, b), poor = s.money < c;
+        const c = E.habBuildCost(s, b), poor = s.money < c && !(b === 'savanna' && !(E.isOpen ? E.isOpen(s) : habs().length));
         return row({ img: tUrl('hab:' + b, 1), title: D.BIOMES[b].name, sub: D.SHAPE_NAME[b], extra: poor ? why(needMoney(c)) : null, right: mny(c), off: poor, tap: () => placeHab(b) });
       }), 'No habitats yet.'));
     } });
@@ -545,8 +545,9 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
         if (!any) body.appendChild(el('div', { cls: 'empty' }, 'No animals in habitats.'));
       } else if (animalTab === 'pen') {
         const canAny = pen.some(a => E.bestHab(s, a));
+        if (pen.length && !habs().length) body.appendChild(ui.note('Build a habitat first.'));
         if (pen.length > 1) body.appendChild(ui.btn('House all', () => { const r = Core.act('autoHouseAll'); if (r.ok) { ui.toast(r.moved.length ? pn(r.moved.length, 'animal', 'animals') + ' housed' : 'No room'); api.rerender(); } }, { cls: 'primary big', disabled: !canAny, sub: canAny ? '' : 'No room' }));
-        body.appendChild(rows(pen.map(a => { const h = E.bestHab(s, a); return animalRow(a, { act: ui.btn('House', () => { const r = Core.act('autoHouse', a.id); if (r.ok) { const hh = E.item(s, r.hab); ui.toast('Housed' + (hh ? ' in ' + E.habName(s, hh) : ''), 'good'); api.rerender(); } }, { cls: 'primary', disabled: !h, sub: h ? '' : 'No room' }) }); }), 'The pen is empty.'));
+        body.appendChild(rows(pen.map(a => { const h = E.bestHab(s, a); return animalRow(a, { act: ui.btn('House', () => { const r = Core.act('autoHouse', a.id); if (r.ok) { const hh = E.item(s, r.hab); ui.toast('Housed' + (hh ? ' in ' + E.habName(s, hh) : ''), 'good'); api.rerender(); } }, { cls: 'primary', disabled: !h, sub: h ? '' : (habs().length ? 'No room' : 'Needs habitat') }) }); }), 'The pen is empty.'));
       } else marketBody(body, api);
     } });
   }
@@ -986,47 +987,64 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   // ------------------------------------------------------------------ TUTORIAL (coach strip, steps live in S.ui.tutorial = {on, step, b})
   const didN = (s, k) => ((s.did && s.did[k]) || 0);
   const benches = s => s.items.filter(i => i.t === 'bench').length;
+  const count = (s, t) => s.items.filter(i => i.t === t).length;
+  const isOpen = s => (E.isOpen ? E.isOpen(s) : s.items.some(i => i.k === 'hab'));
+  const habCount = s => s.items.filter(i => i.k === 'hab').length;
+  const BLANK_GLOW = { menu: 'Build', build: 'Habitats', 'build-habs': 'Savanna' };   // the obvious first move on bare land, tutorial or not
   const TUT = [
-    { text: 'Tap the zoo to open the menu.', done: () => Core.stack().length > 0 },
-    { text: 'Open Projects and send an expedition.', done: (s, b) => didN(s, 'startExpedition') > (b.startExpedition || 0), glow: { menu: 'Projects', projects: 'Expedition' } },
-    { text: 'Flag on habitat: ready. Hold an event.', done: (s, b) => didN(s, 'startEvent') > (b.startEvent || 0), glow: { menu: 'Projects', projects: 'Event' } },
-    { text: 'Build a bench: Build, Facilities.', done: (s, b) => benches(s) > (b.bench || 0), glow: { menu: 'Build', build: 'Facilities', 'build-facs': 'Garden Bench' } },
-    { text: 'Answer pop-ups when they appear. Have fun!', auto: 7000 }
+    { text: 'Tap your land to open the menu.', done: () => Core.stack().length > 0, glow: BLANK_GLOW },
+    { text: 'Build, Habitats: place a Savanna home.', done: (s, b) => habCount(s) > (b.hab || 0), glow: BLANK_GLOW, hold: 2600 },
+    { text: 'Now place a Snack Stand.', done: (s, b) => count(s, 'snack') > (b.snack || 0), glow: { menu: 'Build', build: 'Facilities', 'build-facs': 'Snack Stand' } },
+    { text: 'Place a Garden Bench beside it.', done: (s, b) => count(s, 'bench') > (b.bench || 0), glow: { menu: 'Build', build: 'Facilities', 'build-facs': 'Garden Bench' } },
+    { text: 'Flag on the habitat: hold an event.', done: (s, b) => didN(s, 'startEvent') > (b.startEvent || 0), glow: { menu: 'Projects', projects: 'Event', 'event-habs': 'Savanna', 'event-theme': 'Feeding' } },
+    { text: "That's it. Tap the zoo any time.", auto: 7000 }
   ];
+  const PLACE_TEXT = 'Tap a spot, then Place.';
+  let holdUntil = 0;
   let coachEl = null, coachSince = 0, coachStep = -1, tutTimer = 0;
   function startTutorial() {
     const s = S(); if (!s) return;
     s.ui = s.ui || {};
-    s.ui.tutorial = { on: true, step: 0, b: { startExpedition: didN(s, 'startExpedition'), startEvent: didN(s, 'startEvent'), bench: benches(s) } };
+    s.ui.tutorial = { on: true, step: 0, b: { startExpedition: didN(s, 'startExpedition'), startEvent: didN(s, 'startEvent'), bench: count(s, 'bench'), snack: count(s, 'snack'), hab: habCount(s) } };
     try { Core.save(); } catch (e) { /* ignore */ }
   }
   function coachRemove() { if (coachEl && coachEl.parentNode) coachEl.parentNode.removeChild(coachEl); }
+  function applyGlow(map) {
+    const layers = [...document.querySelectorAll('.layer:not([hidden])')], top = layers[layers.length - 1], stackNow = Core.stack();
+    layers.forEach(l => l.querySelectorAll('.mn-glow').forEach(x => x.classList.remove('mn-glow')));
+    const id = stackNow[stackNow.length - 1];
+    if (top && map && map[id] && !top.classList.contains('modal')) { const want = map[id]; [...top.querySelectorAll('button, .row.tappable')].some(b => { if (b.textContent.trim().indexOf(want) === 0 && !b.classList.contains('disabled')) { b.classList.add('mn-glow'); return true; } return false; }); }
+  }
   function tutTick() {
     const s = S(), t = s && s.ui && s.ui.tutorial;
-    if (!t || !t.on) { coachRemove(); return; }
+    if (!t || !t.on) { coachRemove(); applyGlow(s && !isOpen(s) ? BLANK_GLOW : null); return; }
     const stackNow = Core.stack();
     if (stackNow.indexOf('title') >= 0) { coachRemove(); return; }
     let changed = false, g = 0;
     while (t.on && g++ < 6) {
       const st = TUT[t.step]; if (!st) { t.on = false; changed = true; break; }
       if (st.auto) break;
-      if (st.done(s, t.b || {})) { t.step++; changed = true; coachSince = 0; } else break;
+      if (st.done(s, t.b || {})) { if (st.hold) holdUntil = Date.now() + st.hold; t.step++; changed = true; coachSince = 0; } else break;
     }
     if (t.on && TUT[t.step] && TUT[t.step].auto) { if (!coachSince) coachSince = Date.now(); if (Date.now() - coachSince > TUT[t.step].auto && !Core.busy) { t.on = false; changed = true; } }
     if (changed) { try { Core.save(); } catch (e) { /* ignore */ } }
     if (!t.on) { coachRemove(); return; }
     const st = TUT[t.step], layers = [...document.querySelectorAll('.layer:not([hidden])')], top = layers[layers.length - 1];
-    if (Core.busy || (top && top.classList.contains('modal'))) { coachRemove(); return; }   // pop-ups from the game come first
+    if (Core.busy || (top && top.classList.contains('modal')) || Date.now() < holdUntil) { coachRemove(); applyGlow(null); return; }   // pop-ups from the game come first; after a step the floor gets a moment to show what happened
     if (!coachEl) {
       coachEl = el('div', { cls: 'mn-coach', role: 'status' }, span('mn-ct'), el('button', { type: 'button', cls: 'mn-skip', tap: () => { const t2 = S() && S().ui && S().ui.tutorial; if (t2) { t2.on = false; try { Core.save(); } catch (e) { /* ignore */ } } coachRemove(); } }, 'Skip'));
     }
-    coachEl.firstChild.textContent = st.text; coachEl.dataset.step = t.step;
+    const placing = !!(window.ZRender && ZRender.placing && ZRender.placing());
+    coachEl.firstChild.textContent = placing ? PLACE_TEXT : st.text; coachEl.dataset.step = t.step;
     const panel = top && top.querySelector('.panel'), stage = document.getElementById('stage');
     coachEl.classList.toggle('inpanel', !!panel);
     const parent = panel || stage;
     if (parent && coachEl.parentNode !== parent) { if (panel) panel.insertBefore(coachEl, panel.querySelector('.pbody')); else stage.appendChild(coachEl); }
-    // soft highlight on the target
-    layers.forEach(l => l.querySelectorAll('.mn-glow').forEach(x => x.classList.remove('mn-glow')));
+    // keep clear of the placement note (it sits just under the top strip while placing)
+    if (!panel) { let topPx = 6; const note = document.getElementById('placement-note'); if (placing && note && note.textContent) { const nr = note.getBoundingClientRect(), sr = stage.getBoundingClientRect(); topPx = Math.max(6, nr.bottom - sr.top + 6); } coachEl.style.top = topPx + 'px'; }
+    applyGlow(st.glow || (!isOpen(s) ? BLANK_GLOW : null));
+    return;
+    // (old highlight code kept below for reference, unreachable)
     const id = stackNow[stackNow.length - 1];
     if (top && st.glow && st.glow[id]) { const want = st.glow[id]; [...top.querySelectorAll('button, .row.tappable')].some(b => { if (b.textContent.trim().indexOf(want) === 0 && !b.classList.contains('disabled')) { b.classList.add('mn-glow'); return true; } return false; }); }
   }

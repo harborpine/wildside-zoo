@@ -1,7 +1,7 @@
 # Rules API as built (`data.js` -> `ZD`, `engine.js` -> `ZE`)
 
 Written by the Rules teammate. Everything Menus and Moments need is here. In Node the same objects come from
-`require('./data.js')` and `require('./engine.js')`. Checks: `node test/rules-check.js` (22 checks) and `node test/bot.js 0.8`.
+`require('./data.js')` and `require('./engine.js')`. Checks: `node test/rules-check.js` (26 checks) and `node test/bot.js 0.8`.
 
 ## 0. Ground rules
 
@@ -60,6 +60,7 @@ Written by the Rules teammate. Everything Menus and Moments need is here. In Nod
 | `S.money`, `S.rp`, `S.rep` | Money, research points, reputation. `ZE.rank(S)` 1..10, `ZD.RANK_NAME[rank]`, `ZE.nextRankRep(S)` (reputation for the next rank, or null), `ZD.RANK_REP` |
 | `S.visitorsLast`, `S.incomeLast`, `S.costLast` | Last week's visitors, income, running costs |
 | `S.rows` | Rows of land owned |
+| `S.openedAt` | `null` until the first habitat is built, then that week. `ZE.isOpen(S)` = the zoo has a habitat now (section 10) |
 | `S.zooName`, `S.ng`, `S.runId` | Name, number of earlier runs, run id |
 | `S.items`, `S.animals`, `S.staff` | See below. `ZE.item/animal/staffer(S, id)` |
 | `S.projects` | Running projects (section 5) |
@@ -344,9 +345,32 @@ With none of those, show it at the top strip or the gate.
 ## 10. Starting and legacy
 
 `ZE.newGame(legacy?, opts?)`: `legacy = {runs, aff, combos}` (carried over from earlier runs: number of runs, theme fits
-seen, combos known), `opts = {zooName, staff, animal}` (one staff object and one animal object to carry over). A new zoo
-has $20,000 (+$6,000 per earlier run, up to 5), a Savanna habitat with two zebras and a Snack Stand just inside the gate,
-a keeper and an explorer, and a trader in town with a mystery crate.
+seen, combos known), `opts = {zooName, staff, animal, starter}` (one staff object and one animal object to carry over).
+
+**A new zoo is bare land.** Nothing is built (`S.items` is empty). The two starting zebras wait in the holding pen, a keeper
+and an explorer are on the team, and money is `ZD.START_MONEY` = $26,500 (+$6,000 per earlier run, up to 5). That is the
+old $20,000 (`ZD.START_MONEY_CLASSIC`) plus the price of the old free starter, a Savanna habitat ($5,000) and a Snack Stand
+($1,500), listed in `ZD.START_KIT`. Building the first Savanna habitat houses the zebras automatically (`build` returns
+`housed: 2`). Both starter items fit on the starting land from week 0; `ZE.starterSpots() -> {hab:{q,r}, snack:{q,r}}`
+gives the classic positions (rotation 0) if you want to suggest a spot.
+
+`opts.starter === true` gives the **classic start** instead: the Savanna habitat and Snack Stand already built at
+`starterSpots()`, zebras housed, $20,000, a trader in town. Tests and the bot use it when they need a known layout.
+
+**While the zoo has no habitat** (`ZE.isOpen(S) === false`, also `ZE.c(S).open`):
+- No visitors, no income, and **no running costs** (salaries and upkeep are waived), so waiting never costs anything.
+  Time still passes and the year-end report still comes.
+- No callers, no happenings, no Open Day, Festival or Winter Show. `S.offers` is `null` (no trader, no crate),
+  `callersHere` is empty. Nothing the engine does ever sells or removes the penned zebras.
+- Everything else works: research, hiring, training, expeditions (finds go to the pen), buying land.
+- The first Savanna habitat can always be built, even with too little money (the balance goes below zero and income pays
+  it back), so a bare zoo can never get stuck. Nothing else is ever free.
+
+**Opening.** When the first habitat is built, `S.openedAt` is set to that week (it is `null` before, and `0` on a classic
+start), the news line says the zoo is open, and a trader with a mystery crate is in town at once (no pop-up, no report:
+only `S.offers` and `callersHere`). Nothing random interrupts for `ZD.QUIET_WEEKS` (2) weeks after opening: the first
+caller report can come 2 weeks after opening at the earliest, the first happening 5 to 7 weeks after. If the player later
+removes every habitat the zoo is closed again in the same way until one is rebuilt.
 
 ## 11. Changes from the contract and from the old engine
 
@@ -358,3 +382,4 @@ a keeper and an explorer, and a trader in town with a mystery crate.
 - `habStatus` has one extra field, `choice`.
 - `ZE.habUpgradeCost(habItem, S)` takes `S` second (optional) so the discount shows.
 - `deserialize` returns `null` for old or broken saves.
+- A new zoo starts as bare land (section 10); `ZE.newGame(legacy, {starter:true})` gives the old pre-built start. New: `ZE.isOpen`, `ZE.starterSpots`, `S.openedAt`, `ZE.c(S).open`, `ZD.START_MONEY`, `ZD.START_MONEY_CLASSIC`, `ZD.START_KIT`, `ZD.QUIET_WEEKS`, `snapshot().open`.

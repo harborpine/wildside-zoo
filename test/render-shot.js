@@ -190,6 +190,62 @@ async function run(name) {
   return { name, fails, notes };
 }
 
+// A brand-new zoo: bare land, nothing built, nobody housed, no visitors. Then the tutorial's first three placements.
+async function runBlank(name) {
+  const fails = [], notes = [], sfx = name === 'chromium' ? '' : '-' + name, ok = (c, m) => { if (!c) fails.push(m); return c; };
+  const browser = await pw[name].launch({ headless: true });
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
+  const page = await ctx.newPage(), errors = [];
+  page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
+  page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+  const dbg = () => page.evaluate(() => ZRender.debug());
+  try {
+    await page.goto(url + (url.includes('?') ? '&' : '?') + 'blank=1');
+    await page.waitForFunction('window.RT && RT.ready', null, { timeout: 15000 });
+    await sleep(3000);
+    const st0 = await page.evaluate(() => ({ items: RT.S.items.length, housed: RT.S.animals.filter(a => a.hab != null).length, sim: RT.simulatedBlank }));
+    ok(st0.items === 0 && st0.housed === 0, 'the blank state is not blank: ' + JSON.stringify(st0));
+    notes.push(st0.sim ? 'NOTE: ZE.newGame() still returned a pre-built zoo, so the harness emptied it to simulate the bare start' : 'ZE.newGame() gave bare land by itself');
+    await page.screenshot({ path: path.join(shots, 'render-blank' + sfx + '.png') });
+    const d = await dbg();
+    ok(d.animals === 0 && d.visitors === 0 && d.combos === 0 && Object.keys(d.icons).length === 0, 'bare land should show no animals, visitors, outlines or icons: ' + JSON.stringify({ a: d.animals, v: d.visitors, c: d.combos, i: d.icons }));
+    ok(d.staff === 2 && d.staffAt.every(p => Math.hypot(p[0] - d.gateXY[0], p[1] - d.gateXY[1]) < 120), 'the two staff should be visible near the gate: ' + JSON.stringify(d.staffAt) + ' gate ' + JSON.stringify(d.gateXY));
+    const view = await page.evaluate(() => { const S = RT.S, b = document.getElementById('floor').getBoundingClientRect(), e = ZRender.entrance(), g = ZRender.hexToClient(e.q, e.r); let own = 0, tot = 0; for (let y = 10; y < b.height; y += 20) for (let x = 10; x < b.width; x += 20) { const h = ZRender.clientToHex(b.left + x, b.top + y); tot++; if (ZE.inLand(S, h.q, h.r)) own++; } return { gate: [Math.round(g.x - b.left), Math.round(g.y - b.top)], w: b.width, h: b.height, owned: Math.round(100 * own / tot) }; });
+    ok(view.gate[0] > 60 && view.gate[0] < view.w - 60 && view.gate[1] > view.h * 0.55 && view.gate[1] < view.h * 0.92, 'opening camera: the gate should be on screen in the lower part: ' + JSON.stringify(view)); ok(view.owned >= 50, 'opening camera: owned land covers only ' + view.owned + '% of the floor');
+    notes.push('bare land: gate at ' + view.gate + ' of ' + view.w + 'x' + view.h + ', owned land ' + view.owned + '% of the view, staff at ' + JSON.stringify(d.staffAt) + ' (gate ' + JSON.stringify(d.gateXY) + '), sprites ' + d.sprites);
+    // a caller and a happening character at the gate of an empty zoo
+    const who = await page.evaluate(() => { const S = RT.S; ZE.debug.caller(S, 'headhunter'); let w = null; for (const k of Object.keys(ZD.HAPPENINGS)) { if (!ZD.HAPPENINGS[k].who) continue; let okk = false; try { okk = ZE.debug.happening(S, k); } catch (e) { okk = false; } if (okk && S.happening && S.happening.who) { w = S.happening.who; break; } } S.reports = []; return { who: w, callers: ZE.callersHere(S).map(c => c.kind) }; });
+    await sleep(7000); const dg = await dbg();
+    ok(who.callers.every(k => dg.gateKinds.includes(k)) && dg.gateArrived === dg.gate && dg.gate >= 1, 'callers at the gate of an empty zoo: ' + JSON.stringify(who.callers) + ' shown ' + JSON.stringify(dg.gateKinds) + ', arrived ' + dg.gateArrived);
+    if (who.who) ok(dg.gateKinds.includes(who.who) && dg.gateMarks.includes(who.who), 'happening character missing at the gate: ' + who.who); else notes.push('NOT TESTED on bare land: no happening with a character could be forced');
+    await page.screenshot({ path: path.join(shots, 'render-blank-gate' + sfx + '.png') });
+    await page.evaluate(() => { RT.S.happening = null; RT.S.headhunt = null; });
+    // first placement: the Savanna habitat
+    await page.evaluate(() => RT.place({ kind: 'hab', t: 'savanna', label: 'Savanna' })); await sleep(900);
+    const g0 = await page.evaluate(() => { const p = ZRender.debug().placement, fl = document.getElementById('floor').getBoundingClientRect(), bar = document.getElementById('placement-bar').getBoundingClientRect(), nt = document.getElementById('placement-note').getBoundingClientRect(); const pts = ZE.cellsOf('hab', 'savanna', p.q, p.r, p.rot).map(c => { const k = ZRender.hexToClient(c[0], c[1]); return [Math.round(k.x), Math.round(k.y)]; }); return { p, pts, left: fl.left, right: fl.right, barTop: bar.top, noteBottom: nt.bottom, note: document.getElementById('placement-note').textContent, mid: fl.top + fl.height / 2 }; });
+    ok(g0.p.ok, 'the first habitat ghost should start on a valid spot: ' + JSON.stringify(g0.p));
+    ok(g0.pts.every(p => p[0] > g0.left + 30 && p[0] < g0.right - 30 && p[1] > g0.noteBottom + 24 && p[1] < g0.barTop - 30), 'the first ghost is not in clear view between the note and the buttons: ' + JSON.stringify(g0.pts) + ' note bottom ' + g0.noteBottom + ' bar top ' + g0.barTop);
+    notes.push('first ghost: valid, hexes at ' + JSON.stringify(g0.pts) + ', note "' + g0.note + '", buttons start at y=' + Math.round(g0.barTop));
+    await page.screenshot({ path: path.join(shots, 'render-blank-place' + sfx + '.png') });
+    await page.locator('#placement-bar button.zr-place').click(); await sleep(250);
+    const d1 = await dbg(); await sleep(1200); const d2 = await dbg();
+    ok(await page.evaluate(() => RT.S.items.length) === 1 && !(await page.evaluate(() => ZRender.placing())), 'the habitat was not built or placement did not end');
+    const housed = await page.evaluate(() => ({ n: RT.S.animals.filter(a => a.hab != null).length, byHarness: !!RT.housedByHarness }));
+    ok(housed.n >= 2 && d2.animals === housed.n && d2.inHab === housed.n, 'the housed animals are not drawn inside the new habitat within 1.5 s: housed ' + housed.n + ', drawn ' + d2.animals + ', inside ' + d2.inHab);
+    ok(d1.hopping >= 1 || d1.floaters >= 1, 'no hop or pop-up when the animals moved in: ' + JSON.stringify({ hopping: d1.hopping, floaters: d1.floaters }));
+    notes.push('after placing: ' + d2.animals + ' animals drawn, ' + d2.inHab + ' inside the habitat; arrival showed ' + d1.hopping + ' hopping and ' + d1.floaters + ' pop-ups' + (housed.byHarness ? ' (NOTE: the harness housed the zebras, the engine did not do it on build yet)' : ' (housed by the engine)'));
+    await page.screenshot({ path: path.join(shots, 'render-blank-placed' + sfx + '.png') });
+    // then the Snack Stand and the Garden Bench
+    for (const t of ['snack', 'bench']) { await page.evaluate(t => RT.place({ kind: 'fac', t: t }), t); await sleep(500); const p = (await dbg()).placement; ok(p && p.ok, t + ' ghost should start valid on the near-empty land: ' + JSON.stringify(p)); await page.locator('#placement-bar button.zr-place').click(); await sleep(300); }
+    ok(await page.evaluate(() => RT.S.items.length) === 3, 'snack stand and bench were not built');
+    await sleep(3000); const d3 = await dbg(); ok(d3.visitors > 0, 'visitors should start arriving once there is something to visit'); notes.push('with three things built: ' + d3.visitors + ' visitors, ' + d3.paths + ' path hexes, frame cost ' + d3.frameMs + ' ms');
+    await page.screenshot({ path: path.join(shots, 'render-blank-three' + sfx + '.png') });
+    const pe = await page.evaluate(() => RT.errors); ok(errors.length === 0 && pe.length === 0 && Object.keys(d3.spriteErrors).length === 0, 'errors on bare land: ' + JSON.stringify(errors.concat(pe)));
+  } catch (e) { fails.push('crashed: ' + (e && e.stack || e)); }
+  await browser.close();
+  return { name: name + ' / bare land', fails, notes };
+}
+
 // The real page: index.html with the Shell. Floor draws, a tap opens the menu and pauses, placement builds through ZCore, new game re-aims the camera.
 async function runShell(name) {
   const fails = [], notes = [], sfx = name === 'chromium' ? '' : '-' + name, ok = (c, m) => { if (!c) fails.push(m); return c; };
@@ -252,7 +308,7 @@ async function runShell(name) {
 (async () => {
   let bad = 0;
   for (const n of which === 'both' ? ['chromium', 'webkit'] : [which]) {
-    for (const fn of [run, runShell]) {
+    for (const fn of [run, runBlank, runShell]) {
     let res; try { res = await fn(n); } catch (e) { res = { name: n, fails: ['crashed: ' + (e && e.stack || e)], notes: [] }; }
     console.log('\n=== ' + res.name + ' ===\n' + res.notes.map(x => '  ' + x).join('\n'));
     console.log(res.fails.length ? '  FAILED (' + res.fails.length + '):\n' + res.fails.map(x => '   - ' + x).join('\n') : '  ALL CHECKS PASSED');

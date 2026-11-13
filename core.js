@@ -491,12 +491,13 @@
   }
   function boot() {
     applyTheme(); build(); loadLegacy(); migrateOldSave();
-    try { ghost = E.newGame(legacy, {}); ensureState(ghost); } catch (e) { recordError(e, 'ghost'); }
+    try { ghost = E.newGame(legacy, { starter: true }); ensureState(ghost); } catch (e) { recordError(e, 'ghost'); }
     const r = R(); if (r) { try { r.init($floor, { getState: () => S || ghost, onTap: onFloorTap }); if (r.mapChanged) r.mapChanged(); } catch (e) { recordError(e, 'ZRender.init'); } }
     else { placeholderFloor(); $floor.addEventListener('click', () => onFloorTap({})); window.addEventListener('resize', placeholderFloor); }   // no renderer yet: plain green floor, tap still opens the menu
     lastT = performance.now(); lastRunning = null; updateStrip(); syncRunning();
     timer = setInterval(loop, 50); document.documentElement.setAttribute('data-ready', '1');
-    if (/[?&]play=1/.test(location.search)) { if (!loadSlot(1)) newGame({ slot: 1 }); } else setTimeout(showTitle, 0);
+    const pm = /[?&]play=(1|blank)/.exec(location.search);
+    if (pm) { if (!loadSlot(1)) newGame({ slot: 1, starter: pm[1] === '1' }); } else setTimeout(showTitle, 0);
   }
 
   const Core = {
@@ -510,7 +511,7 @@
   window.ZCore = Core;
   window.ZT = {
     get skipReports() { return skipReports; }, set skipReports(v) { skipReports = !!v; },
-    get S() { return S; }, errors, stack: Core.stack, act, newGame, openMenu, running: isRunning, slots, loadSlot, deleteSlot, title: toTitle, setSpeed, WEEK_MS,
+    get S() { return S; }, errors, stack: Core.stack, act, newGame: o => newGame(Object.assign({ starter: true }, o)), openMenu, running: isRunning, slots, loadSlot, deleteSlot, title: toTitle, setSpeed, WEEK_MS,
     tick(n) { for (let i = 0; i < (n || 1); i++) doTick(); return S ? S.week : 0; },
     popAll, flush: flushReports, logText, save, load
   };

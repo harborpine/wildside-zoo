@@ -148,6 +148,19 @@ async function run(name) {
     await p.reload(); await p.waitForFunction(() => window.ZT && document.documentElement.dataset.ready); await sleep(300);
     check(await p.evaluate(w => ZT.S.week === w, w), '?play=1 loads slot 1 when it exists');
     await c.close(); }
+  { const { c, p } = await fresh(null, '?play=blank');
+    const bl = await p.evaluate(() => { ZT.skipReports = true; const S = ZT.S; const n0 = S.items.length; ZT.tick(14); ZT.save(); const i = ZT.slots()[0]; const snap = ZT.logText().indexOf('Q1 weeks') >= 0; document.getElementById('news'); return { n0, ticks: ZT.S.week, spOk: Array.isArray(i.species), animals: i.animals, snap, strip: document.getElementById('s-money').textContent, tutorial: S.ui.tutorial.on }; });
+    check(bl.n0 === 0 || bl.n0 === undefined || bl.ticks >= 14, '?play=blank: starts (items at start: ' + bl.n0 + ') and survives ticks and a quarterly snapshot');
+    check(bl.spOk && bl.snap && bl.strip.charAt(0) === String.fromCharCode(36), 'blank zoo: slot summary has species list, the log has a quarter snapshot, the strip shows money (' + JSON.stringify({ animals: bl.animals }) + ')');
+    const st = await p.evaluate(() => { ZT.newGame({ slot: 2, starter: false }); const a = ZT.S.items.length; ZT.newGame({ slot: 3 }); return { blank: a, classic: ZT.S.items.length }; });
+    check(st.blank === 0 && st.classic > 0, 'ZT.newGame({starter:false}) is bare land, ZT.newGame() is the classic starter (' + JSON.stringify(st) + ')');
+    await p.evaluate(() => ZT.title()); await sleep(300);
+    check(await p.evaluate(() => ZT.S === null && ZT.stack().length === 1 && document.body.classList.contains('title-on')), 'title shows over a zoo with nothing built');
+    await c.close(); }
+  { const { c, p } = await fresh({ width: 320, height: 568 }, '?play=1');
+    const wd = await p.evaluate(() => { ZCore.push({ id: 'w', title: 'T', render(b) { b.appendChild(ZCore.ui.chipRow([ZCore.ui.astat('charm', 78), ZCore.ui.astat('vigor', 61), ZCore.ui.astat('wit', 49), ZCore.ui.grade('a')])); b.appendChild(ZCore.ui.grid([{ icon: 'm-build', label: 'Build' }, { icon: 'm-info', label: 'Info' }, { icon: 'm-system', label: 'System' }])); } }); const a = document.getElementById('app'), d = document.scrollingElement; return { app: a.scrollWidth, w: a.clientWidth, page: d.scrollWidth, vw: innerWidth, over: [...document.querySelectorAll('.layer:not([hidden]) *')].filter(e => e.getBoundingClientRect().right > innerWidth + 1 && !e.closest('.chips')).length }; });
+    check(wd.app <= 320 && wd.page <= 320 && wd.over === 0, 'nothing exceeds the screen width at 320 px (' + JSON.stringify(wd) + ')');
+    await c.close(); }
   for (const [w, h] of [[390, 664], [390, 753], [375, 553], [375, 647]]) {
     const { c, p } = await fresh({ width: w, height: h }, '?play=1');
     const r = await p.evaluate(() => { ZCore.push({ id: 'hh', title: 'Title', render() {} }); const b = document.querySelector('.layer:not([hidden]) .pbody'), a = document.getElementById('app').getBoundingClientRect(); return { body: Math.round(b.clientHeight), bodyW: Math.round(b.clientWidth), appW: Math.round(a.width), appH: Math.round(a.height), x: Math.round(a.x) }; });

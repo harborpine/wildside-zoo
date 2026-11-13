@@ -466,6 +466,69 @@ async function run(name) {
     }
   }
 
+  if (want('blank')) {
+    console.log(' -- blank-land start (?play=blank)');
+    await page.goto(URL + '?play=blank'); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready && window.ZMoments, null, { timeout: 10000 }); await ev(() => { ZT.WEEK_MS[1] = 1e9; ZT.WEEK_MS[2] = 1e9; });
+    await ev(() => ZT.newGame({ starter: false }));
+    const base = await ev(() => ({ items: ZT.S.items.length, offers: ZT.S.offers, animals: ZT.S.animals.length, open: ZE.isOpen(ZT.S) }));
+    check(base.items === 0 && !base.open, 'blank start: no items, zoo not open (' + JSON.stringify({ i: base.items, o: base.offers, a: base.animals }) + ')');
+    const clean = async label => {
+      const t = await ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); if (!l) return null; return { txt: l.textContent, empty: [...l.querySelectorAll('img')].filter(i => !i.getAttribute('src')).length, imgs: l.querySelectorAll('img').length }; });
+      check(!!t && !/NaN|undefined|null/.test(t.txt) && t.empty === 0, label + ': no NaN / undefined / empty pictures (' + (t ? t.imgs + ' images' : 'no screen') + ')');
+    };
+    // year end on a bare zoo
+    await ev(() => { const S = ZT.S; S.reports.length = 0; for (let i = 0; i < 48; i++) ZE.tick(S); S.reports = S.reports.filter(r => r.type === 'yearend'); ZT.flush(); });
+    await waitStack(s => s.stack.length > 0, 3000); await waitStack(s => s.cur && s.cur.final, 6000); await sleep(2800); await shot('blank-yearend'); await clean('bare year end');
+    for (let g = 0; g < 6 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); }
+    await settled('bare year end');
+    // expedition return on a bare zoo: finds go to the pen
+    await ev(() => ZT.newGame({ starter: false }));
+    const started = await ev(() => { const S = ZT.S; S.money = 1e6; S.reports.length = 0; const ex = ZE.freeStaff(S)[0]; if (!ex) return 'no staff'; const r = ZCore.act('startExpedition', 'savanna', [ex.id], 1); return r.ok ? 'ok' : r.msg; });
+    check(started === 'ok', 'blank start: an expedition can be started with no habitat (' + started + ')');
+    if (started === 'ok') {
+      const got = await ev(() => { const S = ZT.S; for (let i = 0; i < 30; i++) { ZE.tick(S); const r = S.reports.filter(x => x.type === 'expedition'); if (r.length) { S.reports = r; ZT.flush(); return true; } S.reports.length = 0; } return false; });
+      check(got, 'the expedition came home');
+      if (got) {
+        await waitStack(s => s.stack.length > 0, 3000); await sleep(900); await shot('blank-expedition-a'); await clean('expedition find on a bare zoo');
+        await waitStack(s => s.cur && s.cur.final, 8000); await sleep(2200); await shot('blank-expedition-final'); await clean('expedition summary on a bare zoo');
+        const pen = await ev(() => { const f = ZT.S.reports.length; return f; });
+        for (let g = 0; g < 8 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); }
+        await settled('bare expedition');
+      }
+    }
+    // first three placements complete Safari Picnic: the combo pop-up
+    await ev(() => ZT.newGame({ starter: false }));
+    const placed = await ev(() => {
+      const S = ZT.S; S.money = 1e6; S.reports.length = 0;
+      const cells = []; for (let row = 19; row >= 0; row--) for (let col = 0; col < 10; col++) { const q = ZE.fromOffset(col, row); cells.push(q); }
+      const ok = (k, t, q, r) => ZE.canPlace(S, k, t, q, r, 0);
+      let hab = null;
+      for (const [q, r] of cells) if (ok('hab', 'savanna', q, r)) { const res = ZCore.act('build', 'hab', 'savanna', q, r, 0); if (res.ok) { hab = res.id; break; } }
+      if (hab == null) return 'no habitat';
+      const tryFac = t => { for (const [q, r] of cells) if (ok('fac', t, q, r)) { const res = ZCore.act('build', 'fac', t, q, r, 0); if (res.ok) { if (S.reports.some(x => x.type === 'combo') || ZT.stack().length) return 'combo'; ZCore.act('remove', res.id); } } return 'none'; };
+      const a = ZE.cells(ZE.item(S, hab));
+      // snack first (any spot touching the habitat), then bench until the combo appears
+      let snack = null;
+      for (const [q, r] of cells) if (ok('fac', 'snack', q, r)) { const res = ZCore.act('build', 'fac', 'snack', q, r, 0); if (res.ok) { if (((ZE.layout(S).nb || {})[res.id] || []).some(x => x === hab || (x && x.id === hab))) { snack = res.id; break; } ZCore.act('remove', res.id); } }
+      if (snack == null) return 'no snack spot';
+      return tryFac('bench');
+    });
+    check(placed === 'combo', 'placing habitat, snack stand and bench raised the Safari Picnic combo (' + placed + ')');
+    if (placed === 'combo') {
+      await waitStack(s => s.stack.some(i => /mo-combo/.test(i)), 3000); await sleep(1500); await shot('blank-combo'); await clean('first combo');
+      const lay = await layout(); check(!lay || (lay.over <= 1 && lay.top >= 0 && lay.bottom <= 844), 'combo card fits the screen');
+      for (let g = 0; g < 6 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); }
+      await settled('first combo');
+    }
+    // early rank-up
+    await ev(() => ZT.newGame({ starter: false }));
+    await ev(() => { const S = ZT.S; S.reports.length = 0; S.reports.push({ type: 'rankup', rank: 2, name: ZD.RANK_NAME[2], unlocks: ZE.rankUnlocks(2) }); ZT.flush(); });
+    await waitStack(s => s.stack.length > 0, 3000); await sleep(1500); await shot('blank-rankup'); await clean('early rank-up');
+    for (let g = 0; g < 4 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); }
+    await settled('early rank-up');
+    await boot();
+  }
+
   // ---------------------------------------------------------------- 9. errors
   const errs = await ev(() => ZT.errors.slice());
   check(errs.length === 0, 'no captured errors inside the game (' + errs.length + ')' + (errs.length ? ': ' + errs.slice(0, 3).join(' || ') : ''));

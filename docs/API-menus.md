@@ -87,3 +87,11 @@ Animal stats are icon plus number (`ui.astat`; Charm, Energy, Smarts), staff ski
 - **Legend** (How to play): Symbols (stats, skills, sex, baby, new, done, locked, odds, weeks, grades), Zoo (money, research, fame, visitors, rank stars, buzz flame, habitat, pen, land, trophy, rarity, medals, red count badge), On the floor (event flag, pair heart, working, unwell, answer mark, progress bar, buzz).
 - **Title**: fits three slots without scrolling down to 320x568 (the animal row and the 3rd-line of each card hide under 700 px high). Used slots show up to two portraits from `species` / `variantFlags`; the most recently saved used slot has a green number box and outline (and a "Continue" tag on taller screens).
 - **Tutorial** step 3 reads "Flag on habitat: ready. Hold an event."
+
+## Blank start and the placing tutorial (round 4)
+
+- A new zoo from the title is bare land (the Shell passes no `starter`). `?play=1` / `ZT.newGame()` keep the classic start; `?play=blank` gives the bare one.
+- Tutorial steps (6, each done by doing it): 1 "Tap your land to open the menu." > 2 "Build, Habitats: place a Savanna home." > 3 "Now place a Snack Stand." > 4 "Place a Garden Bench beside it." > 5 "Flag on the habitat: hold an event." > 6 "That's it. Tap the zoo any time." (auto-finishes after 7 s).
+  Step 2 hides the strip for 2.6 s after the habitat is placed so the zebras visibly move in. Step 5 (event) is used rather than an expedition because the habitat's flag is up as soon as the zebras are in (`eventAt` starts at -99) and someone is free. The combo is not required.
+  While the ghost is up the strip reads "Tap a spot, then Place." and sits just below `#placement-note`, clear of the placement buttons. Baselines in `S.ui.tutorial.b` (`hab`, `snack`, `bench`, `startEvent`) make Replay work on an existing zoo.
+- While `ZE.isOpen(S)` is false, the Build box, Habitats and the Savanna row carry the soft highlight (tutorial or not), the first Savanna is never greyed for money, Animals opens on the Pen ("Build a habitat first.", House disabled with "Needs habitat"), and Projects says "Build a habitat" under Event. Market shows "Nobody is selling." while `S.offers` is null.
