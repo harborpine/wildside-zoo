@@ -42,7 +42,7 @@ const SIZES = [[375, 553], [375, 647], [390, 664], [390, 753], [390, 844], [430,
       await check(box);
       if (box === 'Research') { if (await T.tapText(/^Regions/)) { await check('Research-Regions'); await T.tapText(/./, { sel: '.back' }); await sleep(200); } }
       if (box === 'Info') { for (const sub of ['Book', 'Rumors']) { if (await T.tapText(new RegExp('^' + sub))) { await check('Info-' + sub); await T.tapText(/./, { sel: '.back' }); await sleep(200); } } }
-      if (box === 'Staff') { if (await T.tapText(/^Hire/, { sel: 'button, .btn' })) { await check('Staff-Hire'); await T.tapText(/./, { sel: '.back' }); await sleep(200); } }
+      /* The Staff screen now carries the advert tiers itself (no separate Hire screen), and tapping one pays for an advert; the Staff screen is already checked above. */
       if (box === 'Animals') { for (const tab of ['Market', 'Pen']) { if (await T.tapText(new RegExp('^' + tab))) { await check('Animals-' + tab); } } }
       await T.tapText(/./, { sel: '.back' }); await sleep(250);
     }
