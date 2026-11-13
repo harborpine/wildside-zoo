@@ -13,6 +13,16 @@ const SIZES = [['landscape', 844, 390, 2], ['small', 375, 667, 2], ['large', 430
     // age the zoo a bit so lists are longer (test hook; skip report cards)
     await page.evaluate(() => { ZCore.onReport('*', (r, d) => d()); ZT.tick(30); ZT.S.reports.length = 0; ZT.S.happening = null; ZT.popAll(); ZCore.onReport('*', null); ZCore.WEEK_MS[1] = 600000; ZCore.WEEK_MS[2] = 600000; });
     await page.evaluate(() => { ZT.popAll(); }); await sleep(300);
+    if (name === 'landscape') {   // round 2: a "Turn your phone upright" card replaces the game
+      const txt = await page.evaluate(() => document.body.innerText); const card = /upright/i.test(txt); console.log('  upright card shown:', card);
+      if (!card) T.find('landscape:no-card', 'no "Turn your phone upright" card at 844x390');
+      await T.shot('card'); await L.invariants(T, 'landscape card');
+      const s1 = await T.state(); if (s1.running) T.find('landscape:running', 'clock keeps running behind the upright card');
+      await T.tapXY(420, 200); const s2 = await T.state(); if (s2.stack.length) T.find('landscape:tap-opens', 'a tap behind the upright card opened the menu');
+      await page.setViewportSize({ width: 390, height: 844 }); await sleep(700); const s3 = await T.state(); console.log('  upright again: running', s3.running); if (!s3.running) T.find('landscape:no-resume', 'clock did not resume after turning upright');
+      await page.setViewportSize({ width: 844, height: 390 }); await sleep(300);
+      T.findings.forEach(f => all.push({ size: name, ...f })); await T.browser.close(); continue;
+    }
     await T.shot('floor'); await L.invariants(T, name + ' floor');
     const fl = await page.evaluate(() => { const c = document.getElementById('floor').getBoundingClientRect(); const a = document.getElementById('app').getBoundingClientRect(); return { canvas: [Math.round(c.width), Math.round(c.height)], app: [Math.round(a.left), Math.round(a.width), Math.round(a.height)], dbg: ZRender.debug().buffer }; });
     console.log('  layout', JSON.stringify(fl));

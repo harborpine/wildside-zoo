@@ -1,5 +1,97 @@
 # Wildside Zoo: test report (Tester)
 
+# ROUND 2 (after the owners' fixes)
+
+## Summary
+
+**Did a full first year play cleanly by touch with no errors: YES, on Chromium and on WebKit (0 findings, 0 console errors, 0 game errors, about 400 s each on the real clock at speed 2).**
+
+Also: years 2 to 4 played by touch (waiting by `ZT.tick` only), all four year-end screens reached, no errors. The mystery crate, a headhunter hire, move, remove, upgrade and entering the Winter Show were driven by touch and work. One real new bug: **the Winter Show result card never shows** (N1).
+
+The Lead's 4 stalls were my script being out of date, not game problems. Confirmed: the planner now skips the region step and puts the budget on the confirm screen; the third placement button is "Done" and returns to the floor, and my script looked for Cancel.
+
+Scripts: `tester-play.js` (updated for the new flows, nothing weakened: every invariant still runs after every tap sequence), `tester-extra.js` (crate, headhunter, upgrade, move, remove, Winter Show), `tester-years.js` (years 2 to 4), `tester-sizes.js` (landscape now checks the "Turn your phone upright" card: shown, clock paused, taps ignored, resumes when upright; Chromium and WebKit pass). Logs: `test/shots/tester-play-r2-cr.txt`, `tester-play-r2-wk.txt`, `tester-years-cr.txt`.
+
+## Status of the original 20 (judged on fresh screenshots)
+
+| # | Owner | Finding | Status |
+|---|---|---|---|
+| R1 | Rules | idle money | **Not fixed.** $19k at year 2 start, $98k year 3, $291k year 4, $583k year 5 with a passive player (land is rank-locked, so nothing to buy). |
+| R2 | Rules | low year-1 results | **Not fixed.** Year-1 review 11/40, #12 of 12 at year end (this player is deliberately light). |
+| RN1 | Renderer | ghost starts invalid | **Fixed.** Ghost starts valid at every size and for every placement. |
+| RN2 | Renderer | dead Rotate button | **Fixed** (hidden; the bar is Place + Done). |
+| RN3 | Renderer | "Cancel" after placing | **Fixed** ("Done"). New: N3 (button colours). |
+| RN4 | Renderer | landscape placement cramped | **Fixed** (landscape shows the upright card). |
+| S1 | Shell | toast over title bar | **Fixed** (toasts sit just above Back). New: N4. |
+| S2 | Shell/Menus | chips wrap | **Fixed.** One line in market, staffer, headhunter and applicant rows at 390, 375, 430 and 820. |
+| S3 | Shell | panel hides the floor | **Not fixed.** The main menu and every screen still fill the stage. |
+| S4 | Shell | dead band, news hidden | **Fixed.** The news line shows under screens. |
+| S5 | Shell | landscape layout | **Fixed** by the upright card. |
+| S6 | Shell | stale `shell-shot.js` | **Not re-checked** (not re-run this round). |
+| M1 | Menus | hiring without a reveal | **Fixed** (see N5 for the back-to-back lists). |
+| M2 | Menus | leaving placement | **Fixed.** Done returns to the floor; a one-off placement returns by itself. |
+| M3 | Menus | Animals opens on Market | **Fixed** (opens on Zoo). |
+| M4 | Menus | breeding animal offered a move | **Fixed** (no refusal toast appeared in the run). |
+| M5 | Menus | empty Combos screen | **Fixed.** Locked combos are listed with "?" and their hint line. |
+| M6 | Menus | running expedition shows little | **Partly fixed.** Detail now shows Team, Spent, Call back and weeks left; still nothing about the half-way choice or what was found. |
+| M7 | Menus | long expedition planner | **Fixed** (see tap counts). |
+| MO1 | Moments | combo card shows a sand tile | **Not fixed.** `tester-cr-popup-mo-combo-w6-48.png`. |
+
+## New findings
+
+### Menus
+- **N1 (should fix). The Winter Show result is never shown.** Steps: let the show open (week 40 of year 1), tap Projects, tap "Animal Show", tap an animal, tap Enter. The entry is taken (the show closes, money and medal apply) but no result card appears. The game log shows `screen mo-showresult` opening and the stack is empty 100 ms later, so something closes it right after `enterShow` (it looks like a `popAll()` after the action, which makes Moments call `done()` on its own card). Calling `ZCore.act('enterShow', id)` directly does show the card, so the close is in the Menus flow. The player enters the Show and sees no payoff.
+- **N5 (polish). Two hire lists back to back.** After the applicant reveal, the "Pick who to hire" card (Hire/Done) closes onto the old "Who turned up" list showing the people still unhired. Hiring one person is 9 taps as played (floor, Staff, Hire, tier, 4 taps through the applicant beats, Hire), then Done and Back. Skip the old list after the reveal, or make the reveal the only list. `tester-cr-hire-after-done.png`.
+- **N6 (polish). The grade letter "D" shows twice** on animal rows (after the chips and again at the right). `tester-cr-look-main-Animals.png`.
+
+### Moments
+- **N2 (polish). Winter Show picker row text overflows its box** ("Dune · African Elephant" 199 px in a 191 px box; "Tansy · African Elephant" 205 px). Seen in years 2 and 3 by `tester-years.js`.
+
+### Shell / Renderer
+- **N3 (polish). The placement buttons are inverted.** With Rotate hidden, the green primary style falls on the second button: Done is green and Place is cream. Place should be the green one. `tester-cr-place-snack-start.png`.
+- **N4 (polish). A toast can cover the placement note.** "Garden Bench built" sits on top of the "Completes Safari Picnic!" note for 2.3 s. `tester-cr-popup-mo-combo-w6-48.png`.
+
+### Rules
+- **N7 (should fix, tuning).** Same as R1: money piles up with nothing to buy (up to $583k in year 5). Land needs rank 2 and the Buy button says so clearly.
+
+No new Artist findings. Zero console errors and zero game errors anywhere. The top strip never overflowed (checked up to $586,561 and 451 visitors a week).
+
+## The things you asked me to check
+
+- **(a) Hiring now.** The reveal introduces each applicant (name, then numbers) and ends on "Pick who to hire" with Hire buttons and Done. Yes, the player then lands on the old "Who turned up" list with the remaining applicants (N5). Taps: 9 as I played it (tapping through every beat); about 7 if the beats run on their own (floor, Staff, Hire, tier, Hire, Done, Back).
+- **(b) Driven by touch, all worked.** Mystery crate: 6 taps, the crate reveal counts the numbers up. Headhunter hire: 3 taps (floor, Staff, Hire), no confirm. Upgrade: 5 taps with confirm, level 1 to 2, the next level says "Research needed". Move a building: 6 taps, ghost starts valid, Place returns to the floor. Remove: 5 taps with confirm. Winter Show entry: 5 taps, but no result card (N1); a missed picker is recoverable from the "Needs you: Animal Show" row in Projects. Buy land: only reached the "Needs rank 2" refusal.
+- **(c) Years 2 to 4.** 15 expeditions, 24 events, 61 choices, 19 happenings, 8 yearly plans, 6 shows and 4 year-end screens, with the zoo growing to 4 habitats, 8 facilities and 27 animals. The pen filled (3 of 6; the House buttons say "No room", which is clear). Only N2 turned up; strip, callers, awards show and long lists were fine.
+
+## Tap counts now (from the floor)
+
+| Job | Taps | Before |
+|---|---|---|
+| Start an expedition | 5 (floor, Projects, Expedition, Next, Send); 6 if the budget tab is changed | 7 |
+| Hold an exhibit event | 6 (floor, Projects, Event, habitat, theme, Start; the host step is skipped when one person is free) | 7 |
+| Pair a breeding | 5 (floor, Projects, Breeding, pair, Start) | 6 |
+| Build a facility, back on the floor | 7 (floor, Build, Facilities, item, hex, Place, Done) | 8 |
+| Build a habitat | 6 (floor, Build, Habitats, Savanna, hex, Place; a one-off returns by itself) | 9 |
+| Buy an animal at the market | 5 (auto-housed) | 5 |
+| Move an animal | 6 (floor, Animals, animal, Choose habitat, habitat; Zoo is the default tab) | 6 |
+| Hire from an advert | 7 to 9 (see (a)) | 5 |
+| Train / Research | 5 / 5 | 5 / 5 |
+| Mystery crate | 6 | untested |
+| Headhunter hire | 3 | untested |
+| Upgrade / Remove / Move a building | 5 / 5 / 6 | untested |
+| Enter the Winter Show | 5 | untested |
+
+## Still untested
+
+- Real touch drag in WebKit; a real phone; Add to Home Screen.
+- Buying land (locked by rank in my runs); years 5 to 20 by touch; the New zoo and final score screens.
+- WebKit for `tester-extra.js` and `tester-years.js` (Chromium only); `shell-shot.js` not re-run; `moments-shot.js` not run.
+- The Show result card itself (N1 blocks reaching it by touch).
+- Whether the money tuning (R1, N7) is acceptable for a better player: my player is deliberately light.
+
+---
+
+# ROUND 1 (original report)
+
 Date: 2026-11-12. Tested the assembled `index.html` in headless Chromium and headless WebKit (iPhone engine), phone size 390 x 844 at 2x, touch emulation, `file:///` URL.
 
 ## Summary

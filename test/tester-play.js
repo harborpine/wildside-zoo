@@ -41,7 +41,7 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
   }
   async function closeAll(label) {
     // press Back/Play until nothing is open
-    for (let i = 0; i < 8; i++) { const s = await st(); if (!s.stack.length) break; const ok = await T.tapText(/./, { sel: '.back' }); if (!ok) { const topn = s.stack.slice(-1)[0]; if (/result|^mo-/.test(topn)) { await T.tapXY(195, 440, 600); continue; } T.find('back:missing:' + s.stack.join('>'), 'no Back/Play button found on screen ' + s.stack.join('>')); await page.evaluate(() => ZT.popAll()); break; } await sleep(250); }
+    for (let i = 0; i < 8; i++) { const s = await st(); if (!s.stack.length) break; const ok = await T.tapText(/./, { sel: '.back' }); if (!ok) { const topn = s.stack.slice(-1)[0]; if (/result|^mo-/.test(topn)) { if (!(await T.tapText(/^Done/i, { sel: 'button, .btn', wait: 500 }))) await T.tapXY(195, 440, 600); continue; } T.find('back:missing:' + s.stack.join('>'), 'no Back/Play button found on screen ' + s.stack.join('>')); await page.evaluate(() => ZT.popAll()); break; } await sleep(250); }
     await sleep(300); await inv(label || 'closeAll', { expectClosed: true });
   }
   async function pathTo(names, label) { // from floor: open menu then tap each name
@@ -140,6 +140,18 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     return { ok: placed, note: gs.note };
   }
 
+  // walk a planner: tap the first row on each screen until the green start button shows (steps may be skipped by the game)
+  async function through(startRe, pre) {
+    for (let i = 0; i < 6; i++) {
+      const has = await T.locate(startRe, { sel: 'button, .btn' });
+      if (has && !/Back|Play/.test(has.text)) { await T.shot(pre + '-confirm'); await inv(pre + ' confirm'); return true; }
+      const d = await describe(T); await shotOnce(pre + '-step' + i + '-' + d.id, pre + '-step' + i); await inv(pre + ' step ' + i);
+      const nx = await T.locate(/^Next/, { sel: 'button, .btn' });
+      if (nx && !/pick/i.test(nx.text)) { await T.tapText(/^Next/, { sel: 'button, .btn' }); continue; }
+      if (!(await T.tapText(/./, { sel: '.row.tappable' }))) return false;
+    }
+    return false;
+  }
   /* ================= START ================= */
   await T.goto(); await installWatch();
   say('== Wildside Zoo first-year playthrough on', engine, new Date().toISOString());
@@ -200,13 +212,7 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     const startT = T.taps;
     await openMenu('exp'); const base = T.taps;
     await T.tapText('Projects'); await T.tapText('Expedition');
-    await T.shot('exp-where'); await inv('exp region');
-    await T.tapText(/./, { sel: '.row.tappable' });
-    await T.shot('exp-team'); await inv('exp team');
-    await T.tapText(/^Next/);
-    await T.shot('exp-budget'); await inv('exp budget');
-    await T.tapText(/Standard/);
-    await T.shot('exp-confirm'); await inv('exp confirm');
+    await through(/^Send/, 'exp'); await T.tapText(/Standard/); await T.shot('exp-confirm-standard');
     const before = await page.evaluate(() => ZT.S.projects.length);
     await T.tapText(/^Send/, { wait: 600 });
     const after = await page.evaluate(() => ZT.S.projects.length);
@@ -234,9 +240,7 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     const t0 = T.taps; await openMenu('event'); const b = T.taps;
     await T.tapText('Projects'); const hasReady = await page.evaluate(() => document.querySelector('#screens .layer:not([hidden])').innerText);
     await T.tapText('Event'); await T.shot('event-habs'); await inv('event habs');
-    await T.tapText(/./, { sel: '.row.tappable' }); await T.shot('event-theme'); await inv('event theme');
-    await T.tapText(/./, { sel: '.row.tappable' }); await T.shot('event-lead'); await inv('event lead');
-    await T.tapText(/./, { sel: '.row.tappable' }); await T.shot('event-confirm'); await inv('event confirm');
+    await through(/^Start/, 'event');
     const n0 = await page.evaluate(() => ZT.S.projects.length);
     const sd = await describe(T); say('  event confirm screen:', sd.text);
     await T.tapText(/^(Start|Hold|Go|Send|Yes|Confirm)/i, { wait: 700 });
@@ -252,8 +256,7 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     const t0 = T.taps; await openMenu('breed');
     say('  floor icons before breeding:', JSON.stringify(await page.evaluate(() => ZRender.debug().icons)));
     await T.tapText('Projects'); await T.tapText('Breeding'); await T.shot('breed-pairs'); await inv('breed pairs');
-    await T.tapText(/./, { sel: '.row.tappable' }); await T.shot('breed-lead'); await inv('breed lead');
-    await T.tapText(/./, { sel: '.row.tappable' }); await T.shot('breed-confirm'); await inv('breed confirm');
+    await through(/^Start/, 'breed');
     const n0 = await page.evaluate(() => ZT.S.projects.length);
     const sd = await describe(T); say('  breed confirm:', sd.text);
     await T.tapText(/^(Start|Pair|Breed|Go|Yes|Confirm)/i, { wait: 700 });
@@ -281,7 +284,7 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     await T.tapText(/./, { sel: '.row.tappable' }); await sleep(300);
     const res = await place('hab', 'savanna', 'habitat2', { rotate: 2 });
     metrics.taps.buildHab = T.taps - t0; say('second habitat placed:', res.ok, 'taps incl floor:', metrics.taps.buildHab);
-    if (!res.ok) { await T.tapText('Cancel', { floor: true, sel: '#placement-bar button' }); await sleep(400); await closeAll('hab cancel'); }
+    if (!res.ok) { await T.tapText(/^(Done|Cancel)$/, { floor: true, sel: '#placement-bar button' }); await sleep(400); await closeAll('hab cancel'); }
     else { const s = await st(); say('  after placing: stack', s.stack.join('>'), 'placing', s.placing, 'running', s.running); }
     await inv('after hab placement', { expectClosed: false });
     const s2 = await st(); if (!s2.placing && !s2.stack.length) await inv('hab done', { expectClosed: true });
@@ -315,10 +318,11 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     await T.tapText('Place', { floor: true, sel: '#placement-bar button', wait: 900 });
     const after = await page.evaluate(() => ({ n: ZT.S.items.length, money: Math.round(ZT.S.money), combos: ZE.c(ZT.S).active.length, stack: ZT.stack(), reports: ZT.S.reports.length }));
     say('  placed:', after.n > before.n, 'combos', before.combos, '->', after.combos, 'reports', after.reports, 'stack', after.stack.join('>'));
+    say('  bar buttons after Place:', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('#placement-bar button')].map(b => b.innerText))));
     await shotOnce('place-' + label + '-after', 'place-' + label + '-after');
     await drain('combo report');
     const s2 = await st(); say('  after combo popup: placing', s2.placing, 'running', s2.running, 'stack', s2.stack.join('>'));
-    if (s2.placing) { await T.tapText('Cancel', { floor: true, sel: '#placement-bar button', wait: 600 }); }
+    if (s2.placing) { await T.tapText(/^(Done|Cancel)$/, { floor: true, sel: '#placement-bar button', wait: 600 }); }
     await sleep(500); const s3 = await st(); say('  after Cancel: stack', s3.stack.join('>'), 'placing', s3.placing, 'running', s3.running);
     await closeAll(label);
     await sleep(1500); const s4 = await st(); say('  after closing everything: running', s4.running, 'stack', s4.stack.join('>'), 'reports', s4.reports);
@@ -376,7 +380,7 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     const n0 = await page.evaluate(() => ZT.S.staff.length);
     await T.tapText(/./, { sel: '.row.tappable, .opt, .gbox', nth: 0, wait: 900 });
     for (let i = 0; i < 6; i++) {       // advert reveal ("who turned up"): tap through, then Hire the first person
-      const s = await st(); const dd = await describe(T);
+      const s = await st(); const dd = await describe(T); say('  hire step', i, dd.id, '|', (dd.text || '').slice(0, 90));
       await shotOnce('hire-' + i + '-' + dd.id, 'hire-step-' + i); await inv('hire step ' + i);
       if (/Pay|Confirm/.test((dd.items || []).join('|')) && !/Who turned up|Hire/.test(dd.text)) { await T.tapText(/^(Pay|Confirm|Advertise)/i, { wait: 700 }); continue; }
       if (/Hire/.test(dd.text) && !/Notice board/.test(dd.text)) { const hb = await T.tapText(/^Hire/, { sel: 'button, .btn', nth: 0, wait: 800 }); if (hb) break; }
@@ -386,7 +390,7 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     const n1 = await page.evaluate(() => ZT.S.staff.length);
     metrics.taps.hire = T.taps - t0; say('hired:', n1 > n0, 'staff', n0, '->', n1, 'taps (incl floor, Staff, Hire, tier, Hire):', metrics.taps.hire);
     if (n1 <= n0) T.find('hire:no-hire', 'could not hire anyone from the advert result screen (staff stayed ' + n0 + ')');
-    await inv('hire done'); await drain('hire'); await closeAll('hire');
+    await inv('hire done'); await T.tapText(/^Done/i, { sel: 'button, .btn', wait: 600 }); { const dd = await describe(T); say('  after Done on the pick list:', dd.id, '|', (dd.text || '').slice(0, 160)); await T.shot('hire-after-done'); await inv('hire after done'); } await drain('hire'); await closeAll('hire');
   });
 
   job('research', async () => (await page.evaluate(() => ZE.researchList(ZT.S).some(r => !r.done && !r.lock && r.rp <= ZT.S.rp))), async () => {
