@@ -1,10 +1,8 @@
 const L = require('./tester-lib.js');
 (async () => {
-  for (const [w,h] of [[375,553],[320,568],[390,664]]) {
-    const T = await L.launch('chromium', {width:w,height:h}); const p = T.page; await T.goto('');
-    await T.tapText(/^1/, {sel:'button', wait:500}); await T.tapText(/^Next/, {sel:'button,.btn', wait:500}); await T.tapText(/^Yes/, {sel:'button,.btn', wait:900});
-    await T.tapXY(Math.round(w/2), Math.round(h*0.55), 600);
-    const m = await p.evaluate(()=>{const l=[...document.querySelectorAll('.layer:not([hidden])')].pop(); const b=l.querySelector('.pbody'); const c=document.querySelector('.mn-coach'); const g=l.querySelector('.grid'); return {scroll:b.scrollHeight>b.clientHeight+1, sh:b.scrollHeight, ch:b.clientHeight, coach: c&&Math.round(c.getBoundingClientRect().height), gridB: g&&Math.round(g.getBoundingClientRect().bottom), back:Math.round(l.querySelector('.back').getBoundingClientRect().top)};});
-    console.log(w+'x'+h, JSON.stringify(m)); await T.shot('tutmenu'); await T.browser.close();
-  }
+  const T = await L.launch('chromium'); const p = T.page; await T.goto();
+  await T.tapXY(195,420); await T.tapText('System'); await T.tapText(/^How to play/);
+  await p.evaluate(()=>{const b=document.querySelector('.layer:not([hidden]) .pbody'); b.scrollTop=b.scrollHeight;}); await L.sleep(300); await T.shot('legend-bottom');
+  console.log(await p.evaluate(()=>[...document.querySelectorAll('.layer:not([hidden]) .pbody')][0].innerText.replace(/\n+/g,' | ')));
+  await T.browser.close();
 })();

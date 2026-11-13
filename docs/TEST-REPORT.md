@@ -1,5 +1,104 @@
 # Wildside Zoo: test report (Tester)
 
+# ROUND 3 (title screen, save slots, tutorial, fit, symbols)
+
+moments.js was unchanged for 13 minutes before I started its pop-up-heavy runs (last change 12:23, runs began about 12:50), so everything below ran on the finished symbol switch.
+
+## Summary
+
+**Did a full first year play cleanly by touch with no errors: YES, on Chromium and WebKit** (0 real findings, 0 console errors, 0 game errors; about 395 s each; reload mid-year kept everything). Years 2 to 4 by touch (waiting by `ZT.tick`): all year-end screens reached, 0 findings (3 years, 18 expeditions, 35 choices, 12 year-end beats). `tester-extra` (crate, headhunter, upgrade, move, remove, Winter Show): all pass, and **the Winter Show result card now shows** (round 2 bug N1 fixed). The first five minutes (title, name, tutorial, slots, delete) play cleanly on both engines. No box-grid screen scrolls at any of the 8 sizes on either engine.
+
+The test suites all pass: rules-check, bot 0.8, art-check, render-shot both, shell-shot (it passes now), menus-shot, menus-title (both engines). `moments-shot` not run, as asked.
+
+What is still wrong is small: words and letters left where symbols were meant to replace them (the star-pick choice, happenings, the trader rows), a few symbols that are hard to read, and blank bands on the title screen. No blockers, no new "should fix" other than the leftover words.
+
+Scripts added or changed this round: `tester-first5.js` (first five minutes, clean profile), `tester-fit.js` (fit at 8 sizes), `tester-symbols.js` (symbol audit of every screen and moment that can be opened), `tester-lib.js` (title-first boot, plus an automatic scan for leftover words and letters after every tap sequence: `test/shots/tester-words-*.log`), and `tester-play/extra/years/sizes` updated for `?play=1`.
+
+## B. The first five minutes (both engines, clean profile)
+
+Flow played: title, tap empty slot 1, name screen (typed "Mina's Safari" by keyboard, field is 18 px so iOS will not zoom), "Play the tutorial?" Yes, followed the 5 coach steps by doing exactly what each said, System, Title screen (slot card shows name, date, money), new zoo in slot 2 with tutorial No (no strip appeared), back to the title, tapped slot 1 (loaded, zoo intact), deleted slot 2 (44 x 44 trash button, asks `Delete "Wildside Zoo" for good?` with No and Delete, No really cancels). Screens: `test/shots/tester-cr-f5-*.png` and `tester-wk-f5-*.png`.
+
+- **Title screen: attractive and clear.** Big pixel logo, zebra, giraffe, gate, lion and elephant, three big slot cards with a number badge. An empty slot says "New zoo"; a used slot shows name, date and money. Nothing to explain. (Polish items below: blank bands, no Continue shortcut, no settings or credits link, which an App Store reviewer may look for.)
+- **Tutorial steps:** 1 "Tap the zoo to open the menu." 2 "Open Projects and send an expedition." 3 "Flag icon: ready. Hold an event." 4 "Build a bench: Build, Facilities." 5 "Answer pop-ups when they appear. Have fun!" Each is 5 to 7 words, one line. Each completed by doing it (13 to 16 s when played quickly). Skip is always there and is 56 x 44.
+- **Does the strip ever cover the thing to tap?** No. On the floor it sits at the top of the stage, over empty ground; taps pass through. Inside a screen it pushes the content down and the boxes still fit without scrolling (checked 375 x 553, 320 x 568, 390 x 664 with the tutorial on). Target buttons (Projects, Expedition, Garden Bench) get a soft white glow, which makes step 2 and 4 easy. In placement the strip stays at the top, the buttons at the bottom.
+- **Pop-ups mid-tutorial:** when a pop-up arrives (a combo card did) the strip hides, then returns on the same step after the pop-up. Not confusing in my runs.
+- **Unclear or blocking steps:** none blocking. Step 3 ("Flag icon: ready") does not say where the flag is, but the Event box and the flag on the habitat make it findable. The tutorial ends without ever teaching housing, breeding, money or the heart icon; those are only in How to play.
+- **Can the player get stuck?** No dead end found: Skip always works; if no event can start the strip stays on step 3 until the player skips. Not seen in my runs.
+- **Polish (title):** during the title and the three new-zoo screens the top strip (57 px) and the news bar (31 px) are empty dark bands, so the title does not use the whole screen (`tester-cr-f5-01-title.png`, `tester-cr-f5-04-tutorial-question.png`). A used slot card does not show animals or play time.
+
+## C. Menu fit and screen use
+
+Sizes: 375x553, 375x647, 390x664, 390x753, 390x844, 430x739, 440x956 and 320x568, Chromium and WebKit, touch, `tester-fit.js`.
+- **No scrolling on any box-grid screen at any size** (main menu, Projects, Build, Research, Info checked at each). Every box is at least 44 px. Back is always fully visible; panel is 9 px from each edge; the app fills 0..width and 0..height with the strip on top and the news bar at the bottom, no unused bands once a game is running. Long lists (Staff, Research regions, Info Book, Rumors, Market) scroll inside the panel with Back visible. The placement bar (two buttons, 137 to 192 px wide, 56 px tall) is inside the screen at every size.
+- **320x568 (oldest small iPhone):** works. The main menu fits (332 px body), boxes fit, placement fine. Only the title screen scrolls a little there (485 px in a 468 px area) and at 375x553 (511 in 453): the third slot card is partly below the fold. Polish.
+
+## D. Symbols
+
+**Remaining words or letters where a symbol was meant** (found by the automatic scan across year 1, years 2 to 4 and the audit):
+1. **Star pick (event, week 1) uses words:** "Charm 17: Fun +1.0", "Energy 19: Animals +1.0", "Smarts 12: Learning +0.9" (Moments). Should read with the stat symbol and a number. Also uses the word "Vigor" nowhere; no leftover "Vigor" or "Wit" anywhere in the game.
+2. **Happening text:** "Wes +2 Science" (mo-happening). **Review line:** "Host on fire" (mo-review). Event confirm still says "Host" as a label (fine, it is a role).
+3. **Sex shown as letters "M" and "F"** after the species name in Trader and Director rows (Animals and Pen use the male and female symbols). Inconsistent.
+4. **Wages and times in words:** "$100 a week" (headhunter), "4 weeks" (campaigns, expedition choices), "Produces research every week" (research list). The legend has a Weeks clock icon, so these should be the clock plus a number. Expedition "Next (clock) 4" is the one place it is done.
+5. Level is still "Lv 1" / "Level 1" (fine, no symbol was promised).
+6. The grade badge on the reveal cards is a letter in a box ("C", "D"); on animal rows it is a rosette that is too small to read the letter (a grey rosette is all you see at 390 px). Reads as a medal, not a grade.
+
+**Symbols that could be confused at phone size:**
+- Staff skills: the **microscope (Science)** looks like a teal blob and the **microphone (Hosting)** looks like a purple lollipop at 14 to 16 px. Paw (Care) and compass (Scouting) are clear. Charm (pink sparkle), Energy (orange bolt) and Smarts (blue bulb) are clear and colour-coded.
+- **Medals:** the Winter Show bronze medal looks like a money sack, and the result card says no word ("Bronze"), only the picture. The reputation icon (a gold ribbon medal) is the same family as the gold-medal target, so "+13 (medal)" next to "25 / (medal) 35" is easy to misread.
+- **Flasks:** the Research box icon (green flask), the research points icon (blue flask) and Know-how (green flask again) are three similar things. **Themes** uses the same flag as "event ready".
+- Years screen: four unlabeled icon-and-zero chips at the top (flag, clipboard, heart, trophy) with no words and no legend entry. It is a case where a symbol made the screen worse. `tester-cr-sym-s-years.png`.
+- Research box corner badges (red 6, 8, 6) are unexplained.
+
+**Symbols with no explanation reachable:** the legend (System, How to play, scroll to the bottom) covers Charm, Energy, Smarts, Care, Science, Scouting, Hosting, Male, Female, Baby, Money, Research, Weeks, Locked, New, Done, Odds, the six grades and `-- - + ++`. Missing: reputation, visitors, rank stars, medals (bronze, silver, gold), the buzz flame, rarity stars, the red count badges, the Years chips, Strength +/-. It is only reachable by scrolling to the bottom of How to play; it is not linked from the screens that use the symbols.
+
+**Words replaced by a symbol where it is not clear (honest list):** the Years chips; the bronze medal; Science and Hosting at small size; the Research flasks; the red badges. Everything else (stats, sex, baby, coin, clock, check, lock, grade rosettes in the legend) reads fine, usually better than the words did, and the one-line chips no longer wrap.
+
+## New findings by owner (round 3)
+
+**Moments (`moments.js`)**
+- **R3-1 (should fix). Words where symbols were meant.** Steps: start an event, answer the week-1 star pick (3 options reading "Charm 17: Fun +1.0", "Energy 19: Animals +1.0", "Smarts 12: Learning +0.9"). Happening results say "+2 Science"; the review says "Host on fire". Should use the stat symbols. Seen in every run (`tester-words-*.log`).
+- **R3-2 (polish). Sex as letters "M"/"F" in Trader and Director rows** (Animals tab uses the symbols). `tester-cr-sym-s-m-caller-trader.png`.
+- **R3-3 (polish). Times and wages still in words** ("$100 a week", "1 week late", "4 weeks") where the clock icon exists.
+
+**Artist (`sprites.js`)**
+- **R3-4 (polish). Microscope and microphone are hard to read at 14 to 16 px** (teal blob, purple lollipop). `tester-cr-sym-s-staffer.png`.
+- **R3-5 (polish). Bronze medal looks like a money sack**, and the reputation icon looks like a medal. `tester-cr-x-x-show-result-0.png`.
+
+**Menus (`menus.js`)**
+- **R3-6 (polish). Years screen top chips (flag, clipboard, heart, trophy with zeros) have no label and no legend entry.** `tester-cr-sym-s-years.png`.
+- **R3-7 (polish). Legend is incomplete and hidden at the bottom of How to play:** missing reputation, visitors, medals, flame, rank stars, rarity stars, the red count badges. Consider linking it from Info.
+- **R3-8 (polish). Title slot cards show only name, date and money.** No Continue shortcut for the last played zoo; no settings, credits or privacy link on the title screen (an App Store reviewer may look for these).
+- **R3-9 (polish). Two hire lists back to back** is still there (round 2 N5): after the hire reveal's "Pick who to hire" card, the old "Who turned up" list follows. Hiring is 9 taps as played.
+
+**Shell (`core.js`, `style.css`)**
+- **R3-10 (polish). The title and new-zoo screens leave the top strip and news bar blank** (57 px and 31 px dark bands), so the screen is not fully used there.
+- **R3-11 (polish). The title screen scrolls at 375x553 and 320x568** (the third slot is partly off screen).
+
+**Rules (`engine.js`, `data.js`)**
+- **R3-12 (should fix, tuning). Money piles up (round 2 R1/N7), still:** $11k at year 2, $52k year 3, $169k year 4 with a light player. Not re-tuned.
+
+**Renderer:** no new findings.
+
+## Status of round 2 findings
+
+Fixed: N1 (Winter Show result card shows), N2 (no overflow in the show picker through 3 years), N3 (Place is green, Done cream), N6 (grade shown once per animal row), plus everything the round 3 list says was fixed: chips are single lines, the strip is clean. Not re-checked: N4 (a toast over the placement note). Not fixed: N5 (see R3-9), N7 (R3-12), R2 low reviews (year-1 review 11/40 and #12 of 12 again).
+
+## Tap counts now (unchanged except where noted)
+
+Expedition 5, event 6, breeding 5, facility 7 (back on the floor), habitat 6, market buy 5, move animal 6, hire 7 to 9, train 5, research 5, crate 6, headhunter 3, upgrade 5, move a building 6, remove 5, Winter Show 5 to 6. Title to first zoo: slot, Next, Yes/No = 3 taps. Tutorial adds no taps.
+
+## Still untested
+
+- Real touch drag in WebKit; a real iPhone with Safari's bars (the "follows Safari's bars" behaviour was tested only by resizing the window, not with real bars); Add to Home Screen.
+- Buying land (rank-locked in my runs), years 5 to 20 by touch, the New zoo carry-over card (needs a finished zoo), the final score screen.
+- `tester-extra` and `tester-years` on WebKit (Chromium only); a tutorial played with a deliberately blocked step (for example no free host for the event).
+- A pop-up arriving at the exact moment a tutorial step completes (only a combo card was seen).
+- Whether the symbol choices are clear to a real first-time player; I judged them from screenshots.
+
+---
+
+# ROUND 2 (previous section)
+
 # ROUND 2 (after the owners' fixes)
 
 ## Summary
