@@ -27,6 +27,10 @@
         body.appendChild(ui.section('Compact chip row (never wraps)'));
         body.appendChild(ui.list([{ img: sp('lion', '#d9a441'), title: 'Lion', sub: 'Savanna #1', right: ui.sign(2) }]));
         body.appendChild(ui.chipRow([ui.stat('Cha', 78, 'charm'), ui.stat('Vig', 61, 'vigor'), ui.stat('Wit', 49, 'wit'), ui.stat('A', 'B+', 'grade')]));
+        body.appendChild(ui.section('Symbols'));
+        body.appendChild(ui.chipRow([ui.astat('charm', 78), ui.astat('vigor', 61), ui.astat('wit', 49), ui.grade('a')]));
+        body.appendChild(ui.chipRow([{ icon: 'skill-care', value: 4, name: 'Care' }, ui.skillChip('sci', 3), ui.statChip('visitors', 120, { name: 'Visitors' })]));
+        body.appendChild(el('div', {}, ui.sym('lock', { label: 'Locked' }), ' ', ui.sym('sex-m', { label: 'Male' }), ui.sym('sex-f', { label: 'Female' }), ' ', ui.cost({ money: 1500, rp: 4, weeks: 3 })));
         body.appendChild(ui.section('Signs and stars'));
         body.appendChild(el('div', { cls: 'btnrow' }, [0, 1, 2, 3, null].map(l => ui.sign(l))));
         body.appendChild(el('div', {}, ui.stars(4, 10), ' ', ui.flames(1)));

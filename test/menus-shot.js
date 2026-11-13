@@ -2,7 +2,7 @@
    Headless only.  Usage: node test/menus-shot.js [chromium|webkit ...]   (default: both) */
 const path = require('path'), fs = require('fs');
 const pw = require('./pw.js');
-const ROOT = path.resolve(__dirname, '..'), URL = 'file:///' + ROOT.replace(/\\/g, '/') + '/index.html';
+const ROOT = path.resolve(__dirname, '..'), URL = 'file:///' + ROOT.replace(/\\/g, '/') + '/index.html?play=1';
 const SHOTS = path.join(__dirname, 'shots'); fs.mkdirSync(SHOTS, { recursive: true });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failures = 0;
@@ -32,7 +32,7 @@ async function run(name) {
       });
       const body = L.querySelector('.pbody'), back = L.querySelector('.back'), br = back && back.getBoundingClientRect();
       const pr = L.querySelector('.panel').getBoundingClientRect();
-      return { bad, over: Math.max(body ? body.scrollWidth - body.clientWidth : 0, pr.right - 391, 15 - pr.left), pageOver: document.documentElement.scrollWidth - 390, backOk: !back || (br.bottom <= 844 && br.top >= 0 && br.height >= 44) };
+      return { bad, over: Math.max(body ? body.scrollWidth - body.clientWidth : 0, pr.right - innerWidth, -pr.left), pageOver: document.documentElement.scrollWidth - 390, backOk: !back || (br.bottom <= 844 && br.top >= 0 && br.height >= 44) };
     });
     if (r.none) return;
     if (r.bad.length) small.push(label + ': ' + r.bad.join(', '));
@@ -59,6 +59,8 @@ async function run(name) {
   async function openMenu() { await ev(() => { ZT.S.reports.length = 0; ZT.popAll(); }); await sleep(150); await page.touchscreen.tap(195, 330); await sleep(450); }
   async function screen(label, file) { await audit(label); if (file !== false) await shot(file || label); }
   async function dismiss() { for (let i = 0; i < 6; i++) { const top = await ev(() => ZT.stack().slice(-1)[0] || ''); if (!/^mo-|result|crate-/.test(top)) return; await sleep(600); const p = await ev(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), c = L.querySelector('.rcard, .panel'), r = c.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await page.touchscreen.tap(p.x, p.y); await sleep(500); } }
+  // Every stat chip on the open screen is an icon and a number, never a letter label.
+  async function chipCheck(label) { const r = await ev(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), cs = [...L.querySelectorAll('.row .chip:not(.grade)')]; return { n: cs.length, bad: cs.filter(c => c.querySelector('b') || !/^[0-9?!*]+$/.test(c.textContent.trim()) || !c.querySelector('img.sym')).map(c => c.textContent.trim().slice(0, 12)) }; }); check(r.n > 0 && r.bad.length === 0, label + ': ' + r.n + ' chips are icon plus number, no letter labels' + (r.bad.length ? ' BAD ' + r.bad.join('|') : '')); }
   async function back() { await tap('Back'); }
 
   await page.goto(URL); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready && window.ZMenus, null, { timeout: 8000 });
@@ -72,7 +74,7 @@ async function run(name) {
   for (const b of ['Projects', 'Build', 'Animals', 'Staff', 'Research', 'Info', 'System']) check(await ev(b => [...document.querySelectorAll('.layer:not([hidden]) .gbox')].some(x => x.textContent.startsWith(b)), b), 'main menu has ' + b);
 
   // ---------------------------------------------------------------- staff: hire through an advert, then the rest of the team screens
-  await tap('Staff'); await screen('staff');
+  await tap('Staff'); await screen('staff'); await chipCheck('staff list');
   const staffN = await S(() => ZT.S.staff.length);
   await tap('Hire'); await screen('hire');
   await tap('Notice board', { wait: 500 }); await screen('candidates');
@@ -204,7 +206,7 @@ async function run(name) {
   check(await S(() => ZT.S.rows) > rows0, 'bought land');
 
   // ---------------------------------------------------------------- animals
-  await ev(() => ZT.popAll()); await openMenu(); await tap('Animals'); await screen('animals-zoo');
+  await ev(() => ZT.popAll()); await openMenu(); await tap('Animals'); await screen('animals-zoo'); await chipCheck('animal list');
   await tap('Pen'); await screen('animals-pen-empty');
   await ev(() => { const a = ZT.S.animals.filter(x => x.sp === 'zebra' && !ZE.busyAnimals(ZT.S)[x.id]); ZT.S.animals.filter(x => x.sp === 'zebra').forEach(x => { x.hab = null; }); }); await ev(() => ZCore.rerender()); await sleep(300);
   await screen('animals-pen');
@@ -277,16 +279,18 @@ async function run(name) {
 
   // ---------------------------------------------------------------- system
   await ev(() => ZT.popAll()); await openMenu(); await tap('System'); await screen('system');
-  await tap('Save now', { wait: 300 }); check(await ev(() => !!localStorage.getItem('wildside-zoo-v3')), 'Save now wrote the save');
+  await tap('Save now', { wait: 300 }); check(await ev(() => !!localStorage.getItem('wildside-zoo-v3-slot1')), 'Save now wrote the save');
   await tap('2x'); check(await ev(() => ZCore.speed === 2), 'speed changed to 2x'); await tap('1x'); check(await ev(() => ZCore.speed === 1), 'speed back to 1x');
   const z0 = await ev(() => ZRender.getZoom()); await tap('Far'); check(await ev(() => ZRender.getZoom()) === 0, 'zoom changed'); await tap('Close');
-  await tap('How to play'); await screen('how'); await back();
-  await tap('New zoo'); await screen('newzoo');
-  await tap('Start new zoo'); await screen('newzoo-confirm1', false); await tap('No', { wait: 300 });
-  check((await stack()) === 'menu>system>newzoo', 'New zoo can be cancelled at the first question');
-  const run0 = await S(() => ZT.S.runId);
-  await tap('Start new zoo'); await tap('Continue', { wait: 400 }); await shot('newzoo-confirm2'); await tap('Yes, new zoo', { wait: 700 });
-  check(await S(() => ZT.S.week === 0 && ZT.S.runId !== null) && await S(() => ZT.stack().length === 0), 'New zoo needs two confirms, then starts a fresh zoo');
+  await tap('How to play'); await screen('how');
+  const lg = await ev(() => { const names = [...Object.values(ZD.ASTAT), ...Object.values(ZD.SKILL)].map(x => x.name), L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), t = L.querySelector('.mn-legend').textContent; return { missing: names.filter(n => !t.includes(n)), icons: L.querySelectorAll('.mn-legend .sym').length }; });
+  check(lg.missing.length === 0 && lg.icons >= 20, 'the symbol legend lists every stat and skill (' + lg.icons + ' symbols' + (lg.missing.length ? ', missing ' + lg.missing : '') + ')'); await back();
+  await tap('Replay tutorial', { wait: 700 }); check(await ev(() => !!(ZT.S.ui && ZT.S.ui.tutorial && ZT.S.ui.tutorial.on)) && await ev(() => ZT.stack().length === 0), 'Replay tutorial restarts the tutorial and closes the menu'); await ev(() => { ZT.S.ui.tutorial.on = false; });
+
+
+
+
+
 
   // ---------------------------------------------------------------- late game: everything unlocked, long lists
   await ev(() => { const S = ZT.S; S.money = 5e7; S.rp = 9000; S.rep = 60000; S.rows = 20; ZD.BIOME_ORDER.forEach(b => { S.regions[b] = true; }); ZE.researchList(S).forEach(r => { if (r.id.indexOf('region:') !== 0) S.research[r.id] = true; });

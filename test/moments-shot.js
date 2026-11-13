@@ -21,7 +21,7 @@ async function run(name) {
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|Access-Control-Allow-Origin|Not allowed to load local resource|manifest/i.test(m.text())) consoleErrors.push(m.text()); });
   page.on('pageerror', e => consoleErrors.push('pageerror: ' + e.message));
   const shot = (n) => page.screenshot({ path: path.join(SHOTS, 'moments-' + n + tag + '.png') });
-  const boot = async () => { await page.goto(URL); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready && window.ZMoments, null, { timeout: 10000 }); await page.evaluate(() => { ZT.WEEK_MS[1] = 1e9; ZT.WEEK_MS[2] = 1e9; }); };
+  const boot = async () => { await page.goto(URL + '?play=1'); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready && window.ZMoments, null, { timeout: 10000 }); await page.evaluate(() => { ZT.WEEK_MS[1] = 1e9; ZT.WEEK_MS[2] = 1e9; }); };
   await boot();
   const ev = (fn, a) => page.evaluate(fn, a);
   const state = () => ev(() => ({ stack: ZT.stack(), reports: ZT.S.reports.length, busy: ZCore.busy, running: ZT.running(), cur: ZMoments.cur || null }));
@@ -432,6 +432,16 @@ async function run(name) {
       }
     }
     await page.setViewportSize({ width: 390, height: 844 }); await sleep(300);
+  }
+
+  if (want('title')) {
+    console.log(' -- title screen');
+    await page.goto(URL); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready, null, { timeout: 10000 }); await sleep(600);
+    const st = await ev(() => ({ stack: ZT.stack(), hasS: !!ZT.S }));
+    check(st.stack.length > 0 && !st.stack.some(i => /^mo-/.test(i)), 'title is up and no moment is on top of it (' + st.stack + ')');
+    await sleep(1500); const st2 = await ev(() => ZT.stack());
+    check(!st2.some(i => /^mo-/.test(i)), 'still no moment after a moment on the title screen');
+    await boot();
   }
 
   // ---------------------------------------------------------------- 9. errors

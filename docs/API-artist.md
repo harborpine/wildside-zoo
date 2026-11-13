@@ -61,6 +61,14 @@ Fences and the entrance also have `sortDy`.
 `rp` (blue flask), `heart`, `rep` (medal). Menu icons, 11 to 15 px: `m-projects` (clipboard), `m-build` (hammer), `m-animals` (paw),
 `m-staff` (keeper), `m-research` (green flask), `m-info` (book), `m-system` (gear).
 
+**Symbols that replace words (also in `ZSprites.ICONS`, 9 to 13 px, anchor centre-bottom, made to be enlarged 2x to 4x with `iconUrl`)**:
+animal stats `stat-charm` (pink four-point sparkle, Charm), `stat-vigor` (yellow lightning bolt, Energy), `stat-wit` (blue lightbulb,
+Smarts); staff skills `skill-care` (green paw), `skill-sci` (teal microscope), `skill-exp` (gold compass), `skill-charm` (purple microphone,
+Hosting); `sex-m`, `sex-f`, `juv` (egg), `time` (clock), `visitors` (little person), `odds` (die), `cost-rp` (same picture as `rp`),
+`lock`, `new` (red and yellow burst), `ok` (green tick), `no` (red cross mark), `habitat` (fence piece), `pen` (crate), `land`
+(signpost), `trophy`, `medal-gold`, `medal-silver`, `medal-bronze`, and grade rosettes `grade-ss` (gold), `grade-s` (red),
+`grade-a` (orange), `grade-b` (green), `grade-c` (blue), `grade-d` (grey), each with its letter inside.
+
 **`ZSprites.PALETTE`**: `ink`, `outline`, `paper`, `panel`, `panelEdge`, `panelDark`, `shade`, `text`, `textSoft`, `white`, `accent`,
 `accentDark`, `blue`, `blueDark`, `good`, `goodDark`, `bad`, `gold`, `goldDark`, `pink`, `purple`, `grass`, `grassDark`, `path`, `water`,
 `wood`, `woodDark`, `sky`, `night`, `rp`, `money`, `rep`, `star`, `flame`, `biome.<id>` (8 colours), `rarity[1..6]`.
@@ -68,7 +76,7 @@ Fences and the entrance also have `sortDy`.
 ## Checking the art
 
 - `node test/art-shot.js` renders every contact sheet to `test/shots/art-*.png` (headless). Name sheets to render only some:
-  `animals-<biome>`, `people`, `tiles`, `fences`, `buildings`, `extras`, `patch` (tiles at 8x), `scene`, `scene2`.
+  `animals-<biome>`, `people`, `tiles`, `fences`, `buildings`, `extras`, `icons2` (the word-replacing symbols on cream, dark and grass), `habcheck-<biome>` (animals on their own ground), `patch` (tiles at 8x), `scene`, `scene2`.
 - `node test/art-check.js` confirms every id in the contract returns its own sprite (not a fallback), that no two species are
   pixel-identical, and that variants, juveniles and walk frames differ from the base sprite.
 - `test/art-sheet.html?s=<sheet>` is the page both scripts use.

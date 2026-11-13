@@ -204,3 +204,52 @@ Web app: `manifest.webmanifest` (standalone, portrait), `icons/icon-180/192/512.
   Game log screen shows only "Nothing to show here." Menus should hide its Info entries for these when `ZCore.devTools` is false. Logging itself keeps running.
 * **`ZCore.popAll()`** now also dismisses a report that is on screen (it is removed from the queue and the queue moves on), so time is never left paused after `popAll`.
 * Test only: `ZT.skipReports = true` makes every report dismiss itself instantly.
+
+## Save slots and the title screen (round 3; Menus builds the title on this)
+
+* **Start-up always shows the title screen first.** Nothing auto-loads. `boot` calls `window.ZMenus.title()` if it exists, otherwise a minimal built-in slot list. The title is a **modal** screen (no Back).
+  While it is up: `ZCore.S` is `null`, `ZCore.slot` is `null`, the clock is stopped, and no report or pop-up can show. The floor behind it keeps drawing the last game (or a calm new starting zoo on first start), frozen.
+* **Storage.** Three slots, keys `wildside-zoo-v3-slot1` .. `slot3` (the save), plus a small summary beside each, `wildside-zoo-v3-slotN-info`. An old single save under `wildside-zoo-v3` is moved into slot 1 once
+  (into the first empty slot if slot 1 is taken) and the old key is removed. Carry-over (`ZCore.legacy`) stays global.
+* **`ZCore.slots() -> [ {slot:1..3, empty:bool, zooName, year, dateText, money, rankStars, animals, savedAt, finished, playSec} ]`** always 3 entries, read only from the small summaries (cheap, call it every render). For an empty slot only `slot` and `empty:true` are meaningful.
+  `dateText` is `fmt.date` style (`Y3 Mar w2`), `rankStars` is a number 1..10, `savedAt` is ms since 1970, `playSec` is real play time.
+* **`ZCore.slot`**: current slot number, or `null` on the title screen.
+* **`ZCore.newGame(opts)`**: `opts.slot` 1..3 is required from the title (it **overwrites that slot**); without it the current slot, else slot 1. `opts.tutorial: true` sets `S.ui.tutorial = {on:true, step:0}`
+  (otherwise `{on:false, step:0}`). Other opts as before (`zooName`, `staff`, `animal`). It dismisses the title screen and starts play; returns the new state. `S.ui.tutorial` is created for loaded games too
+  (`{on:false, step:0}` if the save has none). Menus owns what `step` means; set it by writing `ZCore.S.ui.tutorial.step = n` then `ZCore.save()` (or it is saved with the next autosave).
+* **`ZCore.loadSlot(n) -> bool`**: loads that slot and starts play (false if empty or unreadable; the title stays up). Dismisses the title screen.
+* **`ZCore.deleteSlot(n)`**: removes the save and its summary. If it is the slot being played, play stops and the title shows again.
+* **`ZCore.save()`**: writes the current slot (and its summary); false on the title screen. **`ZCore.load()`**: reloads the current slot.
+* **`ZCore.toTitle()`**: saves, stops the clock, drops the game from play, closes every screen, shows the title. **`ZCore.showTitle()`** shows it without saving (used at boot).
+* Per-slot: the play-time log, notes and Copy log live inside each save, so they are per slot automatically.
+* **Test shortcuts:** `index.html?play=1` skips the title (loads slot 1 if it exists, else new game in slot 1 with no tutorial). `ZT.newGame(opts)` = new game in slot 1, no tutorial, unless you pass `slot`/`tutorial`.
+  `ZT.title()`, `ZT.slots()`, `ZT.loadSlot(n)`, `ZT.deleteSlot(n)`.
+* Built-in fallback title (only used when `ZMenus.title` is missing): `ZCore.screens.title()`.
+
+## Full screen on phones (round 3)
+
+* `#app` is `position: fixed` and fills the whole viewport (`inset: 0`, background colour extends under the top and bottom safe areas: the strip pads the top inset, the news line pads the bottom inset).
+  The centred 430 px column now only applies to windows wider than 500 px; every phone uses the full width. In Safari, `visualViewport` resize/scroll events set `--app-h` / `--app-top` on `#app` (class `vv`) so the layout follows the visible area as the toolbars show and hide.
+* Panels have 6 px outer margin (was 12). Panel **body** (the scrolling area between the title bar and the Back button), measured in headless browsers with zero safe-area insets, for a screen with a title bar and Back button:
+
+| viewport | body height | body width |
+|---|---|---|
+| 390 x 664 (iPhone 14, Safari) | 428 px | 372 px |
+| 390 x 753 (installed) | 517 px | 372 px |
+| 375 x 553 (small iPhone, Safari) | 325 px | 357 px |
+| 375 x 647 | 411 px | 357 px |
+
+  Modal cards without a title bar or Back button get the extra height. Real devices subtract their top safe-area inset from the strip, so expect a few px less on notched phones than the 753 figure if the 753 already includes it (it was measured as the whole viewport).
+
+## Symbols instead of letters (round 3)
+
+Icon keys come from `ZSprites` (`stat-charm`, `stat-vigor`, `stat-wit`, `skill-care|sci|exp|charm`, `sex-m`, `sex-f`, `juv`, `time`, `visitors`, `odds`, `lock`, `new`, `ok`, `no`, `habitat`, `pen`, `land`, `trophy`, `medal-*`, `grade-*`, `coin`, `rp`). Every helper falls back to a short text label for a key `ZSprites.ICONS` does not list yet.
+
+* `ui.sym(iconKey, {scale = 2, label, text, cls})` inline pixel symbol (`<img class="px sym">`, crisp). `label` becomes alt/title/aria-label (not printed). Fallback text: `text`, else the first 3 letters of `label`, else the key tail.
+* `ui.statChip(iconKey, value, {name, tone})` icon plus number; `name` goes to title and aria-label only. `tone`: `'charm' | 'vigor' | 'wit'` tints the chip.
+* `ui.astat('charm' | 'vigor' | 'wit', value)` and `ui.skillChip('care' | 'sci' | 'exp' | 'charm', value)`: the same, with the icon and display name read from `ZD.ASTAT[key]` / `ZD.SKILL[key]` (defaults used if absent).
+* `ui.grade('a')` grade badge (`grade-a` symbol, text letter if the symbol is missing).
+* `ui.chipRow(items)` items may be nodes, `{icon, value, name?, tone?}` or the old `{label, value, kind}`. `ui.stat({icon, name}, value, kind)` also works. Three stat chips plus a grade fit on one line at 375 px (about 333 px wide, tested).
+* `ui.cost({money, rp, weeks})`: coin, flask and clock symbols with numbers (`<span class="costline">`).
+* Layout note: children of `.pbody` no longer shrink (`flex-shrink: 0`), so a long screen scrolls instead of squashing its rows.
+* Shown in `?demo=1` (list screen: "Symbols"). Tested by `test/shell-shot.js`.

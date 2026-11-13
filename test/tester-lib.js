@@ -17,8 +17,8 @@ async function launch(engine, vp, opts) {
   T.find = (key, msg, shot) => { if (T.findings.some(f => f.key === key)) return; T.findings.push({ key, msg, shot }); console.log('  FINDING [' + key + '] ' + msg + (shot ? '  (' + shot + ')' : '')); };
   T.shot = async name => { const f = 'tester-' + T.tag + '-' + name + '.png'; await page.screenshot({ path: path.join(SHOTS, f) }); T.shots.push(f); return f; };
   T.ev = (fn, arg) => page.evaluate(fn, arg);
-  T.state = () => page.evaluate(() => ({ stack: ZT.stack(), running: ZT.running(), week: ZT.S.week, money: Math.round(ZT.S.money), placing: !!(window.ZRender && ZRender.placing && ZRender.placing()), reports: ZT.S.reports.length, speed: ZCore.speed, errors: ZT.errors.length }));
-  T.goto = async (q) => { await page.goto(URL + (q || '')); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready, null, { timeout: 10000 }); await sleep(500); };
+  T.state = () => page.evaluate(() => ({ stack: ZT.stack(), running: ZT.running(), week: ZT.S ? ZT.S.week : -1, money: ZT.S ? Math.round(ZT.S.money) : 0, placing: !!(window.ZRender && ZRender.placing && ZRender.placing()), reports: ZT.S ? ZT.S.reports.length : 0, speed: ZCore.speed, errors: ZT.errors.length }));
+  T.goto = async (q) => { await page.goto(URL + (q === undefined ? '?play=1' : q)); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready, null, { timeout: 10000 }); await sleep(500); };
   /* find the visible tappable element in the top layer by text. returns centre box */
   T.locate = async (text, o) => {
     o = o || {};
@@ -92,8 +92,8 @@ async function invariants(T, label, o) {
       for (const e of root.querySelectorAll('*')) {
         if (!vis(e)) continue; const cs = getComputedStyle(e);
         if (e.children.length === 0 && e.textContent.trim() && e.scrollWidth > e.clientWidth + 2 && cs.overflow !== 'visible' && cs.display !== 'inline') out.overflow.push((e.textContent).trim().slice(0, 30) + ' sw' + e.scrollWidth + '>cw' + e.clientWidth);
-        if (e.classList && e.classList.contains('chips')) { const kids = [...e.children].filter(vis); const tops = new Set(kids.map(k => Math.round(k.getBoundingClientRect().top))); if (tops.size > 1) out.wrapChips.push(e.innerText.replace(/\s+/g, ' ').slice(0, 40)); }
-        if (e.classList && e.classList.contains('chip')) { const r = e.getBoundingClientRect(); const lh = parseFloat(cs.lineHeight) || 16; if (r.height > lh * 1.9 + 6) out.wrapChips.push('chip wraps: ' + e.innerText.replace(/\s+/g, ' ').slice(0, 30)); }
+        if (e.classList && e.classList.contains('chips')) { const kids = [...e.children].filter(vis); const tl = kids.map(k => k.getBoundingClientRect().top); if (tl.length && Math.max(...tl) - Math.min(...tl) > 12) out.wrapChips.push(e.innerText.replace(/\s+/g, ' ').slice(0, 40)); }
+        if (e.classList && e.classList.contains('chip') && e.textContent.trim()) { const r = e.getBoundingClientRect(); const lh = parseFloat(cs.lineHeight) || 16; if (r.height > lh * 1.9 + 6) out.wrapChips.push('chip wraps: ' + e.innerText.replace(/\s+/g, ' ').slice(0, 30)); }
         const r = e.getBoundingClientRect(); if (r.right > innerWidth + 2 && e.children.length === 0 && e.textContent.trim()) out.offscreen.push('text ' + e.textContent.trim().slice(0, 30) + ' R' + Math.round(r.right));
       } }
     for (const t of document.querySelectorAll('#toasts .toast')) { const r = t.getBoundingClientRect(); out.toasts.push({ text: t.textContent.slice(0, 50), top: Math.round(r.top), bottom: Math.round(r.bottom) }); }
@@ -102,6 +102,18 @@ async function invariants(T, label, o) {
     out.topId = top && top.dataset && top.dataset.id; out.topCls = top && top.className;
     return out;
   });
+
+  // round 3 symbol audit: words and letters that should have become symbols
+  try {
+    const hits = await page.evaluate(() => {
+      const layers = [...document.querySelectorAll('#screens .layer:not([hidden])')]; const top = layers[layers.length - 1]; if (!top) return [];
+      const out = []; const re = /\b(Vigor|Vigour|Wit|Wits|Energy|Smarts|Charm|Care|Science|Scouting|Scout|Hosting|Host|Cha|Vig|Sci|Sco|Male|Female|Adult|Baby|Juvenile|weeks?|wk|Lv|Level)\b/;
+      const w = document.createTreeWalker(top, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { const t = n.nodeValue.replace(/\s+/g, ' ').trim(); if (!t) continue; const e = n.parentElement; if (!e || e.closest('[hidden]')) continue; const r = e.getBoundingClientRect(); if (!r.width || !r.height) continue; const m = t.match(re); if (m) out.push(m[1] + ' :: ' + t.slice(0, 60)); else if (/^[A-F][+-]?$/.test(t) || /^[MF]$/.test(t)) out.push('LETTER :: ' + t); }
+      return out;
+    });
+    T.wordSeen = T.wordSeen || new Set();
+    for (const h of hits) { const k = st.stack.join('>') + ' | ' + h; if (!T.wordSeen.has(k)) { T.wordSeen.add(k); try { fs.appendFileSync(path.join(SHOTS, 'tester-words-' + T.tag + '.log'), k + '\n'); } catch (e) { } } }
+  } catch (e) { /* ignore */ }
   const where = label + ' [' + st.stack.join('>') + ']';
   if (geo.overflowX) T.find('overflowX:' + st.stack.join('>'), 'page scrolls horizontally on ' + where);
   if (geo.small.length) T.find('small:' + st.stack.join('>') + ':' + geo.small[0].slice(0, 20), 'tap target under 44 px on ' + where + ': ' + geo.small.slice(0, 4).join('; '));

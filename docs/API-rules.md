@@ -1,7 +1,7 @@
 # Rules API as built (`data.js` -> `ZD`, `engine.js` -> `ZE`)
 
 Written by the Rules teammate. Everything Menus and Moments need is here. In Node the same objects come from
-`require('./data.js')` and `require('./engine.js')`. Checks: `node test/rules-check.js` (21 checks) and `node test/bot.js 0.8`.
+`require('./data.js')` and `require('./engine.js')`. Checks: `node test/rules-check.js` (22 checks) and `node test/bot.js 0.8`.
 
 ## 0. Ground rules
 
@@ -87,13 +87,47 @@ Written by the Rules teammate. Everything Menus and Moments need is here. In Nod
 `ZE.avg(a)`, `ZE.grade(value) -> 'D'..'SS'`, `ZE.animalLabel(a)` ('Golden Zebra'), `ZE.animalValue(a)` (sale price),
 `ZE.prestige(a)`, `ZE.animalDraw(S, a)`, `ZE.isJuv(S, a)` (under 16 weeks old), `ZE.isSick(S, a)` (off show),
 `ZE.inHab(S, habId)`, `ZE.holding(S)`, `ZE.holdCap(S)`, `ZE.habCap(habItem)`, `ZE.busyAnimals(S) -> {animalId: project}`.
-`ZD.RARITY.name[rarity]`, `ZD.ANIMAL_STATS = {charm:'Charm', vigor:'Vigor', wit:'Wit'}`.
+`ZD.RARITY.name[rarity]`. Stat names and icons: section 2a.
 
 **Staff** `{id, name, role, lvl, xp, care, sci, exp, charm, trainAt, mastered?, star?}`. `ZD.ROLES[role] = {name, main,
-second?, adv?, req?, desc}`, `ZD.STATS = {care:'Care', sci:'Science', exp:'Scouting', charm:'Charm'}`. Helpers:
+second?, adv?, req?, desc}` (`main` and `second` are skill keys). Skill names and icons: section 2a. Helpers:
 `ZE.salary(s)` per week, `ZE.staffCap(S)`, `ZE.busyStaff(S) -> {staffId: project}`, `ZE.freeStaff(S) -> [staff]`,
 `ZE.trainCost(s)`, `ZE.trainWait(S, s)` (weeks until they can train again, 0 = now), `ZE.jobOptions(S, s) -> [{role, lock}]`,
 `ZE.jobCost(s)`, `ZD.JOB_LEVEL` (8).
+
+## 2a. Display names and icons
+
+State field names never change (animals `charm / vigor / wit`, staff `care / sci / exp / charm`). Never hard-code a stat
+name or parse one out of text: read these tables and show the icon.
+
+| Table | Contents |
+|---|---|
+| `ZD.ASTAT` | Animal stats: `{charm:{name:'Charm', icon:'stat-charm'}, vigor:{name:'Energy', icon:'stat-vigor'}, wit:{name:'Smarts', icon:'stat-wit'}}` |
+| `ZD.ASTAT_ORDER` | `['charm', 'vigor', 'wit']` |
+| `ZD.SKILL` | Staff skills: `{care:{name:'Care', icon:'skill-care'}, sci:{name:'Science', icon:'skill-sci'}, exp:{name:'Scouting', icon:'skill-exp'}, charm:{name:'Hosting', icon:'skill-charm'}}` |
+| `ZD.SKILL_ORDER` | `['care', 'sci', 'exp', 'charm']` |
+| `ZD.STATS`, `ZD.ANIMAL_STATS` | Older name-only maps, kept in step with the tables above (`{key: name}`) |
+
+Note the two different `charm` keys: on an animal it is Charm (icon `stat-charm`), on staff it is Hosting (icon `skill-charm`).
+In every field below, **`stat` on an animal-related thing is an animal stat key; `skill` is a staff skill key.**
+
+Where the stat or skill key is carried, so the interface can show the icon:
+
+| Where | Field |
+|---|---|
+| `S.show.stat`, `show` report `.stat`, `showresult` report and `enterShow` result `.stat` | Animal stat the judges score this year |
+| Event `star` choice options `.stat` (plus `.animal`, `.score`, `.gain`); `review` report `.star.stat` | Animal stat of the star; `.score` is the review score it lifts (`ZD.STAT_SCORE` maps stat -> score) |
+| `birth` report `kids[].rolls[].stat` | Animal stat of each roll |
+| Event `boost` choice options 0 and 1: `.skill:'charm'`, `.staff` | **new** The odds come from that person's Hosting |
+| Breeding `watch` choice option 0: `.skill:'care'`, `.staff` | **new** The odds come from that person's Care |
+| `escape` happening option 0: `.skill:'care'`, `.staff` | **new** The odds come from that person's Care |
+| `scholar` happening option 1: `.skill:'sci'`, `.staff`, `.gain` (2) | **new** Who gains what |
+| `train` result `.skill` (same as `.stat`) | **new** Skill trained |
+| `ZD.COURSES[].skill` (same as `.stat`) | **new** Skill a course trains. The charm course is now named 'Hosting Class' |
+| `ZD.ROLES[role].main`, `.second` | Skill keys a role is built on |
+
+Option `note` text still contains the word (for example 'Energy 31: Animals +1.1', 'Ada +2 Science') as a fallback;
+prefer the fields. Themes are not tied to any stat (their fit is per biome, `ZD.THEMES[id].aff`).
 
 ## 3. Read-only lookups (rules the interface must not copy)
 
@@ -134,7 +168,7 @@ second?, adv?, req?, desc}`, `ZD.STATS = {care:'Care', sci:'Science', exp:'Scout
 Data tables to read directly: `ZD.BIOMES[biome] = {name, region, color, hab (build cost), diff, exp, weeks, rp, secret?}`,
 `ZD.BIOME_ORDER`, `ZD.SPECIES[id]`, `ZD.SPECIES_LIST` (68), `ZD.FAC[id] = {name, cost, rp, desc, limit?, landmark?}`,
 `ZD.FAC_ORDER`, `ZD.COMBOS = [{id, name, anchor, needs, hint, draw?|spend?|crowd?|rpMult?}]`, `ZD.THEMES[id] = {name, rp,
-aff, needs?}`, `ZD.THEME_ORDER`, `ZD.TECH`, `ZD.TECH_ORDER`, `ZD.COURSES` (the four training courses `{id, name, stat}`),
+aff, needs?}`, `ZD.THEME_ORDER`, `ZD.TECH`, `ZD.TECH_ORDER`, `ZD.COURSES` (the four training courses `{id, name, stat, skill}`),
 `ZD.SHAPES`, `ZD.SHAPE_NAME`, `ZD.VIPS = [{id, name, when, rep, money, boost}]`, `ZD.YEARLY` (week of year of each
 yearly event), `ZD.YEARLY_NAME`, `ZD.SEASONS`, `ZD.RIVALS`, `ZD.CRITICS`, `ZD.HOF_SCORE` (34), `ZD.HAPPENINGS`, `ZD.WHO`.
 
@@ -168,7 +202,7 @@ All take `S` first (call them through `ZCore.act`). Each lists what it adds to `
 | `advertise` | `tierIndex` into `ZE.hireTiers(S)` | `{cost, candidates}` (also in `S.candidates`). `hireTiers -> [{key, name, cost, note, n, star, lock}]`; `n` = how many turn up, `star` = chance each is a standout, `lock` = '' or 'Rank 3'. Refused when the staff room is full |
 | `hireCandidate` | `index` into `S.candidates` | `{staff}`. No extra fee: the advert was the price |
 | `hireHeadhunt` | none | `{staff}`; costs `ZE.headhuntFee(S.headhunt)` |
-| `train` | `staffId, stat ('care'|'sci'|'exp'|'charm')` | `{gain, super, stat, value, cost}`. `super:true` is the triple result (about 1 in 8) |
+| `train` | `staffId, stat ('care'|'sci'|'exp'|'charm')` | `{gain, super, stat, skill, value, cost}`. `super:true` is the triple result (about 1 in 8) |
 | `changeJob` | `staffId, role` | nothing extra |
 | `fire` | `staffId` | nothing extra |
 
@@ -217,9 +251,9 @@ a `choice` report, check `ZE.project(S, pid)` still exists and still has `.choic
 | | | `river` | Cross (odds; 1 week sooner, or 1 week late) / Go around |
 | Breeding | half way | `vet` | Call the vet (cost; better odds, stronger baby) / Wait and see |
 | | | `diet` | Try it (costRp; rare variant more likely) / Skip it |
-| | | `watch` | Stay up (odds from the lead's Care; stronger baby, or a tired keeper) / Get some sleep |
-| Event | week 1 | `star` | Three options, one per stat: the best Charm animal (lifts Fun), best Wit (Learning), best Vigor (Animals). Each also has `animal` (id), `stat`, `score` ('fun'|'learning'|'animals'), `gain`. Default is option 0 (the biggest gain) |
-| Event | week 2 | `boost` | Go for it (costRp, odds; +1.5 to 2.5 points, flop -1) / Go big (costRp, odds; +3 to 4, flop -2) / No thanks |
+| | | `watch` | Stay up (odds from the lead's Care, `skill:'care'`; stronger baby, or a tired keeper) / Get some sleep |
+| Event | week 1 | `star` | Three options, one per stat: the best Charm animal (lifts Fun), best Smarts (Learning), best Energy (Animals). Each also has `animal` (id), `stat`, `score` ('fun'|'learning'|'animals'), `gain`. Default is option 0 (the biggest gain) |
+| Event | week 2 | `boost` | Go for it (costRp, odds from the lead's Hosting, `skill:'charm'`; +1.5 to 2.5 points, flop -1) / Go big (costRp, odds; +3 to 4, flop -2) / No thanks |
 
 ## 6. Reports (`S.reports`, in the order raised)
 

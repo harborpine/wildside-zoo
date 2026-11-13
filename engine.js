@@ -502,7 +502,7 @@
     s[stat] = clamp(s[stat] + gainN, 1, 99); s.trainAt = S.week;
     if (sup) fx(S, { type: 'super', staff: s.id });
     ev(S, 'train', { role: s.role, stat: stat, gain: gainN, sup: sup, cost: c }); Z.refresh(S);
-    return { ok: true, gain: s[stat] - before, super: sup, stat: stat, value: s[stat], cost: c };
+    return { ok: true, gain: s[stat] - before, super: sup, stat: stat, skill: stat, value: s[stat], cost: c };
   };
   function giveXp(S, s, n) {
     s.xp += n; let ups = 0;
@@ -689,7 +689,7 @@
       const r = Z.sp(a).rarity, key = pick(['vet', 'diet', 'watch']);
       if (key === 'vet') return Object.assign(base, { key: key, title: 'Call the vet?', text: 'A check-up would help.', def: 1, options: [{ label: 'Call the vet', note: 'Better odds, stronger baby', cost: price(D.RARITY.value[r] * (Z.c(S).vet ? 0.12 : 0.25)) }, { label: 'Wait and see' }] });
       if (key === 'diet') return Object.assign(base, { key: key, title: 'Special diet', text: 'The lab has a new feed mix.', def: 1, options: [{ label: 'Try it', note: 'Rare variant more likely', costRp: 5 + r * 5 }, { label: 'Skip it' }] });
-      return Object.assign(base, { key: key, title: 'Night watch', text: first(lead) + ' offers to stay up.', def: 1, options: [{ label: 'Stay up', note: 'Stronger baby, or a tired keeper', odds: clamp(0.4 + lead.care / 150, 0.4, 0.9) }, { label: 'Get some sleep' }] });
+      return Object.assign(base, { key: key, title: 'Night watch', text: first(lead) + ' offers to stay up.', def: 1, options: [{ label: 'Stay up', note: 'Stronger baby, or a tired keeper', odds: clamp(0.4 + lead.care / 150, 0.4, 0.9), skill: 'care', staff: lead.id }, { label: 'Get some sleep' }] });
     }
     if (k === 'star') {
       const an = Z.inHab(S, p.hab).filter(a => !Z.isSick(S, a)); if (!an.length) return null;
@@ -701,8 +701,8 @@
     }
     const o1 = clamp(0.55 + lead.charm / 250, 0.55, 0.9), c1 = 3 + 2 * Z.rank(S);
     return Object.assign(base, { key: 'boost', title: 'A big idea', text: first(lead) + ' wants to try something.', def: 2, options: [
-      { label: 'Go for it', note: '+1.5 to 2.5 points, flop -1', costRp: c1, odds: o1 },
-      { label: 'Go big', note: '+3 to 4 points, flop -2', costRp: Math.round(c1 * 2.5), odds: +(o1 - 0.2).toFixed(2) },
+      { label: 'Go for it', note: '+1.5 to 2.5 points, flop -1', costRp: c1, odds: o1, skill: 'charm', staff: lead.id },
+      { label: 'Go big', note: '+3 to 4 points, flop -2', costRp: Math.round(c1 * 2.5), odds: +(o1 - 0.2).toFixed(2), skill: 'charm', staff: lead.id },
       { label: 'No thanks' }] });
   }
   const starGain = stat => +clamp(0.8 + stat / 100, 0.8, 1.8).toFixed(1);
@@ -899,7 +899,7 @@
       done: (S, h, i) => { if (i === 0) { const a = h.newAnimal; S.animals.push(a); house(S, a); discover(S, a, 'stray'); return [a.name + ' has a new home.', true]; } gain(S, { src: 'happenings', rep: h.d.rep }); return ['A good home was found.', true]; }
     },
     scholar: {
-      make: S => { const s = pick(S.staff), d = { cost: price(0.5 * Z.scale(S)), rp: 3 * Z.rpScale(S), staff: s.id }; return { text: 'A scientist is visiting town.', d: d, def: 1, options: [{ label: 'Fund a study', note: '+' + d.rp + ' research', cost: d.cost }, { label: 'Staff seminar', note: first(s) + ' +2 Science' }] }; },
+      make: S => { const s = pick(S.staff), d = { cost: price(0.5 * Z.scale(S)), rp: 3 * Z.rpScale(S), staff: s.id }; return { text: 'A scientist is visiting town.', d: d, def: 1, options: [{ label: 'Fund a study', note: '+' + d.rp + ' research', cost: d.cost }, { label: 'Staff seminar', note: first(s) + ' +2 ' + D.SKILL.sci.name, skill: 'sci', staff: s.id, gain: 2 }] }; },
       done: (S, h, i) => { if (i === 0) { gain(S, { rp: h.d.rp }); return ['The study paid off.', true]; } const s = Z.staffer(S, h.d.staff) || S.staff[0]; s.sci = clamp(s.sci + 2, 1, 99); return [first(s) + ' took a lot of notes.', true]; }
     },
     coins: {
@@ -935,7 +935,7 @@
     escape: {
       can: S => habsWithAnimals(S).length > 0,
       make: S => { const hb = pick(habsWithAnimals(S)), a = pick(Z.inHab(S, hb.id)), s = S.staff.slice().sort((x, y) => y.care - x.care)[0], d = { staff: s.id, up: repChunk(S, 0.02), down: repChunk(S, 0.01) };
-        return { text: a.name + ' slipped out of the pen.', hab: hb.id, animal: a.id, d: d, def: 1, options: [{ label: 'Send ' + first(s), note: 'Reputation +' + d.up + ', or -' + d.down, odds: clamp(0.45 + s.care / 160, 0.45, 0.95) }, { label: 'All hands', note: 'Safe. Shops -10% for a week' }] }; },
+        return { text: a.name + ' slipped out of the pen.', hab: hb.id, animal: a.id, d: d, def: 1, options: [{ label: 'Send ' + first(s), note: 'Reputation +' + d.up + ', or -' + d.down, odds: clamp(0.45 + s.care / 160, 0.45, 0.95), skill: 'care', staff: s.id }, { label: 'All hands', note: 'Safe. Shops -10% for a week' }] }; },
       done: (S, h, i, win) => { if (i === 0) { if (win) { gain(S, { src: 'happenings', rep: h.d.up }); return ['Coaxed back with a snack. People cheered.', true]; } gain(S, { rep: -h.d.down }); return ['Back safe, after a bit of a chase.', false]; } addMod(S, 'spend', -0.10, 1, 'escape'); return ['Back safe and sound.', true]; }
     },
     powercut: {

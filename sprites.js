@@ -1469,6 +1469,51 @@
     'm-info':     { rows: ['.BBBBB.BBBBB.', 'BWWWWWBWWWWWB', 'BWLLLWBWLLLWB', 'BWWWWWBWWWWWB', 'BWLLLWBWLLLWB', 'BWWWWWBWWWWWB', 'BWLLLWBWLLLWB', 'BWWWWWBWWWWWB', 'BBBBBBBBBBBBB', '.....BBB.....'] },
     'm-system':   { rows: ['.....MMM.....', '..MM.MMM.MM..', '.MMMMMMMMMMM.', '.MMMMMMMMMMM.', '..MMM...MMM..', 'MMMM.....MMMM', 'MMMM.....MMMM', 'MMMM.....MMMM', '..MMM...MMM..', '.MMMMMMMMMMM.', '.MMMMMMMMMMM.', '..MM.MMM.MM..', '.....MMM.....'] }
   };
+  // ---- symbols that replace words in the menus: animal stats, staff skills, and small markers ----
+  (function () {
+    var more = { p: '#fbb4d2', b: '#a8d0fa', U: '#27a898', u: '#8fe0d2', I: '#cfd4de', i: '#f4f6fa', J: '#8f96a8', Z: '#cf8a4c', z: '#f0b880', X: '#7a5230', F: '#fff2c8', v: '#c0a4f4', g: '#3f8f45', H: '#f0a020', A: '#f08a2c', a: '#f8b860', e: '#9aa0b0' }, k;
+    for (k in more) IC[k] = more[k];
+    function sub(rows, map) { return rows.map(function (r) { return r.replace(/[adh]/g, function (c) { return map[c]; }); }); }
+    var MEDAL = ['RR.....BB', '.RR...BB.', '..RR.BB..', '...aaa...', '..aaaaa..', '.aahaaad.', '.ahaaaad.', '.aaaaaad.', '..aaadd..', '...ddd...'];
+    var LET = { S: ['WWWWW', 'W....', 'WWWWW', '....W', 'WWWWW'], A: ['.WWW.', 'W...W', 'WWWWW', 'W...W', 'W...W'], B: ['WWWW.', 'W...W', 'WWWW.', 'W...W', 'WWWW.'], C: ['.WWWW', 'W....', 'W....', 'W....', '.WWWW'], D: ['WWWW.', 'W...W', 'W...W', 'W...W', 'WWWW.'],
+      SS: ['WWW.WWW', 'W...W..', 'WWW.WWW', '..W...W', 'WWW.WWW'] };
+    function rosette(col, dark, letter, ink) { // round ribbon badge; the colour carries the rank, the letter is a bonus
+      var base = ['...aaaaa...', '..aaaaaaa..', '.aaaaaaaaa.', '.aaaaaaaaa.', '.aaaaaaaaa.', '.aaaaaaaaa.', '.aaaaaaaaa.', '..aaaaaaa..', '...aaaaa...', '..dd...dd..', '..dd...dd..', '..d.....d..'];
+      var rows = sub(base, { a: col, d: dark, h: col }).map(function (r) { return r.split(''); }), L = LET[letter], x0 = Math.floor((11 - L[0].length) / 2);
+      L.forEach(function (lr, j) { for (var i = 0; i < lr.length; i++) if (lr.charAt(i) !== '.') rows[2 + j][x0 + i] = ink || 'W'; });
+      return { rows: rows.map(function (r) { return r.join(''); }), flat: true };
+    }
+    var add = {
+      'stat-charm': { rows: ['.....P.....', '.....P.....', '....PpP....', '...PpWpP...', 'PPPpWWWpPPP', '...PpWpP...', '....PpP....', '.....P.....', '.....P...P.', '........PpP', '.........P.'], flat: true },
+      'stat-vigor': { rows: ['.....QYYY', '....QYYY.', '...QYYY..', '..QYYY...', '.QYYYYYYH', '....YYYH.', '...YYYH..', '..YYYH...', '.YYH.....', '.YH......', 'YH.......'], flat: true },
+      'stat-wit':   { rows: ['...BBBBB...', '..BBbbBBB..', '.BBbWbBBBB.', '.BBbBBBBBB.', '.BBBQBQBBB.', '.BBBQQQBBB.', '..BBBQBBB..', '...BBQBB...', '...eeeee...', '...JJJJJ...', '....eee....'], flat: true },
+      'skill-care': { rows: ['..GG.GG..', '..GG.GG..', 'GG.....GG', 'GG.GGG.GG', '..GGGGG..', '.GGGGGGG.', '.GGGGGGG.', '..GG.GG..'] },
+      'skill-sci':  { rows: ['..UUU......', '..UuUU.....', '...UuUU....', '....UuUU...', '.UUUUUUU...', '.U....eU...', '.U.....e...', '.U..XXXXXX.', '.UU........', '..UUUUUUU..', '.UUUUUUUUU.'], flat: true },
+      'skill-exp':  { rows: ['...DDDDD...', '..DFFFFFD..', '.DFFFFRFFD.', 'DFFFFRRFFFD', 'DFFFRRFFFFD', 'DFFFFKFFFFD', 'DFFFFBBFFFD', 'DFFFBBFFFFD', '.DFFBFFFFD.', '..DFFFFFD..', '...DDDDD...'], flat: true },
+      'skill-charm': { rows: ['...VVVVV...', '..VvVvVVV..', '..VVvVvVV..', '..VvVvVVV..', '..VVVVVVV..', '...VVVVV...', '...eeeee...', '....JJJ....', '....JJJ....', '....JJJ....', '....eee....'], flat: true },
+      'sex-m': { rows: ['.....BBBB', '.......BB', '......B.B', '.BBBBB..B', 'BB...BB..', 'B.....B..', 'B.....B..', 'BB...BB..', '.BBBBB...'], flat: true },
+      'sex-f': { rows: ['.PPPPP.', 'PP...PP', 'P.....P', 'P.....P', 'PP...PP', '.PPPPP.', '...P...', '.PPPPP.', '...P...', '...P...'], flat: true },
+      'juv':   { rows: ['...FFF...', '..FFFFF..', '.FFiFFFF.', '.FFFFFFF.', 'FFFFFFFFF', 'FaFFFaFFF', 'aFaFaFaFa', 'FFFaFFFaF', '.FFFFFFF.', '..FFFFF..'] },
+      'time':  { rows: ['...BBBBB...', '..BWWWWWB..', '.BWWWKWWWB.', 'BWWWWKWWWWB', 'BWWWWKWWWWB', 'BWWWWKKKWWB', 'BWWWWWWWWWB', 'BWWWWWWWWWB', '.BWWWWWWWB.', '..BWWWWWB..', '...BBBBB...'], flat: true },
+      'visitors': { rows: ['..TTTTT..', '.TTTTTTT.', '.TSSSSSS.', '.SSKSSKS.', '.SSSSSSS.', '..SSSSS..', '.RRRRRRR.', 'SRRRRRRRS', '.RRRRRRR.', '..BB.BB..', '..BB.BB..'], flat: true },
+      'odds':  { rows: ['.iiiiiiiii.', 'iiiiiiiiiii', 'iiKiiiiiKii', 'iiiiiiiiiii', 'iiiiiiiiiii', 'iiiiiKiiiii', 'iiiiiiiiiii', 'iiiiiiiiiii', 'iiKiiiiiKii', 'IIIIIIIIIII', '.IIIIIIIII.'], flat: true },
+      'lock':  { rows: ['...eeeee...', '..ee...ee..', '..e.....e..', '..e.....e..', '.YYYYYYYYY.', '.YQYYYYYYY.', '.YYYYKYYYY.', '.YYYYKYYYY.', '.YYYYYYYYY.', '.DDDDDDDDD.'], flat: true },
+      'new':   { rows: ['..R..R..R..', '..RR.R.RR..', 'R..RRRRR..R', '.RRRYYYRRR.', '..RYYQYYR..', 'RRRYQQQYRRR', '..RYYQYYR..', '.RRRYYYRRR.', 'R..RRRRR..R', '..RR.R.RR..', '..R..R..R..'], flat: true },
+      'ok':    { rows: ['.........GG', '........GGG', '.......GGG.', 'GG....GGG..', 'GGG..GGG...', '.GGGGGG....', '..GGGG.....', '...GG......'] },
+      'no':    { rows: ['RR.....RR', 'RRR...RRR', '.RRR.RRR.', '..RRRRR..', '...RRR...', '..RRRRR..', '.RRR.RRR.', 'RRR...RRR', 'RR.....RR'] },
+      'habitat': { rows: ['z....z....z', 'T....T....T', 'TzzzzTzzzzT', 'TTTTTTTTTTT', 'T....T....T', 'TzzzzTzzzzT', 'TTTTTTTTTTT', 'T....T....T', 'X....X....X'], flat: true },
+      'pen':   { rows: ['zzzzzzzzzzz', 'zTTTTTTTTTz', 'zTXFFFFFXTz', 'zTFXFFFXFTz', 'zTFFXFXFFTz', 'zTFFFXFFFTz', 'zTFFXFXFFTz', 'zTFXFFFXFTz', 'zTXFFFFFXTz', 'XTTTTTTTTTX', 'XXXXXXXXXXX'], flat: true },
+      'land':  { rows: ['.zzzzzzzzz.', '.zFFFFFFFzT', '.zFGGGGGFzT', '.zFFFFFFFzT', '.zTTTTTTTTT', '.....X.....', '.....X.....', '.....X.....', '.g...X..g..', 'gGg..X.gGg.'], flat: true },
+      'trophy': { rows: ['.YYYYYYYYY.', 'YYQYYYYYYYY', 'Y.YQYYYYY.Y', 'Y.YQYYYYY.Y', '.YYYYYYYYY.', '...YYYYY...', '....YYY....', '.....D.....', '.....D.....', '...DDDDD...', '..DDDDDDD..'], flat: true },
+      'medal-gold':   { rows: sub(MEDAL, { a: 'Y', h: 'Q', d: 'D' }), flat: true },
+      'medal-silver': { rows: sub(MEDAL, { a: 'I', h: 'i', d: 'J' }), flat: true },
+      'medal-bronze': { rows: sub(MEDAL, { a: 'Z', h: 'z', d: 'X' }), flat: true },
+      'grade-ss': rosette('Y', 'R', 'SS', 'X'), 'grade-s': rosette('R', 'Y', 'S'), 'grade-a': rosette('A', 'R', 'A'),
+      'grade-b': rosette('G', 'g', 'B'), 'grade-c': rosette('B', 'L', 'C'), 'grade-d': rosette('J', 'e', 'D')
+    };
+    for (k in add) ICON_DEFS[k] = add[k];
+    ICON_DEFS['cost-rp'] = ICON_DEFS.rp;
+  })();
   var ICONS = Object.keys(ICON_DEFS);
   function drawIcon(name) {
     var d = ICON_DEFS[name], P = new Pt(IC, 32, 32, 16, 24), rows, w, h, y, x;
@@ -1478,7 +1523,7 @@
     if (d.badge) { P.ell(0, -5, 4, 4, d.badge, 1); for (x = -3; x <= 3; x++) if (P.has(x, -1)) P.sh(x, -1, 2); for (x = -4; x <= 4; x++) if (P.has(x, -2) && !P.has(x, -1)) P.sh(x, -2, 2); P.stamp(-2, -7, rows); return P.bake(null); }
     P.stamp(-Math.floor(w / 2), -h, rows);
     // a darker bottom edge on each colour gives the icons a little depth
-    for (y = -h; y < 0; y++) for (x = -8; x <= 8; x++) if (P.has(x, y) && !P.has(x, y + 1) && P.kat(x, y) !== 'W' && P.kat(x, y) !== 'K') P.sh(x, y, 2);
+    for (y = -h; y < 0; y++) for (x = -8; x <= 8; x++) if (!d.flat && P.has(x, y) && !P.has(x, y + 1) && P.kat(x, y) !== 'W' && P.kat(x, y) !== 'K') P.sh(x, y, 2);
     return P.bake(null);
   }
   function icon(name) { return cached('i|' + name, function () { return drawIcon(name); }); }

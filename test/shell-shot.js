@@ -15,7 +15,7 @@ async function run(name) {
   const page = await ctx.newPage(); const consoleErrors = [];
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|Access-Control-Allow-Origin|Not allowed to load local resource/.test(m.text())) consoleErrors.push(m.text()); }); page.on('requestfailed', rq => { const f = rq.url().split('/').pop().split('?')[0]; if (!/^(sprites|render|menus|moments).js$|^manifest/.test(f) && !/^icon/.test(f)) consoleErrors.push('missing file: ' + f); }); page.on('pageerror', e => consoleErrors.push('pageerror: ' + e.message));
   const shot = (n, p) => (p || page).screenshot({ path: path.join(SHOTS, 'shell-' + n + tag + '.png') });
-  await page.goto(URL + '?demo=1'); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready && window.ZDemo, null, { timeout: 8000 });
+  await page.goto(URL + '?demo=1&play=1'); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready && window.ZDemo, null, { timeout: 8000 });
   await page.evaluate(() => ZT.setWeekMs ? 0 : 0); await sleep(400);
   await shot('idle');
   const hasRenderer = await page.evaluate(() => !!(window.ZRender && ZRender.init));
@@ -105,13 +105,13 @@ async function run(name) {
   await page.evaluate(() => { ZT.popAll(); window.ZMoments = window.__m2; });
   // landscape phone shows the turn-upright card and pauses the clock
   const lctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
-  const lp = await lctx.newPage(); await lp.goto(URL); await lp.waitForFunction(() => window.ZT && document.documentElement.dataset.ready); await sleep(300);
+  const lp = await lctx.newPage(); await lp.goto(URL + '?play=1'); await lp.waitForFunction(() => window.ZT && document.documentElement.dataset.ready); await sleep(300);
   check(await lp.evaluate(() => getComputedStyle(document.getElementById('rotate')).display !== 'none' && ZT.running() === false), 'landscape phone: turn-upright card shows and the clock is paused');
   await shot('landscape', lp); await lctx.close();
   // idle shot after reload, then wide-screen desktop
   const dctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   const dp = await dctx.newPage(); dp.on('console', m => { if (m.type() === 'error' && !/Failed to load resource|Access-Control-Allow-Origin|Not allowed to load local resource/.test(m.text())) consoleErrors.push('desktop: ' + m.text()); }); dp.on('pageerror', e => consoleErrors.push('desktop pageerror: ' + e.message));
-  await dp.goto(URL + '?demo=1'); await dp.waitForFunction(() => window.ZT && window.ZDemo && document.documentElement.dataset.ready); await sleep(300);
+  await dp.goto(URL + '?demo=1&play=1'); await dp.waitForFunction(() => window.ZT && window.ZDemo && document.documentElement.dataset.ready); await sleep(300);
   await shot('desktop-idle', dp); await dp.evaluate(() => ZDemo.show('list')); await sleep(300); await shot('desktop-list', dp);
   const box = await dp.evaluate(() => { const r = document.getElementById('app').getBoundingClientRect(); return { x: r.x, w: r.width, h: r.height }; });
   check(box.w <= 431 && Math.abs(box.x - (1280 - box.w) / 2) < 2 && box.h === 800, 'desktop: column is phone-width, centred, full height (' + JSON.stringify(box) + ')');
@@ -119,6 +119,43 @@ async function run(name) {
 
   check(consoleErrors.length === 0 && (await page.evaluate(() => ZT.errors.length)) === 0, 'no console or page errors' + (consoleErrors.length ? ': ' + consoleErrors.slice(0, 3).join(' || ') : ''));
   if (await page.evaluate(() => ZT.errors.length)) console.log('  ZT.errors: ' + JSON.stringify(await page.evaluate(() => ZT.errors)));
+
+  // ---- save slots, title screen, ?play=1, full-screen heights
+  const fresh = async (vp, q, init, doc) => { const c = await browser.newContext({ viewport: vp || { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true }); if (init) await c.addInitScript(init, doc); const p = await c.newPage(); p.on('pageerror', e => consoleErrors.push('pageerror: ' + e.message)); await p.goto(URL + (q || '')); await p.waitForFunction(() => window.ZT && document.documentElement.dataset.ready, null, { timeout: 8000 }); await sleep(300); return { c, p }; };
+  { const { c, p } = await fresh(null, '');
+    check(await p.evaluate(() => ZT.S === null && ZCore.slot === null && ZT.stack().length === 1 && ZT.running() === false), 'title screen shows first (no game in play, clock stopped)');
+    await shot('title', p);
+    check(await p.evaluate(() => ZT.slots().length === 3 && ZT.slots().every(s => s.empty)), 'three empty slots listed');
+    await p.evaluate(() => { ZT.skipReports = true; ZT.newGame({ slot: 1, zooName: 'Alpha' }); ZT.tick(5); ZT.save(); });
+    const s1 = await p.evaluate(() => ({ ...ZT.slots()[0], week: ZT.S.week, stack: ZT.stack().length, slot: ZCore.slot }));
+    check(s1.zooName === 'Alpha' && !s1.empty && s1.stack === 0 && s1.slot === 1 && s1.dateText && s1.rankStars >= 1, 'new game in slot 1 starts play and is listed (' + s1.dateText + ')');
+    await p.evaluate(() => { ZT.newGame({ slot: 2, zooName: 'Beta', tutorial: true }); });
+    const s2 = await p.evaluate(() => ({ a: ZT.slots()[0], b: ZT.slots()[1], tut: ZT.S.ui.tutorial }));
+    check(s2.a.zooName === 'Alpha' && s2.a.savedAt === s1.savedAt && s2.b.zooName === 'Beta' && s2.tut.on === true, 'new game into slot 2 leaves slot 1 untouched and sets the tutorial flag');
+    const rt = await p.evaluate(() => { ZT.title(); const onTitle = ZT.S === null && ZCore.slot === null && ZT.stack().length === 1 && ZT.running() === false; const ok = ZT.loadSlot(1); return { onTitle, ok, week: ZT.S.week, slot: ZCore.slot, stack: ZT.stack().length, tut: ZT.S.ui.tutorial.on, name: ZT.S.zooName }; });
+    check(rt.onTitle && rt.ok && rt.week === s1.week && rt.slot === 1 && rt.stack === 0 && rt.tut === false && rt.name === 'Alpha', 'toTitle then loadSlot round trip restores slot 1 and starts play');
+    const dl = await p.evaluate(() => { ZT.deleteSlot(2); const a = ZT.slots(); ZT.deleteSlot(1); return { two: a[1].empty, one: a[0].empty, slotNow: ZCore.slot, stack: ZT.stack().length, after: ZT.slots()[0].empty }; });
+    check(dl.two && !dl.one && dl.slotNow === null && dl.stack === 1 && dl.after, 'delete slot works; deleting the slot in play returns to the title');
+    const doc = await p.evaluate(() => { ZT.newGame({ slot: 3, zooName: 'Mig' }); ZT.tick(3); ZT.save(); return localStorage.getItem('wildside-zoo-v3-slot3'); });
+    await c.close();
+    const m = await fresh(null, '', d => { if (!sessionStorage.getItem('mig')) { sessionStorage.setItem('mig', '1'); localStorage.setItem('wildside-zoo-v3', d); } }, doc);
+    const mg = await m.p.evaluate(() => ({ s: ZT.slots()[0], old: localStorage.getItem('wildside-zoo-v3'), ok: ZT.loadSlot(1), name: ZT.S && ZT.S.zooName }));
+    check(!mg.s.empty && mg.s.zooName === 'Mig' && mg.old === null && mg.ok && mg.name === 'Mig', 'an old single save is moved into slot 1 once and the old key removed');
+    await m.c.close(); }
+  { const { c, p } = await fresh(null, '?play=1');
+    check(await p.evaluate(() => ZT.S !== null && ZCore.slot === 1 && ZT.stack().length === 0 && ZT.S.ui.tutorial.on === false && !ZT.slots()[0].empty), '?play=1 skips the title: new game in slot 1, no tutorial');
+    await p.evaluate(() => { ZT.skipReports = true; ZT.tick(4); ZT.save(); }); const w = await p.evaluate(() => ZT.S.week);
+    await p.reload(); await p.waitForFunction(() => window.ZT && document.documentElement.dataset.ready); await sleep(300);
+    check(await p.evaluate(w => ZT.S.week === w, w), '?play=1 loads slot 1 when it exists');
+    await c.close(); }
+  for (const [w, h] of [[390, 664], [390, 753], [375, 553], [375, 647]]) {
+    const { c, p } = await fresh({ width: w, height: h }, '?play=1');
+    const r = await p.evaluate(() => { ZCore.push({ id: 'hh', title: 'Title', render() {} }); const b = document.querySelector('.layer:not([hidden]) .pbody'), a = document.getElementById('app').getBoundingClientRect(); return { body: Math.round(b.clientHeight), bodyW: Math.round(b.clientWidth), appW: Math.round(a.width), appH: Math.round(a.height), x: Math.round(a.x) }; });
+    if (w === 375 && h === 647) { const cr = await p.evaluate(() => { const u = ZCore.ui; ZCore.push({ id: 'cr', title: 'T', render(b) { b.appendChild(u.list([{ title: 'Lion', sub: 'x', img: u.icon('m-build').src || null, right: u.sign(2) }])); b.appendChild(u.chipRow([u.astat('charm', 78), u.astat('vigor', 61), u.astat('wit', 49), u.grade('a')])); } }); const c = document.querySelector('.layer:not([hidden]) .chips'), tops = [...c.children].map(x => { const r = x.getBoundingClientRect(); return r.top + r.height / 2; }); return { n: tops.length, one: tops.every(v => Math.abs(v - tops[0]) < 3), fits: c.scrollWidth <= c.clientWidth + 1, w: c.scrollWidth }; });
+      check(cr.n === 4 && cr.one && cr.fits, 'icon chip row (3 stats + grade) fits on one line at 375 px (' + JSON.stringify(cr) + ')'); await shot('icon-chips', p); }
+    console.log('  panel body at ' + w + 'x' + h + ': ' + JSON.stringify(r));
+    check(r.appW === w && r.appH === h && r.x === 0, 'full screen at ' + w + 'x' + h + ': app fills the whole viewport');
+    await c.close(); }
   await browser.close();
 }
 (async () => {

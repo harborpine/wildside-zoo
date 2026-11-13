@@ -11,7 +11,7 @@
   const MAP_ACTIONS = { build: 1, move: 1, remove: 1, upgrade: 1, buyLand: 1 };
   const MAX_CUR_EVENTS = 800, KEEP_DETAIL_QUARTERS = 6, MAX_ARG_LEN = 80;
 
-  let S = null, speed = 1, acc = 0, lastT = 0, lastRunning = null, timer = 0;
+  let S = null, ghost = null, slot = null, speed = 1, acc = 0, lastT = 0, lastRunning = null, timer = 0;
   let busy = null;                          // the report currently on screen (or null)
   let busySince = 0, emptyStackSince = 0, token = 0;
   let skipReports = false, dirtySave = false, saveTimer = 0, saveFailedToast = false;
@@ -94,8 +94,32 @@
     if (!rows || !rows.length) l.appendChild(el('div', { cls: 'empty' }, (o && o.empty) || 'Nothing here yet.'));
     return l;
   }
-  function chipRow(items) { return el('div', { cls: 'chips' }, items); }
-  function stat(label, value, kind) { return el('span', { cls: 'chip' + (kind ? ' ' + kind : '') }, el('b', label), el('span', { cls: 'v' }, value == null ? '?' : String(value))); }
+  function hasIcon(key) { const I = window.ZSprites && ZSprites.ICONS; return !!(I && (Array.isArray(I) ? I.indexOf(key) >= 0 : (key in I))); }
+  function sym(key, o) {   // inline pixel symbol; falls back to a short text label when the sprite does not exist yet
+    o = o || {}; const u = hasIcon(key) ? iconUrl(key, o.scale || 2) : null;
+    if (u) return el('img', { cls: 'px sym' + (o.cls ? ' ' + o.cls : ''), src: u, alt: o.label || '', title: o.label || null, 'aria-label': o.label || null });
+    return el('span', { cls: 'sym txt' + (o.cls ? ' ' + o.cls : ''), title: o.label || null, 'aria-label': o.label || null }, o.text || (o.label ? String(o.label).slice(0, 3) : String(key).split('-').pop().slice(0, 3)));
+  }
+  function statChip(key, value, o) {
+    o = o || {}; const name = o.name || '';
+    return el('span', { cls: 'chip iconchip' + (o.tone ? ' ' + o.tone : ''), title: name || null, 'aria-label': name ? name + ' ' + value : null, role: 'img' }, sym(key, { scale: o.scale || 2, label: name, text: name ? name.slice(0, 3) : null }), el('span', { cls: 'v' }, value == null ? '?' : String(value)));
+  }
+  const DEF_ICON = { charm: 'stat-charm', vigor: 'stat-vigor', wit: 'stat-wit' };
+  function astat(key, value) { const d = window.ZD && ZD.ASTAT && ZD.ASTAT[key]; return statChip((d && d.icon) || DEF_ICON[key] || 'stat-' + key, value, { name: (d && d.name) || key.charAt(0).toUpperCase() + key.slice(1), tone: key }); }
+  function skillChip(key, value) { const d = window.ZD && ZD.SKILL && ZD.SKILL[key]; return statChip((d && d.icon) || 'skill-' + key, value, { name: (d && d.name) || key.charAt(0).toUpperCase() + key.slice(1) }); }
+  function grade(g) { g = String(g || '').toLowerCase(); return el('span', { cls: 'chip iconchip grade', title: 'Grade ' + g.toUpperCase(), role: 'img', 'aria-label': 'Grade ' + g.toUpperCase() }, hasIcon('grade-' + g) ? sym('grade-' + g, { scale: 2, label: 'Grade ' + g.toUpperCase() }) : el('span', { cls: 'v' }, g.toUpperCase())); }
+  function cost(o) {
+    o = o || {}; const w = el('span', { cls: 'costline' });
+    if (o.money != null) w.appendChild(el('span', { cls: 'ci' }, sym('coin', { text: '$', label: 'Money' }), fmt.num(o.money)));
+    if (o.rp != null) w.appendChild(el('span', { cls: 'ci' }, sym('rp', { text: 'RP', label: 'Research' }), fmt.num(o.rp)));
+    if (o.weeks != null) w.appendChild(el('span', { cls: 'ci' }, sym('time', { text: 'wk', label: 'Weeks' }), String(o.weeks)));
+    return w;
+  }
+  function chipRow(items) {
+    return el('div', { cls: 'chips' }, (items || []).map(it => (it && it.nodeType ? it : it && it.icon ? statChip(it.icon, it.value, { name: it.name, tone: it.tone }) : it && it.label != null ? stat(it.label, it.value, it.kind) : it)));
+  }
+  function stat(label, value, kind) {
+    if (label && typeof label === 'object') return statChip(label.icon, value, { name: label.name, tone: kind }); return el('span', { cls: 'chip' + (kind ? ' ' + kind : '') }, el('b', label), el('span', { cls: 'v' }, value == null ? '?' : String(value))); }
   function sign(level) { const k = level == null ? 'q' : ['m2', 'm1', 'p1', 'p2'][Math.max(0, Math.min(3, level | 0))]; return el('span', { cls: 'sg ' + k }, fmt.signs(level)); }
   function stars(n, max) { max = max || 5; const w = el('span', { cls: 'stars', 'aria-label': n + ' of ' + max + ' stars' }); for (let i = 0; i < max; i++) w.appendChild(el('i', { cls: 'star' + (i < n ? '' : ' off') })); return w; }
   function flames(n, max) { max = max || 3; const w = el('span', { cls: 'flames', 'aria-label': n + ' flames' }); for (let i = 0; i < max; i++) w.appendChild(el('i', { cls: 'flame' + (i < n ? '' : ' off') })); return w; }
@@ -143,7 +167,7 @@
       body.appendChild(el('div', { cls: 'btnrow' }, btn(o.no || 'No', () => api.pop(), { cls: 'ghost big' }), btn(o.yes || 'Yes', () => { api.pop(); if (onYes) onYes(); }, { cls: (o.danger ? 'danger' : 'primary') + ' big' })));
     } });
   }
-  const ui = { chipRow, el, btn, grid, list, stat, img, icon, sign, stars, flames, bar, section, note, tabs, reveal, choices, toast, confirm };
+  const ui = { chipRow, statChip, astat, skillChip, grade, sym, cost, el, btn, grid, list, stat, img, icon, sign, stars, flames, bar, section, note, tabs, reveal, choices, toast, confirm };
 
   // ------------------------------------------------------------------ screen stack
   function isRunning() { return !!S && !stack.length && !busy && !placing() && !(LANDSCAPE && LANDSCAPE.matches); }
@@ -226,6 +250,7 @@
     if (!St.fx) St.fx = []; if (!St.reports) St.reports = []; if (!St.elog) St.elog = [];
     if (!St.play) St.play = { sec: 0, bySpeed: [0, 0, 0, 0] };
     if (St.logQ == null) St.logQ = Math.floor((St.week || 0) / 12);
+    if (!St.ui) St.ui = {}; if (!St.ui.tutorial) St.ui.tutorial = { on: false, step: 0 };
     if (!St.glog) St.glog = { cur: [], quarters: [], notes: [] };
   }
   function tele(group, key) { if (!S) return; const t = S.tele[group] || (S.tele[group] = {}); key = String(key).slice(0, 64); t[key] = (t[key] || 0) + 1; }
@@ -305,23 +330,73 @@
 
   // ------------------------------------------------------------------ saving
   function queueSave() { dirtySave = true; if (!saveTimer) saveTimer = setTimeout(() => { saveTimer = 0; if (dirtySave) save(); }, 2500); }
+  const slotKey = n => SAVE_KEY + '-slot' + n, infoKey = n => SAVE_KEY + '-slot' + n + '-info';
+  const okSlot = n => n === 1 || n === 2 || n === 3;
+  function topSpecies(St) {   // the zoo's two most prestigious species (rarity, variants, then stats) for the slot card portraits
+    const best = {}; (St.animals || []).forEach(a => { const sp = D.SPECIES[a.sp]; if (!sp) return; const sc = sp.rarity * 10 + (a.variant ? 5 : 0) + E.avg(a) / 100, b = best[a.sp]; if (!b || sc > b.sc) best[a.sp] = { id: a.sp, sc, v: !!a.variant }; if (a.variant && best[a.sp]) best[a.sp].v = true; });
+    const top = Object.keys(best).map(k => best[k]).sort((x, y) => y.sc - x.sc).slice(0, 2); return { species: top.map(t => t.id), variantFlags: top.map(t => t.v) };
+  }
+  function makeInfo(St, at) { return Object.assign(topSpecies(St), { zooName: St.zooName, year: E.year(St), dateText: fmt.date(St), money: Math.round(St.money), rankStars: Math.max(1, E.rank(St)), animals: St.animals.length, savedAt: at || Date.now(), finished: !!St.finished, playSec: Math.round((St.play && St.play.sec) || 0) }); }
   function save() {
-    if (!S) return false;
+    if (!S || !slot) return false;
     try {
-      const doc = { v: SAVE_V, savedAt: Date.now(), week: S.week, zoo: S.zooName, runId: S.runId, speed, json: E.serialize(S) };
-      localStorage.setItem(SAVE_KEY, JSON.stringify(doc)); dirtySave = false; return true;
+      const at = Date.now(), doc = { v: SAVE_V, savedAt: at, week: S.week, zoo: S.zooName, runId: S.runId, speed, json: E.serialize(S) };
+      localStorage.setItem(slotKey(slot), JSON.stringify(doc)); localStorage.setItem(infoKey(slot), JSON.stringify(makeInfo(S, at))); dirtySave = false; return true;
     } catch (e) { if (!saveFailedToast) { saveFailedToast = true; toast('Could not save on this device', 'bad'); } recordError(e, 'save'); return false; }
   }
-  function load() {
+  function slots() {
+    const out = [];
+    for (let n = 1; n <= 3; n++) {
+      let info = null; try { const raw = localStorage.getItem(infoKey(n)); info = raw ? JSON.parse(raw) : null; } catch (e) { info = null; }
+      out.push(info ? Object.assign({ slot: n, empty: false }, info) : { slot: n, empty: true });
+    }
+    return out;
+  }
+  function migrateOldSave() {
+    try {
+      const old = localStorage.getItem(SAVE_KEY); if (!old) return;
+      let target = 0; for (let n = 1; n <= 3 && !target; n++) if (!localStorage.getItem(slotKey(n))) target = n;
+      if (!target) return;
+      localStorage.setItem(slotKey(target), old);
+      try { const doc = JSON.parse(old), St = E.deserialize(doc.json); if (St) localStorage.setItem(infoKey(target), JSON.stringify(makeInfo(St, doc.savedAt))); else localStorage.removeItem(slotKey(target)); } catch (e) { localStorage.removeItem(slotKey(target)); }
+      localStorage.removeItem(SAVE_KEY);
+    } catch (e) { recordError(e, 'migrate'); }
+  }
+  function loadSlot(n) {
+    if (!okSlot(n)) return false;
     let doc = null;
-    try { const raw = localStorage.getItem(SAVE_KEY); doc = raw ? JSON.parse(raw) : null; } catch (e) { doc = null; }
+    try { const raw = localStorage.getItem(slotKey(n)); doc = raw ? JSON.parse(raw) : null; } catch (e) { doc = null; }
     if (!doc || doc.v !== SAVE_V || typeof doc.json !== 'string') return false;
     let St; try { St = E.deserialize(doc.json); } catch (e) { recordError(e, 'load'); return false; }
     if (!St) return false;
     if (E.SAVE_VERSION && St.v !== E.SAVE_VERSION) return false;
-    S = St; ensureState(S); busy = null; token++; acc = 0;
+    S = St; slot = n; ghost = null; ensureState(S); busy = null; token++; acc = 0;
     if (doc.speed === 1 || doc.speed === 2) speed = doc.speed;
     afterNewState(); return true;
+  }
+  const load = () => (slot ? loadSlot(slot) : false);
+  function deleteSlot(n) {
+    if (!okSlot(n)) return false;
+    try { localStorage.removeItem(slotKey(n)); localStorage.removeItem(infoKey(n)); } catch (e) { /* ignore */ }
+    if (slot === n) { dirtySave = false; toTitle(true); } return true;
+  }
+  function toTitle(noSave) {
+    if (S && !noSave) save();
+    if (S) ghost = S; S = null; slot = null; busy = null; token++; acc = 0; lastRunning = null;
+    popAll(); syncRunning(); updateStrip(); showTitle();
+  }
+  function showTitle() {
+    popAll();
+    if (window.ZMenus && typeof ZMenus.title === 'function') { try { ZMenus.title(); return; } catch (e) { recordError(e, 'ZMenus.title'); } }
+    titleScreen();
+  }
+  function titleScreen() {
+    return push({ id: 'title', modal: true, title: 'Wildside Zoo', render(body) {
+      slots().forEach(sl => {
+        if (sl.empty) body.appendChild(btn('Slot ' + sl.slot + ': new zoo', () => newGame({ slot: sl.slot }), { cls: 'primary big' }));
+        else body.appendChild(el('div', { cls: 'btnrow' }, btn(sl.zooName + ' (' + sl.dateText + ')', () => loadSlot(sl.slot), { cls: 'big', sub: fmt.money(sl.money) }), btn('Delete', () => confirm('Delete slot ' + sl.slot + '?', () => { deleteSlot(sl.slot); rerender(); }, { danger: true, yes: 'Delete' }), { cls: 'danger' })));
+      });
+    } });
   }
   function saveLegacy() { try { localStorage.setItem(LEGACY_KEY, JSON.stringify(legacy)); return true; } catch (e) { return false; } }
   function loadLegacy() { try { const raw = localStorage.getItem(LEGACY_KEY); if (raw) legacy = Object.assign(legacy, JSON.parse(raw)); } catch (e) { /* ignore */ } }
@@ -333,12 +408,15 @@
     lastRunning = null; updateStrip(); syncRunning(); setTimeout(flushReports, 0);
   }
   function newGame(opts) {
+    opts = opts || {}; const sl = okSlot(opts.slot) ? opts.slot : (slot || 1);
     if (S) { try { localStorage.setItem(PREV_LOG_KEY, logText()); } catch (e) { /* ignore */ } }
-    S = E.newGame(legacy, opts || {}); ensureState(S); S.elog = []; acc = 0;
+    S = E.newGame(legacy, opts); slot = sl; ghost = null; ensureState(S); S.ui.tutorial = { on: !!opts.tutorial, step: 0 }; S.elog = []; acc = 0;
     log('start', { zoo: S.zooName, ng: S.ng }); afterNewState(); save(); return S;
   }
+  const curView = () => (S || ghost), S0 = () => S;
   function updateStrip() {
-    if (!S || !$strip) return;
+    document.body.classList.toggle('title-on', !window.ZCore || !S0());
+    const S = curView(); if (!S || !$strip) return;
     $date.textContent = fmt.date(S); $money.textContent = fmt.money(S.money); $money.className = 'v' + (S.money < 0 ? ' neg' : '');
     $vis.textContent = fmt.num(S.visitorsLast || 0) + '/wk';
     const max = D.RANK_REP.length, rk = Math.max(1, E.rank(S)); const ex = $stars.getAttribute('data-n');
@@ -378,7 +456,7 @@
 
   // ------------------------------------------------------------------ boot and hooks
   function openMenu() {
-    if (stack.length || busy || placing()) return;
+    if (!S || stack.length || busy || placing()) return;
     if (window.ZMenus && typeof ZMenus.open === 'function') { try { ZMenus.open(); } catch (e) { recordError(e, 'ZMenus.open'); } return; }
     push({ id: 'menu', title: 'Menu', backLabel: 'Play', render(body, api) {
       body.appendChild(note('The real menu goes here.'));
@@ -398,6 +476,8 @@
     document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && stack.length && !stack[stack.length - 1].modal) pop(); });
     document.addEventListener('gesturestart', ev => ev.preventDefault());
     document.addEventListener('contextmenu', ev => { if (!/^(TEXTAREA|INPUT)$/.test(ev.target.tagName)) ev.preventDefault(); });
+    const vvFix = () => { const v = window.visualViewport, app = $('app'); if (!v || !app) return; app.style.setProperty('--app-h', Math.round(v.height) + 'px'); app.style.setProperty('--app-top', Math.round(v.offsetTop) + 'px'); app.classList.add('vv'); };
+    if (window.visualViewport) { visualViewport.addEventListener('resize', vvFix); visualViewport.addEventListener('scroll', vvFix); vvFix(); }
     document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else lastT = performance.now(); });
     window.addEventListener('pagehide', () => save());
   }
@@ -410,26 +490,27 @@
     try { const P = window.ZSprites && ZSprites.PALETTE; if (!P) return; const m = { blue: '--blue', blueDark: '--blue-d', gold: '--gold', goldDark: '--gold-d', bad: '--red', good: '--green', goodDark: '--green-d' }, st = document.documentElement.style; for (const k in m) if (typeof P[k] === 'string') st.setProperty(m[k], P[k]); } catch (e) { /* keep css defaults */ }
   }
   function boot() {
-    applyTheme(); build(); loadLegacy();
-    if (!load()) newGame({});
-    const r = R(); if (r) { try { r.init($floor, { getState: () => S, onTap: onFloorTap }); if (r.mapChanged) r.mapChanged(); } catch (e) { recordError(e, 'ZRender.init'); } }
+    applyTheme(); build(); loadLegacy(); migrateOldSave();
+    try { ghost = E.newGame(legacy, {}); ensureState(ghost); } catch (e) { recordError(e, 'ghost'); }
+    const r = R(); if (r) { try { r.init($floor, { getState: () => S || ghost, onTap: onFloorTap }); if (r.mapChanged) r.mapChanged(); } catch (e) { recordError(e, 'ZRender.init'); } }
     else { placeholderFloor(); $floor.addEventListener('click', () => onFloorTap({})); window.addEventListener('resize', placeholderFloor); }   // no renderer yet: plain green floor, tap still opens the menu
     lastT = performance.now(); lastRunning = null; updateStrip(); syncRunning();
     timer = setInterval(loop, 50); document.documentElement.setAttribute('data-ready', '1');
+    if (/[?&]play=1/.test(location.search)) { if (!loadSlot(1)) newGame({ slot: 1 }); } else setTimeout(showTitle, 0);
   }
 
   const Core = {
     version: '0.1', devTools: DEV_TOOLS, fmt, ui, WEEK_MS, errors,
-    get S() { return S; }, get speed() { return speed; }, get legacy() { return legacy; }, get busy() { return !!busy; },
-    newGame, save, load, setSpeed, act, push, pop, popAll, replace, rerender, stack: () => stack.map(e => e.id), top: () => (stack.length ? stack[stack.length - 1].api : null),
+    get S() { return S; }, get slot() { return slot; }, get speed() { return speed; }, get legacy() { return legacy; }, get busy() { return !!busy; },
+    newGame, save, load, slots, loadSlot, deleteSlot, toTitle, showTitle, setSpeed, act, push, pop, popAll, replace, rerender, stack: () => stack.map(e => e.id), top: () => (stack.length ? stack[stack.length - 1].api : null),
     openMenu, onReport, flushReports, running: isRunning, saveLegacy,
     log, logText, copyLog, downloadLog, addNote, updateStrip, weekProgress: () => (WEEK_MS[speed] ? Math.min(1, acc / WEEK_MS[speed]) : 0),
-    screens: { log: logScreen }, toast, boot
+    screens: { log: logScreen, title: titleScreen }, toast, boot
   };
   window.ZCore = Core;
   window.ZT = {
     get skipReports() { return skipReports; }, set skipReports(v) { skipReports = !!v; },
-    get S() { return S; }, errors, stack: Core.stack, act, newGame, openMenu, running: isRunning, setSpeed, WEEK_MS,
+    get S() { return S; }, errors, stack: Core.stack, act, newGame, openMenu, running: isRunning, slots, loadSlot, deleteSlot, title: toTitle, setSpeed, WEEK_MS,
     tick(n) { for (let i = 0; i < (n || 1); i++) doTick(); return S ? S.week : 0; },
     popAll, flush: flushReports, logText, save, load
   };

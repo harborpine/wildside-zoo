@@ -6,7 +6,7 @@
 const path = require('path'), fs = require('fs');
 const { chromium } = require('./pw.js');
 const BIOMES = ['savanna', 'jungle', 'desert', 'arctic', 'mountain', 'ocean', 'paleo', 'mythic'];
-const ALL = BIOMES.map(b => 'animals-' + b).concat(['people', 'tiles', 'fences', 'buildings', 'extras', 'patch', 'scene', 'scene2']);
+const ALL = BIOMES.map(b => 'animals-' + b).concat(['people', 'tiles', 'fences', 'buildings', 'extras', 'icons2', 'patch', 'scene', 'scene2']);
 (async () => {
   const want = process.argv.slice(2).length ? process.argv.slice(2) : ALL;
   const out = path.join(__dirname, 'shots'); fs.mkdirSync(out, { recursive: true });

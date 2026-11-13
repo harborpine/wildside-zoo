@@ -212,6 +212,24 @@ check('bot: 20 years at skills 0.3, 0.6, 0.8 and 1.0', () => {
   return [0.3, 0.6, 0.8, 1].map(s => { const r = bot(s, false); ok(r.S.finished && r.rows.length === 20); ok(r.rows.every(h => h.money > -1e5), 'deep debt'); return s + ': ' + r.S.score.total; }).join(', ');
 });
 
+check('display names and icons: tables match the state keys, no old stat words in player text', () => {
+  const S = Z.newGame();
+  eq(D.ASTAT_ORDER, ['charm', 'vigor', 'wit']); eq(D.SKILL_ORDER, ['care', 'sci', 'exp', 'charm']);
+  D.ASTAT_ORDER.forEach(k => { ok(typeof S.animals[0][k] === 'number'); ok(D.ASTAT[k].name && D.ASTAT[k].icon === 'stat-' + k); eq(D.ANIMAL_STATS[k], D.ASTAT[k].name); });
+  D.SKILL_ORDER.forEach(k => { ok(typeof S.staff[0][k] === 'number'); ok(D.SKILL[k].name && D.SKILL[k].icon === 'skill-' + k); eq(D.STATS[k], D.SKILL[k].name); });
+  eq([D.ASTAT.vigor.name, D.ASTAT.wit.name, D.SKILL.charm.name], ['Energy', 'Smarts', 'Hosting']);
+  D.COURSES.forEach(c => { ok(D.SKILL[c.skill] && c.skill === c.stat); });
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'engine.js'), 'utf8') + require('fs').readFileSync(require('path').join(__dirname, '..', 'data.js'), 'utf8');
+  const hits = src.split(String.fromCharCode(10)).filter(line => /'[^']*\b(Vigor|Wit)\b[^']*'/.test(line.split(' // ')[0])); eq(hits, [], 'old stat words in strings');
+  S.rp = 100; const pid = Z.startEvent(S, S.items[0].id, 'feeding', S.staff[0].id).pid; tickN(S, 1);
+  const star = Z.project(S, pid).choice; star.options.forEach(o => { ok(D.ASTAT[o.stat], 'star option carries the stat key'); ok(o.note.indexOf(D.ASTAT[o.stat].name) === 0); });
+  Z.resolveChoice(S, pid, 0); tickN(S, 1); const boost = Z.project(S, pid).choice; eq([boost.options[0].skill, boost.options[1].skill], ['charm', 'charm']); ok(Z.staffer(S, boost.options[0].staff));
+  Z.debug.happening(S, 'scholar'); eq(S.happening.options[1].skill, 'sci'); ok(S.happening.options[1].note.indexOf('Science') > 0);
+  Z.debug.happening(S, 'escape'); eq(S.happening.options[0].skill, 'care'); ok(Z.staffer(S, S.happening.options[0].staff));
+  Z.debug.yearly(S, 'show'); ok(D.ASTAT[S.show.stat]); ok(D.ASTAT[S.reports.filter(r => r.type === 'show').pop().stat]);
+  S.money = 1e6; const tr = Z.train(S, S.staff[1].id, 'charm'); eq(tr.skill, 'charm');
+});
+
 check('short labels', () => {
   const long = [];
   const see = (s, max, where) => { if (s && s.length > max) long.push(where + ': ' + s); };

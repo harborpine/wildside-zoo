@@ -34,12 +34,26 @@
     if (hab == null) return 'Holding pen';
     const it = E.item(S(), hab); return it ? E.habName(S(), it) : 'Holding pen';
   }
+  // Symbols instead of words for stats and skills (names and icon keys come from ZD.ASTAT / ZD.SKILL when they exist).
+  const hasIcon = n => { try { const p = SPR(); return !!(p && p.ICONS && p.ICONS.indexOf(n) >= 0); } catch (e) { return false; } };
+  const ASTAT_FB = { charm: { name: 'Charm', icon: 'stat-charm' }, vigor: { name: 'Energy', icon: 'stat-vigor' }, wit: { name: 'Smarts', icon: 'stat-wit' } };
+  const SKILL_FB = { care: { name: 'Care', icon: 'skill-care' }, sci: { name: 'Science', icon: 'skill-sci' }, exp: { name: 'Scouting', icon: 'skill-exp' }, charm: { name: 'Hosting', icon: 'skill-charm' } };
+  const ASTAT = k => (D.ASTAT && D.ASTAT[k]) || ASTAT_FB[k] || { name: String(k), icon: 'star' };
+  const SKILL = k => (D.SKILL && D.SKILL[k]) || SKILL_FB[k] || { name: String(k), icon: 'star' };
+  // A symbol: the pixel icon if it exists, otherwise a one-letter stand-in (only until the art lands).
+  function sym(icon, fb, name, scale) {
+    const u = hasIcon(icon) ? iUrl(icon, scale || 3) : null;
+    const e = u ? el('img', { cls: 'px mo-symg', src: u, alt: name || '' }) : el('span', { cls: 'mo-symt' }, fb || '');
+    return el('span', { cls: 'mo-sym', title: name || '' }, e);
+  }
+  const astatSym = k => sym(ASTAT(k).icon, ASTAT(k).name.charAt(0), ASTAT(k).name);
+  const skillSym = k => sym(SKILL(k).icon, SKILL(k).name.charAt(0), SKILL(k).name);
   function chip(icon, text, cls) { return el('span', { cls: 'mo-chip' + (cls ? ' ' + cls : '') }, icon ? pic(iUrl(icon, 3), 'mo-cico') : null, el('b', text)); }
   function stats3(a, st) {   // three big stat boxes with numbers that count up
     const row = el('div', { cls: 'mo-stats' });
-    [['charm', 'Charm'], ['vigor', 'Vigor'], ['wit', 'Wit']].forEach((k, i) => {
+    [['charm'], ['vigor'], ['wit']].forEach((k, i) => {
       const num = el('span', { cls: 'mo-snum' }, st && !st.instant ? '0' : String(a[k[0]] == null ? '?' : a[k[0]]));
-      const box = el('div', { cls: 'mo-stat ' + k[0] }, el('i', k[1]), num);
+      const box = el('div', { cls: 'mo-stat ' + k[0] }, el('i', astatSym(k[0])), num);
       if (st) { st.anim(box, st.t(950 + i * 160)); if (a[k[0]] != null) st.count(num, a[k[0]], st.t(500), st.t(1050 + i * 160)); }
       row.appendChild(box);
     });
@@ -86,6 +100,12 @@
 .mo-snum { font-size: 28px; padding: 5px 0 6px; line-height: 1; }
 .mo-grade { position: absolute; top: 0; right: 0; min-width: 30px; padding: 3px 7px; font-size: 16px; background: var(--ink); color: var(--gold); box-shadow: 0 0 0 2px #000; }
 .mo-rare { background: #fff3b8; box-shadow: 0 -3px 0 0 var(--gold-d), 0 3px 0 0 var(--gold-d), -3px 0 0 0 var(--gold-d), 3px 0 0 0 var(--gold-d), inset 0 0 0 4px var(--gold); padding: 10px 6px 6px; margin: 3px 0; }
+.mo-sym { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; } .mo-symg { height: 20px; width: auto; image-rendering: pixelated; } .mo-symt { font-size: 12px; }
+.mo-stat i .mo-symg, .mo-roll .nm .mo-symg { height: 22px; } .mo-m b .mo-symg { height: 14px; } .mo-line .mo-symg { height: 22px; }
+.mo-roll .nm { width: 44px; text-align: center; padding: 3px 0; display: flex; justify-content: center; }
+.mo-chip.main { box-shadow: 0 0 0 3px var(--blue); }
+.mo-medalbox { min-width: 62px; text-align: center; display: inline-flex; justify-content: center; } .mo-medalbox .mo-symg { height: 36px; } .mo-bigmedal .mo-symg { height: 96px; }
+.mo-odds .mo-symg { height: 16px; }
 .mo-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .mo-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--paper); padding: 4px 10px 4px 6px; min-height: 32px; font-size: 16px; box-shadow: 0 0 0 2px var(--bd); }
 .mo-chip img { height: 22px; width: auto; image-rendering: pixelated; }
@@ -307,7 +327,7 @@
       if (o.kicker) card.appendChild(el('div', { cls: 'mo-kicker' }, o.kicker));
       if (o.img) card.appendChild(st.anim(el('div', { cls: 'mo-pic' + (o.imgCls ? ' ' + o.imgCls : '') }, o.img.nodeType ? o.img : pic(o.img)), 0));
       if (o.title) card.appendChild(st.anim(el('div', { cls: 'mo-title' }, o.title), 100));
-      if (o.big != null) { const b = el('div', { cls: 'mo-big' }, ''); card.appendChild(st.anim(b, 180)); if (typeof o.big === 'number') st.count(b, o.big, 700, 250, o.bigFmt); else b.textContent = o.big; }
+      if (o.big != null) { const b = el('div', { cls: 'mo-big' }, ''); card.appendChild(st.anim(b, 180)); if (typeof o.big === 'number') st.count(b, o.big, 700, 250, o.bigFmt); else if (o.big.nodeType) b.appendChild(o.big); else b.textContent = o.big; }
       if (o.stars != null) { const s = ui.stars(o.stars, o.starsMax || o.stars); s.classList.add('big'); card.appendChild(st.anim(el('div', { cls: 'mo-stars' }, s), 200)); }
       (o.lines || []).forEach((l, k) => { if (l == null || l === '') return; card.appendChild(st.anim(l.nodeType ? l : el('div', { cls: 'mo-line' + (k === 0 && !o.title ? ' hi' : '') }, l), 300 + k * 90)); });
       if (o.chips && o.chips.length) card.appendChild(st.anim(el('div', { cls: 'mo-chips' }, o.chips), 450));
@@ -411,7 +431,7 @@
     spec.valid = () => { const h = S().happening; return !!(h && h.key === rep.key && h.options); };
     spec.resolve = i => Z.act('resolveHappening', i);
     // the stray: show its numbers so the choice is informed
-    if (rep.newAnimal) spec.pre = body => { const a = rep.newAnimal; body.appendChild(el('div', { cls: 'mo-line center', style: { textAlign: 'center' } }, animalName(a) + '  ' + rarityName(spOf(a.sp).rarity))); body.appendChild(stats3(a)); };
+    if (rep.newAnimal) spec.pre = body => { const a = rep.newAnimal; body.appendChild(el('div', { cls: 'mo-line center', style: { textAlign: 'center' } }, animalName(a))); body.appendChild(stats3(a)); };
     return choiceScreen(spec, done);
   }
 
@@ -434,7 +454,7 @@
           const val = el('span', { cls: 'val' }, st.instant ? String(ro.value) : '0');
           const d = ro.delta != null ? ro.delta : (ro.value - ro.parents);
           const dl = el('span', { cls: 'dl ' + (ro.lucky ? '' : d >= 0 ? 'up' : 'dn') }, ro.lucky ? 'LUCKY ' + sgn(Math.round(d)) : sgn(Math.round(d)));
-          const row = el('div', { cls: 'mo-roll' + (ro.lucky ? ' lucky' : '') }, el('span', { cls: 'nm ' + ro.stat }, ro.stat === 'charm' ? 'Charm' : ro.stat === 'vigor' ? 'Vigor' : 'Wit'), el('span', { cls: 'par' }, 'parents ' + Math.round(ro.parents)), val, dl);
+          const row = el('div', { cls: 'mo-roll' + (ro.lucky ? ' lucky' : '') }, el('span', { cls: 'nm ' + ro.stat }, astatSym(ro.stat)), el('span', { cls: 'par' }, 'parents ' + Math.round(ro.parents)), val, dl);
           const t0 = T(450 + j * 380);
           st.anim(row, t0); st.count(val, ro.value, T(380), t0 + 120);
           if (!st.instant) { dl.style.visibility = 'hidden'; st.at(t0 + 420, () => { dl.style.visibility = ''; dl.classList.add('mo-in'); }); }
@@ -444,7 +464,7 @@
         const vc = kid.variantChance != null ? Math.round(kid.variantChance * 1000) / 10 : null;
         if (vc != null) {
           const res = el('span', { cls: 'dl ' + (kid.variant ? 'up' : '') }, kid.variant ? 'YES!' : 'no');
-          const row = el('div', { cls: 'mo-roll' + (kid.variant ? ' lucky' : '') }, el('span', { cls: 'nm var' }, 'Rare'), el('span', { cls: 'par' }, 'chance ' + vc + '%'), el('span', { cls: 'val', style: { fontSize: '16px', flex: '1' } }, kid.variant ? (spOf(kid.sp || r.sp).variant || 'Rare variant') : ''), res);
+          const row = el('div', { cls: 'mo-roll' + (kid.variant ? ' lucky' : '') }, el('span', { cls: 'nm var' }, sym('star', '*', 'rare variant')), el('span', { cls: 'par' }, sym('odds', '', 'chance'), ' ' + vc + '%'), el('span', { cls: 'val', style: { fontSize: '16px', flex: '1' } }, kid.variant ? (spOf(kid.sp || r.sp).variant || 'Rare variant') : ''), res);
           const t0 = T(450 + 3 * 380 + 120); st.anim(row, t0);
           if (!st.instant) { res.style.visibility = 'hidden'; st.at(t0 + 450, () => { res.style.visibility = ''; res.classList.add('mo-in'); }); }
           rolls.appendChild(row);
@@ -588,7 +608,7 @@
 
   // ------------------------------------------------------------------ callers (trader, director, headhunter)
   function mini(a) {   // three stat numbers on one line
-    return el('span', { cls: 'mo-mini' }, [['charm', 'C', a.charm], ['vigor', 'V', a.vigor], ['wit', 'W', a.wit]].map(k => el('span', { cls: 'mo-m ' + k[0] }, el('b', k[1]), String(k[2]))));
+    return el('span', { cls: 'mo-mini' }, [['charm', a.charm], ['vigor', a.vigor], ['wit', a.wit]].map(k => el('span', { cls: 'mo-m ' + k[0] }, el('b', astatSym(k[0])), String(k[1]))));
   }
   function offerRow(o, i, M) {
     const a = o.a, s = spOf(a.sp), poor = S().money < o.price;
@@ -609,7 +629,7 @@
       const r = Z.act('openCrate'); if (r && r.ok) revealCrate(r, () => M.rerender());
     }, { cls: 'blue', sub: fmt.money(info.cost), disabled: S().money < info.cost });
     return el('div', { cls: 'mo-row' }, el('div', { cls: 'mo-pic' }, el('div', { cls: 'mo-crate mini' })),
-      el('div', { cls: 'mid' }, el('span', { cls: 't' }, 'Mystery crate' + (info.left > 1 ? ' x' + info.left : '')), el('span', { cls: 's' }, odds)), open);
+      el('div', { cls: 'mid' }, el('span', { cls: 't' }, 'Mystery crate' + (info.left > 1 ? ' x' + info.left : '')), el('span', { cls: 's' }, sym('odds', '', 'odds'), ' ' + odds)), open);
   }
   function callerMoment(kind, done, quiet) {
     const s = S();
@@ -626,7 +646,7 @@
         const R = D.ROLES[h.role] || { name: h.role, main: 'care' }, fee = E.headhuntFee(h), full = st.staff.length >= E.staffCap(st), poor = st.money < fee;
         const card = el('div', { cls: 'mo-card' }, el('div', { cls: 'mo-kicker' }, 'The headhunter'),
           el('div', { cls: 'mo-pic small' }, pic(pUrl(h.role, 5))), el('div', { cls: 'mo-title' }, h.name), el('div', { cls: 'mo-line hi' }, R.name + ' · level ' + (h.lvl || 1)),
-          el('div', { cls: 'mo-chips' }, [['care', 'Care'], ['sci', 'Sci'], ['exp', 'Scout'], ['charm', 'Charm']].map(k => ui.stat(k[1], h[k[0]], R.main === k[0] ? 'wit' : '')) ),
+          el('div', { cls: 'mo-chips' }, ['care', 'sci', 'exp', 'charm'].map(k => el('span', { cls: 'mo-chip' + (R.main === k ? ' main' : '') }, skillSym(k), el('b', String(h[k]))))),
           el('div', { cls: 'mo-line' }, fmt.money(E.salary(h)) + ' a week · fee ' + fmt.money(fee)));
         body.appendChild(card);
         M.foot(ui.btn('Hire for ' + fmt.money(fee), () => {
@@ -677,21 +697,23 @@
     } }]), done);
   }
 
+  function medalSym(m, scale) { return sym('medal-' + m, m.charAt(0).toUpperCase(), m, scale || 3); }
+  function medalSpan(m, n) { return el('span', medalSym(m), ' ' + (n == null ? '?' : n)); }
   function showPicker(done) {
     const s0 = S();
     if (!s0.show) { ui.toast('The show is not on right now'); once(done)(); return null; }
     return open('mo-show', (body, M) => {
       const s = S(), sh = s.show; if (!sh) { M.end(); return; }
-      const label = { charm: 'Charm', vigor: 'Vigor', wit: 'Wit' }[sh.stat] || sh.stat, med = E.showMedals(s);
+      const med = E.showMedals(s);
       M.head(el('div', { cls: 'mo-card', style: { padding: '8px 10px 4px' } }, el('div', { cls: 'mo-pic tiny' }, pic(pUrl('showrunner', 5) || iUrl('star', 8))),
-        el('div', { cls: 'mo-line hi' }, 'Judges want ' + label + '. Pick one animal.'),
-        el('div', { cls: 'mo-odds' }, el('span', 'Gold ' + (med ? med.gold : '?')), el('span', 'Silver ' + (med ? med.silver : '?')), el('span', 'Bronze ' + (med ? med.bronze : '?')))));
+        el('div', { cls: 'mo-line hi' }, 'Judges', ' ', astatSym(sh.stat)),
+        el('div', { cls: 'mo-odds' }, medalSpan('gold', med && med.gold), medalSpan('silver', med && med.silver), medalSpan('bronze', med && med.bronze))));
       const rows = el('div', { cls: 'mo-rows' });
       s.animals.slice().sort((a, b) => E.showScore(s, b) - E.showScore(s, a)).slice(0, 12).forEach(a => {
         const m = E.showMedal(s, a), sc = Math.round(E.showScore(s, a));
         const row = el('div', { cls: 'mo-row tap' }, el('div', { cls: 'mo-pic' }, pic(aUrl(a.sp, { variant: !!a.variant }, 3))),
-          el('div', { cls: 'mid' }, el('span', { cls: 't' }, a.name), el('span', { cls: 's', style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, animalName(a)), el('span', { cls: 's' }, label + ' ' + a[sh.stat] + ' · score ' + sc)),
-          el('span', { cls: 'mo-medal ' + (m || 'none'), style: { fontSize: '14px', padding: '4px 6px', minWidth: '66px', textAlign: 'center', boxShadow: '0 0 0 2px var(--bd)' } }, m ? m : 'none'));
+          el('div', { cls: 'mid' }, el('span', { cls: 't' }, a.name), el('span', { cls: 's', style: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, animalName(a)), el('span', { cls: 's' }, astatSym(sh.stat), ' ' + a[sh.stat] + ' · ' + sc)),
+          el('span', { cls: 'mo-medalbox' }, m ? medalSym(m, 4) : '-'));
         row.addEventListener('click', () => ui.confirm('Enter ' + a.name + '?', () => { const r = Z.act('enterShow', a.id); if (r && r.ok) M.end(); }, { yes: 'Enter' }));
         rows.appendChild(row);
       });
@@ -703,18 +725,17 @@
     const a = E.animal(S(), r.animal), m = r.medal, chips = [];
     if (r.money) chips.push(chip('coin', moneyOf(r.money))); if (r.rep) chips.push(chip('rep', sgn(Math.round(r.rep))));
     if (r.trophy) chips.push(chip('star', 'Trophy'));
-    const lab = { charm: 'Charm', vigor: 'Vigor', wit: 'Wit' }[r.stat] || '';
     return open('mo-showresult', (body, M) => sequence(M, body, [{ ms: 1300, anim: 1200, render(card, st) {
-      card.appendChild(el('div', { cls: 'mo-kicker' }, 'Winter Animal Show · ' + lab));
+      card.appendChild(el('div', { cls: 'mo-kicker' }, 'Winter Animal Show ', astatSym(r.stat)));
       if (a) card.appendChild(el('div', { cls: 'mo-pic small' }, pic(aUrl(a.sp, { variant: !!a.variant }, 4))));
       card.appendChild(el('div', { cls: 'mo-title' }, a ? a.name : 'Your animal'));
       const sc = el('div', { cls: 'mo-big' }, ''); card.appendChild(sc); st.count(sc, Math.round(r.score || 0), 900, 100);
-      card.appendChild(el('div', { cls: 'mo-line' }, 'gold needs ' + (r.medals ? r.medals.gold : r.bar)));
+      card.appendChild(el('div', { cls: 'mo-line' }, medalSym('gold'), ' ' + (r.medals ? r.medals.gold : r.bar)));
     } }, { anim: 500, render(card, st) {
       card.classList.add(m ? 'mo-gold' : 'mo-x'); if (m === 'gold') card.classList.add('mo-rare');
       if (a) card.appendChild(el('div', { cls: 'mo-pic small' }, pic(aUrl(a.sp, { variant: !!a.variant }, 4))));
-      card.appendChild(st.anim(el('div', { cls: 'mo-medal ' + (m || 'none') }, m ? m.toUpperCase() : 'No medal'), 0));
-      card.appendChild(el('div', { cls: 'mo-line' }, 'Score ' + Math.round(r.score || 0) + ' · gold needs ' + (r.medals ? r.medals.gold : r.bar)));
+      card.appendChild(st.anim(m ? el('div', { cls: 'mo-bigmedal' }, medalSym(m, 8)) : el('div', { cls: 'mo-medal none' }, 'No medal'), 0));
+      card.appendChild(el('div', { cls: 'mo-line' }, Math.round(r.score || 0) + ' / ', medalSym('gold'), ' ' + (r.medals ? r.medals.gold : r.bar)));
       card.appendChild(st.anim(el('div', { cls: 'mo-chips' }, chips), 200));
       card.appendChild(hint());
     } }]), done);
@@ -853,9 +874,9 @@
         card.appendChild(st.anim(el('div', { cls: 'mo-line hi' }, R.name + (c.star ? '' : '')), T(650)));
         if (c.star) card.appendChild(st.anim(el('span', { cls: 'mo-tag gold' }, 'Standout!'), T(750)));
         const row = el('div', { cls: 'mo-stats' });
-        [['care', 'Care'], ['sci', 'Sci'], ['exp', 'Scout'], ['charm', 'Charm']].forEach((q, j) => {
+        [['care'], ['sci'], ['exp'], ['charm']].forEach((q, j) => {
           const num = el('span', { cls: 'mo-snum', style: { fontSize: '24px' } }, st.instant ? String(c[q[0]]) : '0');
-          const box = el('div', { cls: 'mo-stat' + (R.main === q[0] ? ' wit' : ''), style: R.main === q[0] ? {} : {} }, el('i', { style: { background: R.main === q[0] ? 'var(--blue)' : 'var(--ink2)' } }, q[1]), num);
+          const box = el('div', { cls: 'mo-stat' + (R.main === q[0] ? ' wit' : ''), style: R.main === q[0] ? {} : {} }, el('i', { style: { background: R.main === q[0] ? 'var(--blue)' : 'var(--ink2)' } }, skillSym(q[0])), num);
           st.anim(box, T(850 + j * 120)); st.count(num, c[q[0]], T(400), T(900 + j * 120)); row.appendChild(box);
         });
         card.appendChild(row);
@@ -867,10 +888,9 @@
   }
   function revealTrain(staff, res, done) {
     if (!res) { once(done)(); return null; }
-    const lab = { care: 'Care', sci: 'Science', exp: 'Scouting', charm: 'Charm' }[res.stat] || '';
     return simpleCard('mo-train', {
       tone: res.super ? 'gold' : 'good', rare: !!res.super, kicker: staff ? staff.name : 'Training', img: staff ? pUrl(staff.role, 5) : null, imgCls: 'small',
-      title: res.super ? 'SUPER!' : 'Trained', big: lab + ' ' + sgn(res.gain), lines: [res.value != null ? 'Now ' + res.value : ''], ms: 0
+      title: res.super ? 'SUPER!' : 'Trained', big: el('span', skillSym(res.stat), ' ' + sgn(res.gain)), lines: [res.value != null ? String(res.value) : ''], ms: 0
     }, done);
   }
 

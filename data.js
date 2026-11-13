@@ -159,12 +159,17 @@
     showrunner: { name: 'Showrunner',       main: 'charm', second: 'sci',  adv: true, req: [['guide'], ['researcher', 'keeper']], desc: 'Events gain a point of Fun and a point of Learning.' }
   };
   D.JOB_LEVEL = 8; // level needed before someone can change jobs
-  D.STATS = { care: 'Care', sci: 'Science', exp: 'Scouting', charm: 'Charm' };
+  // Display names and icon names. The state keeps the short keys (staff: care/sci/exp/charm, animals: charm/vigor/wit).
+  D.SKILL = { care: { name: 'Care', icon: 'skill-care' }, sci: { name: 'Science', icon: 'skill-sci' }, exp: { name: 'Scouting', icon: 'skill-exp' }, charm: { name: 'Hosting', icon: 'skill-charm' } };
+  D.SKILL_ORDER = ['care', 'sci', 'exp', 'charm'];
+  D.ASTAT = { charm: { name: 'Charm', icon: 'stat-charm' }, vigor: { name: 'Energy', icon: 'stat-vigor' }, wit: { name: 'Smarts', icon: 'stat-wit' } };
+  D.ASTAT_ORDER = ['charm', 'vigor', 'wit'];
+  D.STATS = { care: 'Care', sci: 'Science', exp: 'Scouting', charm: 'Hosting' }; // staff skill names (same as D.SKILL[k].name)
   D.COURSES = [
-    { id: 'care',  name: 'Animal Handling Course', stat: 'care' },
-    { id: 'sci',   name: 'Zoology Seminar',        stat: 'sci' },
-    { id: 'exp',   name: 'Wilderness Training',    stat: 'exp' },
-    { id: 'charm', name: 'Public Speaking Class',  stat: 'charm' }
+    { id: 'care',  name: 'Animal Handling Course', stat: 'care',  skill: 'care' },
+    { id: 'sci',   name: 'Zoology Seminar',        stat: 'sci',   skill: 'sci' },
+    { id: 'exp',   name: 'Wilderness Training',    stat: 'exp',   skill: 'exp' },
+    { id: 'charm', name: 'Hosting Class',          stat: 'charm', skill: 'charm' }
   ];
 
   D.RANK_REP = [0, 120, 400, 1000, 2200, 4500, 8500, 14000, 22000, 32000];
@@ -192,7 +197,7 @@
   D.HOF_SCORE = 34;                                                           // review total that enters the Hall of Fame
   D.CRITICS = [{ key: 'animals', name: 'Animals' }, { key: 'habitat', name: 'Habitat' }, { key: 'fun', name: 'Fun' }, { key: 'learning', name: 'Learning' }];
   D.STAT_SCORE = { charm: 'fun', wit: 'learning', vigor: 'animals' };         // which review score a star animal's best stat lifts
-  D.ANIMAL_STATS = { charm: 'Charm', vigor: 'Vigor', wit: 'Wit' };
+  D.ANIMAL_STATS = { charm: 'Charm', vigor: 'Energy', wit: 'Smarts' };           // animal stat names (same as D.ASTAT[k].name)
 
   // Hiring: pay for an advert, then see who turns up. k = cost as a share of D.SCALE, q = quality bonus, star = chance of a standout.
   D.HIRE_TIERS = [

@@ -41,6 +41,13 @@ function habcheck(biome) { // every species of a biome standing on its own habit
     [{}, { variant: true }, { juv: true }].forEach(function (o, n) { var x = x0 + 110 + n * 215; put(S.tile('hab:' + biome, n), x, y0, K); put(S.animal(sp.id, o), x, y0 + 12, K); });
     label(sp.name, x0 + 325, y0 + 86, '#fff'); });
 }
+function icons2() { // the word-replacing symbols at 1x to 4x on cream, dark brown and grass
+  var names = S.ICONS.slice(S.ICONS.indexOf('stat-charm')), per = 7, CW = 190, RH = 86, rows = Math.ceil(names.length / per), bgs = ['#fbeccb', '#4a3526', GRASS];
+  size(per * CW + 20, bgs.length * rows * RH + 20, '#000');
+  bgs.forEach(function (bg, b) { g.fillStyle = bg; g.fillRect(0, b * rows * RH, cv.width, rows * RH + (b === 2 ? 20 : 0));
+    names.forEach(function (n, i) { var x = 14 + (i % per) * CW, y = b * rows * RH + Math.floor(i / per) * RH + 62, s = S.icon(n);
+      put(s, x + 8, y, 1); put(s, x + 34, y, 2); put(s, x + 74, y, 3); put(s, x + 130, y, 4); label(n, x + 80, y + 15, b === 1 ? '#fff' : '#2a1d33', 11); }); });
+}
 function people() {
   var kinds = S.PERSON_KINDS, K = 4, CW = 64, RH = 104;
   size(16 * CW + 20, (Math.ceil(kinds.length / 4) + 3) * RH + 20, '#d8c9a3');
@@ -170,7 +177,7 @@ try {
   if (S.init) S.init();
   if (sheet.indexOf('animals-') === 0) animals(sheet.slice(8)); else if (sheet.indexOf('habcheck-') === 0) habcheck(sheet.slice(9));
   else if (sheet === 'people') people(); else if (sheet === 'tiles') tiles(); else if (sheet === 'fences') fences();
-  else if (sheet === 'buildings') buildings(); else if (sheet === 'patch') patch(); else if (sheet === 'extras') extras(); else if (sheet === 'scene2') scene(2); else scene(1);
+  else if (sheet === 'buildings') buildings(); else if (sheet === 'patch') patch(); else if (sheet === 'icons2') icons2(); else if (sheet === 'extras') extras(); else if (sheet === 'scene2') scene(2); else scene(1);
 } catch (e) { window.__err.push(String(e && e.stack || e)); }
 window.__done = true;
 </script></body></html>

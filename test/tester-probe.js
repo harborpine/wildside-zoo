@@ -1,10 +1,10 @@
 const L = require('./tester-lib.js');
 (async () => {
-  const T = await L.launch('chromium'); const p = T.page; await T.goto();
-  await p.evaluate(() => { ZCore.WEEK_MS[1]=ZCore.WEEK_MS[2]=600000; ZCore.onReport('*',(r,d)=>d()); ZT.tick(60); ZT.S.reports.length=0; ZT.S.happening=null; ZT.popAll(); ZT.S.money=500000; });
-  const r0 = await p.evaluate(()=>ZT.S.rows); await T.tapXY(195,420); await T.tapText('Build'); await T.tapText(/^Buy land/);
-  let d = await L.describe(T); console.log(d.id, d.text.slice(0,200), JSON.stringify(d.items)); await T.shot('x-land');
-  await T.tapText(/^(Buy|Yes|Confirm)/i,{wait:600}); console.log('rows', r0, '->', await p.evaluate(()=>ZT.S.rows), JSON.stringify(await T.state()));
-  await L.invariants(T,'land'); console.log(T.findings.map(f=>f.msg));
-  await T.browser.close();
+  for (const [w,h] of [[375,553],[320,568],[390,664]]) {
+    const T = await L.launch('chromium', {width:w,height:h}); const p = T.page; await T.goto('');
+    await T.tapText(/^1/, {sel:'button', wait:500}); await T.tapText(/^Next/, {sel:'button,.btn', wait:500}); await T.tapText(/^Yes/, {sel:'button,.btn', wait:900});
+    await T.tapXY(Math.round(w/2), Math.round(h*0.55), 600);
+    const m = await p.evaluate(()=>{const l=[...document.querySelectorAll('.layer:not([hidden])')].pop(); const b=l.querySelector('.pbody'); const c=document.querySelector('.mn-coach'); const g=l.querySelector('.grid'); return {scroll:b.scrollHeight>b.clientHeight+1, sh:b.scrollHeight, ch:b.clientHeight, coach: c&&Math.round(c.getBoundingClientRect().height), gridB: g&&Math.round(g.getBoundingClientRect().bottom), back:Math.round(l.querySelector('.back').getBoundingClientRect().top)};});
+    console.log(w+'x'+h, JSON.stringify(m)); await T.shot('tutmenu'); await T.browser.close();
+  }
 })();

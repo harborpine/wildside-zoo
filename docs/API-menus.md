@@ -53,3 +53,29 @@ Every state change goes through `ZCore.act`. Checks: `node test/menus-shot.js [c
 ## Result cards are never swallowed
 
 After any action that can raise a report or reveal (start project, Open Day, Animal Show entry, buy, sell, upgrade, remove, job change, let go), Menus closes or pops its own screen through `later()`, which waits until `ZCore.busy` is false and `S.reports` is empty. So the Winter Show result and any combo or rank-up card are seen and tapped away first, then the menu closes. Training, crate and hire use `ZMoments.revealTrain`, `revealCrate` and `revealHire` when present (own cards otherwise). Animal rows show the grade once, on the chip line.
+
+## Title screen, slots and new-zoo flow (round 3)
+
+- `ZMenus.title()` is what `ZCore.showTitle()` calls at start-up (modal, id `title`, no Back). A pixel logo ("WILDSIDE" / "ZOO") is drawn in code from a tiny 5x7 letter font (no image files), a row of animals and the gate sits under it, then three slot cards from `ZCore.slots()`.
+  A used slot (zoo name, `dateText`, money, rank stars, animal count with a paw) taps straight into play (`ZCore.loadSlot(n)`); a separate 44 px cross at its right edge deletes after a confirm (`ZCore.deleteSlot`). An empty slot reads "New zoo".
+  If the slot summary ever gains a `species` array (ids), the card shows up to two portraits instead of the paw and count; the Shell does not provide it yet.
+- New zoo: `newzoo-name` (prefilled "Wildside Zoo", 18 px field so iOS does not zoom, Enter goes on) > `newzoo-tutorial` (Yes / No) > `newzoo-carry` (only when `ZCore.legacy` has carry-over: pick one person and one animal) > `ZCore.newGame({slot, tutorial, zooName, staff, animal})`.
+- System: Save now, Title screen (saves, records legacy if the zoo is finished, `ZCore.toTitle()`), speed, zoom, How to play, Replay tutorial. The old "New zoo" with two confirms is gone: starting a zoo always goes through the title.
+
+## Tutorial (coach strip)
+
+- Five steps, each a one-line text completed by doing the thing: 1 open the menu, 2 start an expedition, 3 start an event, 4 build a bench, 5 (auto-finishes after 7 s). State is `S.ui.tutorial = {on, step, b}` (`b` = baselines used by Replay so earlier actions do not count), saved with the game.
+- A 300 ms ticker (`tutTick`) checks `S.did` counts and the bench count; steps complete in order, even if the player had already done the thing. A bar sits under the top strip on the floor (taps pass through, only Skip takes touches) and inside the top screen's panel, just under its title, while a screen is open. It hides while a modal or a report is on screen. A soft pulsing outline marks the next box or button.
+- `ZMenus.startTutorial()` restarts it (System, Replay tutorial). Skip sets `on:false`.
+
+## Boxes fit without scrolling
+
+Main menu, Projects, Build, Research, Info and System use `fitGrid`: rows share the panel height, icons scale with `vh`, sub-lines hide under 640 px height. Checked at 390x664, 390x753, 375x553, 375x647, 430x739, 440x956 and 390x844. Nothing in menus.js assumes a panel width.
+
+## Symbols
+
+Animal stats are icon plus number (`ui.astat`; Charm, Energy, Smarts), staff skills `ui.skillChip` (Care, Science, Scouting, Hosting), grade `ui.grade`, sex `sex-m` / `sex-f`, babies `juv`, costs `ui.cost` (coin, flask, clock), "New!" the burst, locked reasons start with the padlock, show medals and review scores use icons. Fit and strength stay `--  -  +  ++`. How to play has a "Symbols" legend listing every stat, skill, grade and the common symbols.
+
+## Tests
+
+`node test/menus-shot.js` (use `?play=1`; includes chip and legend checks) and `node test/menus-title.js` (title, slots, tutorial steps, Skip, reload mid-tutorial, delete confirm, Title screen round trip, no-scroll at seven sizes).
