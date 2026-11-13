@@ -26,6 +26,13 @@ Tests: `node test/moments-shot.js [chromium] [webkit] [--quick] [--only=late,car
 
 * **Fit rule:** content that can outgrow the screen scrolls inside the panel; exit and continue buttons are pinned below it (`M.foot`, 56 px minimum, inside the safe area) and the Winter Show header is pinned above it (`M.head`). Tested at 390x844 and 375x667 with 32 animals, 8 staff, long names (`--only=late`).
 
+## Symbols, not words
+
+* Animal stats and staff skills are shown as icons plus exact numbers, with names and icon keys read from `ZD.ASTAT[key]` / `ZD.SKILL[key]` (the Shell's `ui.astat` / `ui.skillChip` for the compact chips on trader and headhunter cards; larger icon boxes in the reveals). No stat word is printed anywhere in Moments.
+* Choice options (`choice`, `happening`, `yearlyplan`) are drawn by Moments with the same look as `ui.choices`, but the detail line is built from the option's fields, never from its `note` text: star pick = animal portrait, its stat icon and value, then the gain; options with `.skill` and `.staff` = the person's portrait, skill icon and their value (boost, night watch, escape, scientist). `note` is shown only where there is no such field (for example "+1.5 to 2.5 points, flop -1"). Costs are `ui.cost` (coin and flask), odds are the die symbol, a bar and a percent.
+* Sex uses `sex-m` / `sex-f` (and `juv` for youngsters) on trader and director rows. Wages use the coin plus the clock (`time`). Medals are `medal-*` icons, the Show shows the judged stat as an icon, review lines use `flame`, `ok` / `no`, `new`.
+* `ZMoments.revealHire` needs ONE tap to skip the flips (they also flip by themselves in about 2 s) and one tap on the last card to leave. It never needs a tap per applicant.
+
 ## Report handlers (registered by `ZMoments.init`)
 
 | Report | What the player sees |

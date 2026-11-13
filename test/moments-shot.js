@@ -354,8 +354,11 @@ async function run(name) {
     // revealHire
     await ev(() => { ZT.S.rank = 5; ZCore.act('advertise', 1); });
     await openMenu(); await ev(() => { window.__d = 0; ZMoments.revealHire(ZT.S.candidates, () => { window.__d++; }); });
-    await waitStack(s => s.stack.length === 2, 3000); await waitStack(s => s.cur && s.cur.final, 6000); await sleep(700);
-    await sleep(600); await tapAway(); await sleep(400); await tapAway(); await backOnMenu('revealHire'); check(await ev(() => window.__d === 1), 'revealHire in menu: done called once');
+    await waitStack(s => s.stack.length === 2, 3000); await sleep(700);
+    await tapAway(); await sleep(500);   // ONE tap during the flips skips to the last card
+    check(await ev(() => ZMoments.cur.id === 'mo-hire' && ZMoments.cur.final), 'revealHire: one tap during the flips jumps to the final card');
+    await sleep(500); await tapAway(); await sleep(400);   // ONE tap on the final card leaves
+    await backOnMenu('revealHire: exactly two taps in all (skip, leave)'); check(await ev(() => window.__d === 1), 'revealHire in menu: done called once');
     await ev(() => ZT.popAll());
     // showHappening: dismiss a pending happening, then reopen it
     await ev(() => { ZT.S.happening = null; ZE.debug.happening(ZT.S, 'school'); ZT.flush(); });
@@ -442,6 +445,25 @@ async function run(name) {
     await sleep(1500); const st2 = await ev(() => ZT.stack());
     check(!st2.some(i => /^mo-/.test(i)), 'still no moment after a moment on the title screen');
     await boot();
+  }
+
+  if (want('choices')) {
+    console.log(' -- event choices use symbols');
+    for (const key of ['star', 'boost']) {
+      const ok = await ev(k => {
+        ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.rp = 5000; S.reports.length = 0;
+        const hab = S.items.find(i => i.k === 'hab'); const lead = ZE.freeStaff(S)[0];
+        if (!ZCore.act('startEvent', hab.id, 'feeding', lead.id).ok) return false;
+        for (let i = 0; i < 6; i++) { ZE.tick(S); const p = S.projects.find(x => x.choice && x.choice.key === k); if (p) { S.reports = S.reports.filter(r => r.type === 'choice' && r.pid === p.id); if (k === 'boost' || S.reports.length) { ZT.flush(); return true; } } if (k === 'boost') { const q = S.projects.find(x => x.choice && x.choice.key === 'star'); if (q) ZE.resolveChoice(S, q.id, 0); } }
+        return false;
+      }, key);
+      check(ok, key + ' choice raised by a real event');
+      if (!ok) continue;
+      await waitStack(s => s.stack.length > 0, 3000); await sleep(500); await shot('choice-' + key + '-icons');
+      const info = await ev(() => { const t = [...document.querySelectorAll('.layer:not([hidden]) .choices .btn.opt')].map(b => b.textContent); return { txt: t.join(' | '), imgs: document.querySelectorAll('.layer:not([hidden]) .choices .mo-det img').length }; });
+      check(!/Charm|Energy|Smarts|Vigor|Wit|Science|Hosting/.test(info.txt) && info.imgs > 0, key + ' options show stat/skill symbols, no stat words (' + info.txt.slice(0, 120) + ' / ' + info.imgs + ' icons)');
+      await ev(() => ZT.popAll()); await sleep(200);
+    }
   }
 
   // ---------------------------------------------------------------- 9. errors

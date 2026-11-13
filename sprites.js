@@ -1465,16 +1465,16 @@
     'm-build':    { rows: ['.........MM..', '.......MMMMM.', '......MMMMMMM', '.....MMMMMM..', '......MMMM...', '.....TTTM....', '....TTT......', '...TTT.......', '..TTT........', '.TTT.........', 'TTT..........'] },
     'm-animals':  { rows: ['...TT...TT...', '..TTTT.TTTT..', '..TTTT.TTTT..', 'TT.TT...TT.TT', 'TTT.......TTT', 'TTT.TTTTT.TTT', '.T.TTTTTTT.T.', '..TTTTTTTTT..', '..TTTTTTTTT..', '..TTTT.TTTT..', '...TT...TT...'] },
     'm-staff':    { rows: ['....GGGGG....', '...GGGGGGG...', '...GGGGGGGGG.', '...SSSSSSS...', '...SKSSSKS...', '...SSSSSSS...', '....SSSSS....', '..BBBBBBBBB..', '.BBBBBBBBBBB.', '.BBBBWBWBBBB.', '.BBBBBBBBBBB.'] },
-    'm-research': { rows: ['....EEEEE....', '.....CCC.....', '.....CCC.....', '.....CCC.....', '....CCCCC....', '...CCGGGCC...', '..CGGGGGGGC..', '..GGGWGGGGG..', '.GGGGGGGWGGG.', '.GGGGGGGGGGG.', '..GGGGGGGGG..'] },
+    'm-research': { rows: ['....EEEEE....', '.....CCC.....', '.....CCC.....', '.....CCC.....', '....CCCCC....', '...CCBBBCC...', '..CBBBBBBBC..', '..BBBWBBBBB..', '.BBBBBBBWBBB.', '.BBBBBBBBBBB.', '..BBBBBBBBB..'] },
     'm-info':     { rows: ['.BBBBB.BBBBB.', 'BWWWWWBWWWWWB', 'BWLLLWBWLLLWB', 'BWWWWWBWWWWWB', 'BWLLLWBWLLLWB', 'BWWWWWBWWWWWB', 'BWLLLWBWLLLWB', 'BWWWWWBWWWWWB', 'BBBBBBBBBBBBB', '.....BBB.....'] },
     'm-system':   { rows: ['.....MMM.....', '..MM.MMM.MM..', '.MMMMMMMMMMM.', '.MMMMMMMMMMM.', '..MMM...MMM..', 'MMMM.....MMMM', 'MMMM.....MMMM', 'MMMM.....MMMM', '..MMM...MMM..', '.MMMMMMMMMMM.', '.MMMMMMMMMMM.', '..MM.MMM.MM..', '.....MMM.....'] }
   };
   // ---- symbols that replace words in the menus: animal stats, staff skills, and small markers ----
   (function () {
-    var more = { p: '#fbb4d2', b: '#a8d0fa', U: '#27a898', u: '#8fe0d2', I: '#cfd4de', i: '#f4f6fa', J: '#8f96a8', Z: '#cf8a4c', z: '#f0b880', X: '#7a5230', F: '#fff2c8', v: '#c0a4f4', g: '#3f8f45', H: '#f0a020', A: '#f08a2c', a: '#f8b860', e: '#9aa0b0' }, k;
+    var more = { p: '#fbb4d2', b: '#a8d0fa', U: '#27a898', u: '#8fe0d2', I: '#cfd4de', i: '#f4f6fa', J: '#8f96a8', Z: '#cf8a4c', z: '#f0b880', X: '#7a5230', F: '#fff2c8', v: '#c0a4f4', g: '#3f8f45', H: '#f0a020', A: '#f08a2c', a: '#f8b860', e: '#9aa0b0', m: '#e8894a', n: '#fcc49a', o: '#b85c2a' }, k;
     for (k in more) IC[k] = more[k];
     function sub(rows, map) { return rows.map(function (r) { return r.replace(/[adh]/g, function (c) { return map[c]; }); }); }
-    var MEDAL = ['RR.....BB', '.RR...BB.', '..RR.BB..', '...aaa...', '..aaaaa..', '.aahaaad.', '.ahaaaad.', '.aaaaaad.', '..aaadd..', '...ddd...'];
+    var MEDAL = ['..RRWBB..', '..RRWBB..', '..RRWBB..', '..aaaaa..', '.aahhaaa.', 'aahaaaaad', 'aahaaaaad', 'aaaaaaadd', '.aaaaadd.', '..adddd..'];
     var LET = { S: ['WWWWW', 'W....', 'WWWWW', '....W', 'WWWWW'], A: ['.WWW.', 'W...W', 'WWWWW', 'W...W', 'W...W'], B: ['WWWW.', 'W...W', 'WWWW.', 'W...W', 'WWWW.'], C: ['.WWWW', 'W....', 'W....', 'W....', '.WWWW'], D: ['WWWW.', 'W...W', 'W...W', 'W...W', 'WWWW.'],
       SS: ['WWW.WWW', 'W...W..', 'WWW.WWW', '..W...W', 'WWW.WWW'] };
     function rosette(col, dark, letter, ink) { // round ribbon badge; the colour carries the rank, the letter is a bonus
@@ -1488,9 +1488,9 @@
       'stat-vigor': { rows: ['.....QYYY', '....QYYY.', '...QYYY..', '..QYYY...', '.QYYYYYYH', '....YYYH.', '...YYYH..', '..YYYH...', '.YYH.....', '.YH......', 'YH.......'], flat: true },
       'stat-wit':   { rows: ['...BBBBB...', '..BBbbBBB..', '.BBbWbBBBB.', '.BBbBBBBBB.', '.BBBQBQBBB.', '.BBBQQQBBB.', '..BBBQBBB..', '...BBQBB...', '...eeeee...', '...JJJJJ...', '....eee....'], flat: true },
       'skill-care': { rows: ['..GG.GG..', '..GG.GG..', 'GG.....GG', 'GG.GGG.GG', '..GGGGG..', '.GGGGGGG.', '.GGGGGGG.', '..GG.GG..'] },
-      'skill-sci':  { rows: ['..UUU......', '..UuUU.....', '...UuUU....', '....UuUU...', '.UUUUUUU...', '.U....eU...', '.U.....e...', '.U..XXXXXX.', '.UU........', '..UUUUUUU..', '.UUUUUUUUU.'], flat: true },
+      'skill-sci':  { rows: ['.CC..CC..CC.', '.CC..CC..CC.', '.CC..CC..CC.', 'TTTTTTTTTTTT', '.UU..CC..UU.', '.UU..uu..UU.', '.UU..uu..UU.', '.UU..uu..UU.', 'TTTTTTTTTTTT', 'X..........X'], flat: true },
       'skill-exp':  { rows: ['...DDDDD...', '..DFFFFFD..', '.DFFFFRFFD.', 'DFFFFRRFFFD', 'DFFFRRFFFFD', 'DFFFFKFFFFD', 'DFFFFBBFFFD', 'DFFFBBFFFFD', '.DFFBFFFFD.', '..DFFFFFD..', '...DDDDD...'], flat: true },
-      'skill-charm': { rows: ['...VVVVV...', '..VvVvVVV..', '..VVvVvVV..', '..VvVvVVV..', '..VVVVVVV..', '...VVVVV...', '...eeeee...', '....JJJ....', '....JJJ....', '....JJJ....', '....eee....'], flat: true },
+      'skill-charm': { rows: ['.....VVVV..', '....VvVvVV.', '...VvVvVVVV', '...VVvVVVVV', '...VVVVVVVV', '....VVVVVV.', '...JJVVVV..', '..JJJ......', '.JJJ.......', 'JJJ........'], flat: true },
       'sex-m': { rows: ['.....BBBB', '.......BB', '......B.B', '.BBBBB..B', 'BB...BB..', 'B.....B..', 'B.....B..', 'BB...BB..', '.BBBBB...'], flat: true },
       'sex-f': { rows: ['.PPPPP.', 'PP...PP', 'P.....P', 'P.....P', 'PP...PP', '.PPPPP.', '...P...', '.PPPPP.', '...P...', '...P...'], flat: true },
       'juv':   { rows: ['...FFF...', '..FFFFF..', '.FFiFFFF.', '.FFFFFFF.', 'FFFFFFFFF', 'FaFFFaFFF', 'aFaFaFaFa', 'FFFaFFFaF', '.FFFFFFF.', '..FFFFF..'] },
@@ -1507,7 +1507,7 @@
       'trophy': { rows: ['.YYYYYYYYY.', 'YYQYYYYYYYY', 'Y.YQYYYYY.Y', 'Y.YQYYYYY.Y', '.YYYYYYYYY.', '...YYYYY...', '....YYY....', '.....D.....', '.....D.....', '...DDDDD...', '..DDDDDDD..'], flat: true },
       'medal-gold':   { rows: sub(MEDAL, { a: 'Y', h: 'Q', d: 'D' }), flat: true },
       'medal-silver': { rows: sub(MEDAL, { a: 'I', h: 'i', d: 'J' }), flat: true },
-      'medal-bronze': { rows: sub(MEDAL, { a: 'Z', h: 'z', d: 'X' }), flat: true },
+      'medal-bronze': { rows: sub(MEDAL, { a: 'm', h: 'n', d: 'o' }), flat: true },
       'grade-ss': rosette('Y', 'R', 'SS', 'X'), 'grade-s': rosette('R', 'Y', 'S'), 'grade-a': rosette('A', 'R', 'A'),
       'grade-b': rosette('G', 'g', 'B'), 'grade-c': rosette('B', 'L', 'C'), 'grade-d': rosette('J', 'e', 'D')
     };

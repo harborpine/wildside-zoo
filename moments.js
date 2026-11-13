@@ -106,6 +106,11 @@
 .mo-chip.main { box-shadow: 0 0 0 3px var(--blue); }
 .mo-medalbox { min-width: 62px; text-align: center; display: inline-flex; justify-content: center; } .mo-medalbox .mo-symg { height: 36px; } .mo-bigmedal .mo-symg { height: 96px; }
 .mo-odds .mo-symg { height: 16px; }
+.mo-optbody img, .mo-optbody .costline img, .mo-optbody .odds img { height: 20px; width: auto; max-width: none; image-rendering: pixelated; }
+.mo-optbody .odds { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 150px; } .mo-optbody .odds .bar { min-width: 60px; height: 12px; } .mo-optbody .odds b { font-size: 13px; min-width: 36px; }
+.mo-optpic > img { height: 52px; width: auto; max-width: 64px; }
+.mo-det {display: flex; align-items: center; gap: 4px; font-size: 15px; } .mo-det .mo-symg { height: 20px; }
+.mo-optbody .lbl { font-size: 17px; } .mo-optbody .meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .mo-optbody .sub { font-size: 13px; color: var(--ink2); }
 .mo-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .mo-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--paper); padding: 4px 10px 4px 6px; min-height: 32px; font-size: 16px; box-shadow: 0 0 0 2px var(--bd); }
 .mo-chip img { height: 22px; width: auto; image-rendering: pixelated; }
@@ -259,6 +264,7 @@
     function next() { if (M.ended) return; if (i < steps.length - 1) { i++; show(false); } else M.end(); }
     M.tap = () => {
       const st = M.st, step = steps[i];
+      if (step.skipToFinal && !isFinal()) { i = steps.length - 1; show(false); return; }   // one tap skips straight to the last card
       if (st && !st.finished && Date.now() < st.endAt) { st.finish(); return; }   // first tap completes the beat and holds
       if (isFinal()) { if (!step.noEnd) M.end(); return; }
       next();
@@ -344,16 +350,38 @@
   }
 
   // ------------------------------------------------------------------ choices (project choices and happenings)
+  // Option rows (same look as ui.choices) whose detail line uses symbols: stat or skill icon + number, cost and odds symbols,
+  // an animal or staff portrait. Reads the option's fields (stat, animal, gain, skill, staff), never its note text.
+  function optDetail(op) {
+    const st = S();
+    if (op.stat && op.animal != null) {
+      const an = E.animal(st, op.animal);
+      return { det: el('span', { cls: 'mo-det' }, astatSym(op.stat), ' ' + (an ? an[op.stat] : '?') + '  \u2192 ' + (op.gain != null ? '+' + (+op.gain).toFixed(1) : '')), img: an ? aUrl(an.sp, { variant: !!an.variant }, 4) : null };
+    }
+    if (op.skill) {
+      const sf = op.staff != null ? E.staffer(st, op.staff) : null;
+      const det = el('span', { cls: 'mo-det' }, skillSym(op.skill), (sf && sf[op.skill] != null ? ' ' + sf[op.skill] : ''), op.gain != null ? '  \u2192 +' + op.gain : '');
+      return { det: det, keepNote: op.gain == null, img: sf ? pUrl(sf.role, 4) : null };
+    }
+    return null;
+  }
   function optionButtons(options, onPick) {
-    const wrap = ui.choices(options, onPick);
-    [].forEach.call(wrap.children, (b, i) => {
-      const op = options[i]; if (!op) return;
-      let u = null;
-      if (op.animal != null) { const a = E.animal(S(), op.animal); if (a) u = aUrl(a.sp, { variant: !!a.variant }, 4); }
-      if (u) {
-        const kids = [].slice.call(b.childNodes), body = el('div', { cls: 'mo-optbody' }); kids.forEach(k => body.appendChild(k));
-        b.classList.add('mo-optpic'); b.appendChild(el('img', { cls: 'px', src: u, alt: '' })); b.appendChild(body);
-      }
+    const wrap = el('div', { cls: 'choices n' + (options || []).length });
+    (options || []).forEach((op, i) => {
+      const st = S(), poor = (op.cost && op.cost > st.money) || (op.costRp && op.costRp > st.rp), off = op.disabled || poor;
+      const d = optDetail(op);
+      const b = ui.btn(op.label, () => onPick(i, op), { disabled: off, cls: 'opt' + (op.cls ? ' ' + op.cls : '') });
+      b.textContent = '';
+      const body = el('div', { cls: 'mo-optbody' }, el('span', { cls: 'lbl' }, op.label));
+      if (d && d.det) body.appendChild(d.det);
+      if ((!d || d.keepNote) && op.note) body.appendChild(el('span', { cls: 'sub' }, op.note));
+      const meta = [];
+      if (op.cost || op.costRp) meta.push(ui.cost ? ui.cost(Object.assign({}, op.cost ? { money: op.cost } : {}, op.costRp ? { rp: op.costRp } : {})) : el('span', { cls: 'cost' }, op.cost ? fmt.money(op.cost) : op.costRp + ' RP'));
+      if (op.odds != null) meta.push(typeof op.odds === 'number' ? el('span', { cls: 'odds' }, sym('odds', '', 'odds'), ui.bar(op.odds, { cls: 'gold' }), el('b', Math.round(op.odds * 100) + '%')) : el('span', { cls: 'odds txt' }, String(op.odds)));
+      if (meta.length) body.appendChild(el('span', { cls: 'meta' }, meta));
+      if (d && d.img) { b.classList.add('mo-optpic'); b.appendChild(el('img', { cls: 'px', src: d.img, alt: '' })); }
+      b.appendChild(body);
+      wrap.appendChild(b);
     });
     return wrap;
   }
@@ -518,11 +546,11 @@
       card.appendChild(st.anim(el('div', { cls: 'mo-big mo-gold' }, String(total) + ' / 40'), 240));
     } });
     const lines = [];
-    if (r.firstTime) lines.push('New pairing noted in the Book');
-    if (r.repeat) lines.push('Same theme again: Fun suffered');
-    if (r.fired) lines.push('Host on fire' + (r.fired > 1 ? ' x' + r.fired : ''));
-    if (r.boost) lines.push((r.boost.good ? 'Big idea worked ' : 'Big idea flopped ') + sgn(Math.round((+r.boost.amt || 0) * 10) / 10));
-    if (r.star) { const sa = E.animal(S(), r.star.animal); lines.push((sa ? sa.name : 'Your star') + ' led the show' + (r.star.gain ? ' ' + sgn(+(+r.star.gain).toFixed(1)) : '')); }
+    if (r.firstTime) lines.push(el('div', { cls: 'mo-line' }, sym('new', '*', 'new pairing'), ' ', sym('habitat', '', 'noted')));
+    if (r.repeat) lines.push(el('div', { cls: 'mo-line' }, sym('no', '-', 'repeat theme'), ' ', sym('time', '', 'again')));
+    if (r.fired) lines.push(el('div', { cls: 'mo-line' }, sym('flame', '', 'host on fire'), r.fired > 1 ? ' x' + r.fired : ''));
+    if (r.boost) lines.push(el('div', { cls: 'mo-line' }, sym(r.boost.good ? 'ok' : 'no', r.boost.good ? '+' : '-', r.boost.good ? 'idea worked' : 'idea flopped'), ' ' + sgn(Math.round((+r.boost.amt || 0) * 10) / 10)));
+    if (r.star) { const sa = E.animal(S(), r.star.animal); lines.push(el('div', { cls: 'mo-line' }, sa ? sa.name + ' ' : '', r.star.stat ? astatSym(r.star.stat) : null, r.star.gain ? ' ' + sgn(+(+r.star.gain).toFixed(1)) : '')); }
     steps.push({ anim: 700, render(card, st) {
       card.classList.add(tone ? 'mo-' + tone : 'mo-x');
       card.appendChild(el('div', { cls: 'mo-kicker' }, T.name + ' · ' + hab));
@@ -533,7 +561,7 @@
       if (r.rep) chips.appendChild(chip('rep', sgn(Math.round(r.rep))));
       if (r.rp) chips.appendChild(chip('rp', sgn(Math.round(r.rp))));
       card.appendChild(st.anim(chips, 220));
-      lines.forEach((l, k) => card.appendChild(st.anim(el('div', { cls: 'mo-line' }, l), 350 + k * 90)));
+      lines.forEach((l, k) => card.appendChild(st.anim(l.nodeType ? l : el('div', { cls: 'mo-line' }, l), 350 + k * 90)));
       card.appendChild(hint());
     } });
     return open('mo-review', (body, M) => sequence(M, body, steps), done);
@@ -608,7 +636,7 @@
 
   // ------------------------------------------------------------------ callers (trader, director, headhunter)
   function mini(a) {   // three stat numbers on one line
-    return el('span', { cls: 'mo-mini' }, [['charm', a.charm], ['vigor', a.vigor], ['wit', a.wit]].map(k => el('span', { cls: 'mo-m ' + k[0] }, el('b', astatSym(k[0])), String(k[1]))));
+    return el('span', { cls: 'mo-mini' }, [['charm', a.charm], ['vigor', a.vigor], ['wit', a.wit]].map(k => ui.astat ? ui.astat(k[0], k[1]) : el('span', { cls: 'mo-m ' + k[0] }, el('b', astatSym(k[0])), String(k[1]))));
   }
   function offerRow(o, i, M) {
     const a = o.a, s = spOf(a.sp), poor = S().money < o.price;
@@ -618,7 +646,7 @@
       if (r && r.ok) { ui.toast(animalName(a) + (r.housed ? ' joins ' + habLine(r.hab) : ' is in the pen'), 'good'); M.rerender(); }
     }, { cls: 'primary', disabled: poor });
     return el('div', { cls: 'mo-row' }, el('div', { cls: 'mo-pic' }, pic(aUrl(a.sp, { variant: !!a.variant }, 3))),
-      el('div', { cls: 'mid' }, el('span', { cls: 't' }, animalName(a), ' ', a.sex === 'M' ? 'M' : 'F'),
+      el('div', { cls: 'mid' }, el('span', { cls: 't' }, animalName(a), ' ', sym(a.sex === 'M' ? 'sex-m' : 'sex-f', a.sex === 'M' ? 'M' : 'F', a.sex === 'M' ? 'male' : 'female'), E.isJuv && E.isJuv(S(), a) ? sym('juv', 'j', 'young') : null),
         el('span', { cls: 's' }, ui.stars(s.rarity, s.rarity), isNew ? el('span', { cls: 'mo-tag gold', style: { marginLeft: '6px' } }, 'New') : null),
         mini(a)), btn);
   }
@@ -646,8 +674,8 @@
         const R = D.ROLES[h.role] || { name: h.role, main: 'care' }, fee = E.headhuntFee(h), full = st.staff.length >= E.staffCap(st), poor = st.money < fee;
         const card = el('div', { cls: 'mo-card' }, el('div', { cls: 'mo-kicker' }, 'The headhunter'),
           el('div', { cls: 'mo-pic small' }, pic(pUrl(h.role, 5))), el('div', { cls: 'mo-title' }, h.name), el('div', { cls: 'mo-line hi' }, R.name + ' · level ' + (h.lvl || 1)),
-          el('div', { cls: 'mo-chips' }, ['care', 'sci', 'exp', 'charm'].map(k => el('span', { cls: 'mo-chip' + (R.main === k ? ' main' : '') }, skillSym(k), el('b', String(h[k]))))),
-          el('div', { cls: 'mo-line' }, fmt.money(E.salary(h)) + ' a week · fee ' + fmt.money(fee)));
+          el('div', { cls: 'mo-chips' }, ['care', 'sci', 'exp', 'charm'].map(k => ui.skillChip ? ui.skillChip(k, h[k]) : el('span', { cls: 'mo-chip' + (R.main === k ? ' main' : '') }, skillSym(k), el('b', String(h[k]))))),
+          el('div', { cls: 'mo-chips' }, chip('coin', fmt.money(E.salary(h)) + ' /'), sym('time', '', 'per week', 3), chip('coin', fmt.money(fee))));
         body.appendChild(card);
         M.foot(ui.btn('Hire for ' + fmt.money(fee), () => {
           const r = Z.act('hireHeadhunt'); if (r && r.ok) { M.hired = true; ui.toast(h.name + ' joins the team', 'good'); M.end(); }
@@ -882,6 +910,7 @@
         card.appendChild(row);
       } };
     });
+    steps.forEach(x => { x.skipToFinal = true; }); steps[steps.length - 1].anim = 150;
     steps[steps.length - 1].ms = 0; steps[steps.length - 1].render0 = steps[steps.length - 1].render;
     steps[steps.length - 1].render = function (card, st) { this.render0(card, st); card.appendChild(hint()); };
     return open('mo-hire', (body, M) => sequence(M, body, steps), done);

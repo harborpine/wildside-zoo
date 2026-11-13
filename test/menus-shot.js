@@ -76,7 +76,7 @@ async function run(name) {
   // ---------------------------------------------------------------- staff: hire through an advert, then the rest of the team screens
   await tap('Staff'); await screen('staff'); await chipCheck('staff list');
   const staffN = await S(() => ZT.S.staff.length);
-  await tap('Hire'); await screen('hire');
+  await screen('hire');
   await tap('Notice board', { wait: 500 }); await screen('candidates');
   await sleep(300); await screen('hire-reveal', 'hire-reveal');
   await ev(() => { let g = 0; while (ZT.stack().length && ZT.stack().slice(-1)[0] !== 'staff-candidates' && g++ < 8) ZCore.pop(); }); await sleep(300); await screen('candidates');
@@ -254,7 +254,7 @@ async function run(name) {
   const sc = await S(() => ZT.S.staff.length); await screen('staff-headhunter');
   await ev(() => { ZT.S.money = 500000; });
   const cap = await S(() => ZE.staffCap(ZT.S));
-  if (sc < cap) { await tap('Hire', { nth: 1 }); check(await S(() => ZT.S.staff.length) === sc + 1, 'headhunter offer taken'); } else console.log('  (staff room full; headhunter hire skipped)');
+  if (sc < cap) { await tap('Hire', { nth: 0 }); check(await S(() => ZT.S.staff.length) === sc + 1, 'headhunter offer taken'); } else console.log('  (staff room full; headhunter hire skipped)');
   await ev(() => { ZT.S.rep = 40000; ZE.refresh(ZT.S); }); await ev(() => ZCore.rerender());
   const hired = await ev(() => { const s = ZT.S.staff.find(x => !ZE.busyStaff(ZT.S)[x.id] && x.role !== 'keeper'); return s && s.name; });
   const sN = await S(() => ZT.S.staff.length); await tap(hired); await tap('Let go'); await tap('Let go', { wait: 500 });

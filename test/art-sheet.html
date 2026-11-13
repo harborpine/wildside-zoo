@@ -43,8 +43,10 @@ function habcheck(biome) { // every species of a biome standing on its own habit
 }
 function icons2() { // the word-replacing symbols at 1x to 4x on cream, dark brown and grass
   var names = S.ICONS.slice(S.ICONS.indexOf('stat-charm')), per = 7, CW = 190, RH = 86, rows = Math.ceil(names.length / per), bgs = ['#fbeccb', '#4a3526', GRASS];
-  size(per * CW + 20, bgs.length * rows * RH + 20, '#000');
-  bgs.forEach(function (bg, b) { g.fillStyle = bg; g.fillRect(0, b * rows * RH, cv.width, rows * RH + (b === 2 ? 20 : 0));
+  size(per * CW + 20, bgs.length * rows * RH + 90, '#fbeccb');
+  ['stat-charm', 'stat-vigor', 'stat-wit', 'skill-care', 'skill-sci', 'skill-exp', 'skill-charm', 'rp', 'm-research', 'medal-gold', 'medal-silver', 'medal-bronze'].forEach(function (n, i) { // as in the game: 2x on a dark chip beside a number
+    var x = 16 + i * 108, y = bgs.length * rows * RH + 34; g.fillStyle = '#4a3526'; g.fillRect(x, y, 96, 36); put(S.icon(n), x + 20, y + 30, 2); g.font = 'bold 18px system-ui, sans-serif'; g.textAlign = 'left'; g.fillStyle = '#fff'; g.fillText(String(12 + i * 7), x + 44, y + 25); });
+  bgs.forEach(function (bg, b) { g.fillStyle = bg; g.fillRect(0, b * rows * RH, cv.width, rows * RH + (b === 2 ? 20 : 0)); g.textAlign = 'center';
     names.forEach(function (n, i) { var x = 14 + (i % per) * CW, y = b * rows * RH + Math.floor(i / per) * RH + 62, s = S.icon(n);
       put(s, x + 8, y, 1); put(s, x + 34, y, 2); put(s, x + 74, y, 3); put(s, x + 130, y, 4); label(n, x + 80, y + 15, b === 1 ? '#fff' : '#2a1d33', 11); }); });
 }

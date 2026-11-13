@@ -7,6 +7,7 @@ const SHOTS = path.join(__dirname, 'shots'); fs.mkdirSync(SHOTS, { recursive: tr
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let failures = 0;
 const check = (cond, msg) => { console.log((cond ? '  PASS ' : '  FAIL ') + msg); if (!cond) failures++; };
+const TITLE_SIZES = [[375, 553], [320, 568], [390, 664], [390, 844], [440, 956]];
 const SIZES = [[390, 664], [390, 753], [375, 553], [375, 647], [430, 739], [440, 956], [390, 844]];
 
 async function run(name) {
@@ -68,7 +69,7 @@ async function run(name) {
   check(await ev(page, () => !!document.querySelector('.layer:not([hidden]) .mn-glow')), 'the Projects box is softly highlighted');
   // step 2: expedition
   await tap(page, 'Projects'); await shot(page, 'tut-2-projects'); await tap(page, 'Expedition'); await tap(page, 'Next'); await tap(page, 'Send', { wait: 900 });
-  check(await step(page) === 2 && (await coach(page) || '').startsWith('Flag icon'), 'sending an expedition completes step 2 (' + await step(page) + ')');
+  check(await step(page) === 2 && (await coach(page) || '').startsWith('Flag on habitat'), 'sending an expedition completes step 2 (' + await step(page) + ')');
   // step 3: event
   await page.touchscreen.tap(195, 400); await sleep(700);
   await tap(page, 'Projects'); await tap(page, 'Event'); await tap(page, 'Savanna'); await tap(page, 'Feeding'); await shot(page, 'tut-3-event');
@@ -131,6 +132,18 @@ async function run(name) {
     const bad = Object.keys(res).filter(k => res[k].over > 1 || res[k].small > 0 || (k !== 'System' && res[k].boxes < 4));
     check(!bad.length, w + 'x' + hh + ': main menu, Projects, Build, Research, Info and System show every box with no scrolling' + (bad.length ? ' ' + JSON.stringify(bad.map(k => [k, res[k]])) : '') + ' panel ' + Math.round(res.menu.wide) + 'px wide');
     await ctx.close();
+  }
+  // title fits without scrolling at every size, even with three used slots
+  for (const [w, hh] of TITLE_SIZES) {
+    const c2 = await browser.newContext({ viewport: { width: w, height: hh }, deviceScaleFactor: 2, hasTouch: true, isMobile: true }), p2 = await c2.newPage();
+    await p2.addInitScript(() => { if (!localStorage.getItem('seeded')) { localStorage.setItem('seeded', '1'); } });
+    await p2.goto(URL + '?play=1'); await p2.waitForFunction(() => window.ZT && window.ZMenus); await sleep(400);
+    await p2.evaluate(() => { ZCore.WEEK_MS[1] = 1e9; ZCore.newGame({ slot: 1, zooName: 'Alpha Zoo' }); ZCore.toTitle(); ZCore.newGame({ slot: 2, zooName: 'Beta Zoo' }); ZCore.toTitle(); ZCore.newGame({ slot: 3, zooName: 'Gamma Zoo' }); ZCore.toTitle(); });
+    await sleep(600);
+    const r = await p2.evaluate(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), b = L.querySelector('.pbody'), sl = [...L.querySelectorAll('.mn-slot')], bb = b.getBoundingClientRect(); return { n: sl.length, over: b.scrollHeight - b.clientHeight, below: sl.filter(x => x.getBoundingClientRect().bottom > bb.bottom + 1).length, port: L.querySelectorAll('.mn-port').length, cont: L.querySelectorAll('.mn-cont').length }; });
+    check(r.n === 3 && r.over <= 1 && r.below === 0, w + 'x' + hh + ': title shows all three slots without scrolling (' + JSON.stringify(r) + ')');
+    if ((w === 320) || (w === 375)) await p2.screenshot({ path: path.join(SHOTS, 'menus-t-title-' + w + 'x' + hh + tag + '.png') });
+    await c2.close();
   }
   check(errors.length === 0, 'no console errors' + (errors.length ? ': ' + errors.slice(0, 3).join(' || ') : ''));
   await browser.close();

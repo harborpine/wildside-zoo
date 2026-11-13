@@ -39,6 +39,10 @@
   }
   // Symbols instead of words (docs/API-shell.md: ui.astat, ui.skillChip, ui.grade, ui.sym, ui.cost).
   const mny = v => ui.cost({ money: v }), rpc = v => ui.cost({ rp: v }), wkc = v => ui.cost({ weeks: v });
+  const clk = v => span('mn-cnt', ui.sym('time', { scale: 2, label: 'Weeks', text: 'wk' }), ' ' + v);
+  const capChip = (icon, word, v) => el('span', { cls: 'chip iconchip mn-capchip' }, ui.sym(icon, { scale: 2, label: word, text: word.slice(0, 2) }), span('mn-cap', word), el('span', { cls: 'v' }, String(v)));
+  // One line that names the symbols the first time they show on a screen.
+  const keyRow = kind => el('div', { cls: 'mn-key' }, (kind === 'a' ? ASTATS.map(k => [aIcon(k), (D.ASTAT && D.ASTAT[k] && D.ASTAT[k].name) || k]) : SKILLS.map(k => [kIcon(k), (D.SKILL && D.SKILL[k] && D.SKILL[k].name) || k])).map(p => span('mn-cnt', ui.sym(p[0], { scale: 2, label: p[1], text: p[1].slice(0, 2) }), ' ' + p[1])));
   const A = (k, v) => ui.astat(k, v), K = (k, v) => ui.skillChip(k, v);
   const ASTATS = ['charm', 'vigor', 'wit'], SKILLS = ['care', 'sci', 'exp', 'charm'];
   const aIcon = k => (D.ASTAT && D.ASTAT[k] && D.ASTAT[k].icon) || 'stat-' + k;
@@ -96,12 +100,14 @@
 .mn-setrow{display:flex;align-items:center;gap:8px}.mn-setrow .mn-lab{flex:none;width:58px;font-size:14px;color:var(--ink2)}.mn-setrow .tabs{flex:1}
 .modal .panel.mn-title{flex:1 1 auto;height:100%;background:linear-gradient(#8fd3f4 0,#bfe9ff 34%,#8fd06a 34%,#6fae4f 100%)}
 .mn-title .pbody{justify-content:flex-start;gap:6px}
-.mn-logo{display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:2px}.mn-logo img{image-rendering:pixelated;display:block}.mn-logo .lg1{width:94%}.mn-logo .lg2{width:48%}
-.mn-scene{display:flex;align-items:flex-end;justify-content:center;gap:0;min-height:52px;border-bottom:6px solid #3f7d34}.mn-scene img{image-rendering:pixelated;max-height:max(44px,8vh);max-width:21%;width:auto;height:auto}
-.mn-slots{display:flex;flex-direction:column;gap:12px;margin-top:8px}
-.mn-slot{display:flex;align-items:center;background:var(--paper);box-shadow:0 0 0 3px var(--bd),0 5px 0 3px rgba(0,0,0,.25);min-height:78px;border:0;padding:0;font:inherit;color:var(--ink)}
+.mn-logo{display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:2px}.mn-logo img{image-rendering:pixelated;display:block;width:auto;height:auto}.mn-logo .lg1{max-width:94%;max-height:clamp(30px,8.5vh,80px)}.mn-logo .lg2{max-width:48%;max-height:clamp(36px,10.5vh,100px)}
+@media (max-height:700px){.mn-cont{display:none}.mn-scene{display:none}.mn-logo .lg1{max-height:5vh}.mn-logo .lg2{max-height:7.5vh}.mn-slot,.mn-slothit{min-height:52px!important}.mn-sinfo .mn-sline:nth-child(3){display:none}.mn-sname{font-size:16px}.mn-del{width:44px;height:44px}.mn-title .pbody{gap:4px}.mn-slots{gap:8px}}
+.mn-ports{flex:none;display:flex;align-items:flex-end}.mn-port{height:clamp(30px,5.5vh,44px);width:auto;max-width:56px;image-rendering:pixelated}.mn-cont{margin-left:8px;font-size:11px;background:var(--green);color:#fff;padding:1px 6px;vertical-align:middle;text-shadow:1px 1px 0 var(--green-d)}.mn-slot.recent{box-shadow:0 0 0 3px var(--green-d),0 5px 0 3px rgba(0,0,0,.25)}
+.mn-scene{display:flex;align-items:flex-end;justify-content:center;gap:0;min-height:30px;border-bottom:6px solid #3f7d34}.mn-scene img{image-rendering:pixelated;max-height:clamp(30px,7vh,70px);max-width:21%;width:auto;height:auto}
+.mn-slots{display:flex;flex-direction:column;gap:clamp(6px,1.6vh,12px);margin-top:clamp(2px,1vh,8px)}
+.mn-slot{display:flex;align-items:center;background:var(--paper);box-shadow:0 0 0 3px var(--bd),0 5px 0 3px rgba(0,0,0,.25);min-height:clamp(58px,10.5vh,78px);border:0;padding:0;font:inherit;color:var(--ink)}
 button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream2);cursor:pointer;font-weight:800;font-size:18px;text-align:left}
-.mn-slothit{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:78px;padding:6px 8px;border:0;background:none;font:inherit;font-weight:700;color:inherit;text-align:left;cursor:pointer}
+.mn-slothit{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:clamp(58px,10.5vh,78px);padding:6px 8px;border:0;background:none;font:inherit;font-weight:700;color:inherit;text-align:left;cursor:pointer}
 .mn-sn{flex:none;width:34px;height:34px;line-height:34px;text-align:center;background:var(--gold);color:var(--ink);font-weight:800;font-size:18px;box-shadow:0 0 0 2px var(--bd)}
 .mn-sinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.mn-sname{font-size:18px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mn-sline{font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .mn-del{flex:none;width:44px;height:44px;margin:0 8px 0 14px;border:0;background:var(--cream2);box-shadow:0 0 0 2px var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer}
@@ -111,6 +117,8 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
 .mn-coach.inpanel{position:static;flex:none;margin:6px 6px 0;pointer-events:auto}
 @keyframes mnglow{0%{outline-color:#ffcf33}50%{outline-color:#fff}100%{outline-color:#ffcf33}}
 .mn-glow{outline:4px solid #ffcf33;outline-offset:-4px;animation:mnglow .9s steps(2) infinite}
+.mn-capwrap{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}.mn-slot.recent .mn-sn{background:var(--green);color:#fff}
+.mn-key{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink2);justify-content:center}.mn-cap{font-size:11px;padding:0 4px;color:var(--ink2);display:flex;align-items:center}.mn-capchip{align-items:center}.mn-legend .lg2{display:flex;align-items:center;gap:8px;min-height:34px}
 .mn-cnt{display:inline-flex;align-items:center;gap:2px}.mn-legend{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 10px}.mn-legend .lg{display:flex;align-items:center;gap:8px;min-height:34px;font-size:14px}.mn-legend .lg .sym{height:26px;width:auto}.mn-legend .lg img.sym{height:26px}
 .mn-hit{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:56px;padding:0;margin:0;border:0;background:none;text-align:left;font:inherit;font-weight:700;color:inherit;cursor:pointer}
 .row.mn-split{padding-right:4px}.row.mn-split>.btn{flex:none;margin:0;min-width:84px}
@@ -215,7 +223,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     });
     return out;
   }
-  const shortWhy = t => (/rest/i.test(t) ? 'Rests ' + ((/(\d+)/.exec(t) || [])[1] || '') + ' wks' : /young/i.test(t) ? 'Too young' : /paired|busy/i.test(t) ? 'Already busy' : t.split(' ').slice(0, 4).join(' '));
+  const shortWhy = t => (/rest/i.test(t) ? ['Rest ', clk((/(\d+)/.exec(t) || [])[1] || '')] : /young/i.test(t) ? 'Too young' : /paired|busy/i.test(t) ? 'Already busy' : t.split(' ').slice(0, 4).join(' '));
   function eventHabs() { return habs().map(h => ({ hab: h, why: E.eventCheck(S(), h.id) })); }
 
   function projectsScreen() {
@@ -359,7 +367,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       body.appendChild(rows(eventHabs().map(x => row({ img: itemUrl(x.hab), title: E.habName(s, x.hab), sub: x.why ? null : cnt('m-animals', E.inHab(s, x.hab.id).length), extra: x.why ? why(shortEvWhy(x.why)) : null, right: x.why ? null : mny(cost), off: !!x.why, tap: () => eventTheme(x.hab.id) })), 'No habitats yet.'));
     } });
   }
-  const shortEvWhy = t => (/quiet/i.test(t) ? 'Rests ' + ((/(\d+)/.exec(t) || [])[1] || '') + ' wks' : /no animals/i.test(t) ? 'No animals' : /well enough/i.test(t) ? 'All unwell' : /already/i.test(t) ? 'Event running' : t.split(' ').slice(0, 4).join(' '));
+  const shortEvWhy = t => (/quiet/i.test(t) ? ['Rest ', clk((/(\d+)/.exec(t) || [])[1] || '')] : /no animals/i.test(t) ? 'No animals' : /well enough/i.test(t) ? 'All unwell' : /already/i.test(t) ? 'Event running' : t.split(' ').slice(0, 4).join(' '));
   function eventTheme(habId) {
     push({ id: 'event-theme', title: 'Which theme?', render(body) {
       const s = S(), h = E.item(s, habId); if (!h) { Core.pop(); return; }
@@ -384,7 +392,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       body.appendChild(kv('Where', E.habName(s, h)));
       body.appendChild(kv('Host', lead.name));
       body.appendChild(kv('Fit', fit == null ? 'Untried' : span('', ui.sign(fit), ' ', E.fitWord(fit))));
-      body.appendChild(kv('Time', '3 weeks'));
+      body.appendChild(kv('Time', wkc(3)));
       body.appendChild(ui.btn('Start', guard(() => { const r = Core.act('startEvent', habId, theme, leadId); if (r.ok) { later(() => Core.popAll()); ui.toast('Event started', 'good'); } }), { cls: 'primary big', sub: money(cost), disabled: s.money < cost, onDisabled: () => ui.toast(needMoney(cost), 'bad') }));
     } });
   }
@@ -394,7 +402,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     push({ id: 'campaigns', title: 'Advertise', render(body, api) {
       const s = S();
       body.appendChild(rows(E.campaigns(s).map((c, i) => {
-        const reason = c.weeksLeft > 0 ? 'On: ' + c.weeksLeft + 'w' : c.lock ? 'Needs ' + c.lock : s.money < c.cost ? needMoney(c.cost) : '';
+        const reason = c.weeksLeft > 0 ? ['On ', clk(c.weeksLeft)] : c.lock ? 'Needs ' + c.lock : s.money < c.cost ? needMoney(c.cost) : '';
         return row({ img: iUrl('rep', 4), title: c.name, sub: c.note, extra: reason ? why(reason) : null, right: mny(c.cost), off: !!reason,
           tap: () => ui.confirm('Run ' + c.name + ' for ' + money(c.cost) + '?', () => { const r = Core.act('runCampaign', i); if (r.ok) { ui.toast(c.name + ' running', 'good'); api.rerender(); } }, { yes: 'Run it' }) });
       })));
@@ -525,6 +533,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     if (tab) animalTab = tab;
     push({ id: 'animals', title: 'Animals', render(body, api) {
       const s = S(), pen = E.holding(s), offers = s.offers, mk = offers ? offers.list.length + (E.crateInfo(s) ? 1 : 0) : 0;
+      body.appendChild(keyRow('a'));
       body.appendChild(ui.tabs([{ id: 'zoo', label: 'Zoo' }, { id: 'pen', label: 'Pen ' + pen.length + '/' + E.holdCap(s) }, { id: 'market', label: mk ? 'Market ' + mk : 'Market' }], animalTab, t => { animalTab = t; api.rerender(); }));
       if (animalTab === 'zoo') {
         let any = false;
@@ -550,7 +559,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       extra: animalChips(x.a), right: [mny(x.price), starsOn(E.sp(x.a).rarity)], tap: () => offerScreen(i) })), info ? '' : 'Nothing left.'));
   }
   function statBoxes(a) {
-    return el('div', { cls: 'mn-stats' }, ASTATS.map(k => el('div', { cls: 'mn-st ' + k, title: (D.ASTAT && D.ASTAT[k] && D.ASTAT[k].name) || k }, el('b', ui.sym(aIcon(k), { scale: 3, label: (D.ASTAT && D.ASTAT[k] && D.ASTAT[k].name) || k })), span('n', a[k]), ui.grade(E.grade(a[k])))));
+    return el('div', { cls: 'mn-stats' }, ASTATS.map(k => el('div', { cls: 'mn-st ' + k, title: (D.ASTAT && D.ASTAT[k] && D.ASTAT[k].name) || k }, el('b', ui.sym(aIcon(k), { scale: 3, label: (D.ASTAT && D.ASTAT[k] && D.ASTAT[k].name) || k }), ' ' + ((D.ASTAT && D.ASTAT[k] && D.ASTAT[k].name) || k)), span('n', a[k]), ui.grade(E.grade(a[k])))));
   }
   function animalCard(body, a) {
     const s = S(), sp = E.sp(a);
@@ -619,14 +628,14 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   function staffScreen() {
     push({ id: 'staff', title: 'Staff', render(body, api) {
       const s = S(), busy = E.busyStaff(s), cap = E.staffCap(s);
-      body.appendChild(ui.btn('Hire', hireScreen, { cls: 'primary big', sub: s.staff.length + '/' + cap, disabled: s.staff.length >= cap, onDisabled: () => ui.toast('Staff room is full', 'bad') }));
+      body.appendChild(ui.section('Hire  ' + s.staff.length + '/' + cap)); body.appendChild(hireOptions(api, false));
       if (s.candidates && s.candidates.length) body.appendChild(ui.btn('Who turned up', candidatesScreen, { cls: 'blue', sub: s.candidates.length + ' waiting' }));
       if (s.headhunt) {
         const h = s.headhunt, fee = E.headhuntFee(h);
         body.appendChild(ui.section('Headhunter'));
         body.appendChild(row({ img: pUrl(h.role, 3), title: h.name, sub: D.ROLES[h.role].name + ' · Lv ' + h.lvl, line: staffChips(h), act: ui.btn('Hire', guard(() => { const r = Core.act('hireHeadhunt'); if (r.ok) { ui.toast(h.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', sub: money(fee), disabled: s.money < fee || s.staff.length >= cap }) }));
       }
-      body.appendChild(ui.section('Team'));
+      body.appendChild(ui.section('Team')); body.appendChild(keyRow('s'));
       body.appendChild(el('div', { cls: 'list' }, s.staff.map(st => row({ img: pUrl(st.role, 3), title: st.name, sub: D.ROLES[st.role].name + ' · Lv ' + st.lvl + ' · ' + money(E.salary(st)) + '/wk', extra: staffChips(st), right: busy[st.id] ? imgEl(iUrl('busy', 3), 'mn-mini') : null, tap: () => staffDetail(st.id) }))));
     } });
   }
@@ -638,7 +647,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       body.appendChild(el('div', { cls: 'mn-big' }, st.name));
       body.appendChild(el('div', { cls: 'center' }, R.name + ' · Level ' + st.lvl));
       body.appendChild(ui.bar(Math.min(1, st.xp / (40 + st.lvl * 30)), { cls: 'blue', label: 'XP' }));
-      body.appendChild(el('div', { cls: 'chips', style: { justifyContent: 'center' } }, SKILLS.map(k => K(k, st[k]))));
+      body.appendChild(el('div', { cls: 'mn-capwrap' }, SKILLS.map(k => capChip(kIcon(k), (D.SKILL && D.SKILL[k] && D.SKILL[k].name) || k, st[k]))));
       body.appendChild(kv('Pay', mny(E.salary(st))));
       if (busy) body.appendChild(kv('Status', 'On a project'));
       const wait = E.trainWait(s, st);
@@ -654,7 +663,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       const wait = E.trainWait(s, st), c = E.trainCost(st);
       body.appendChild(ui.note('Sometimes a Super! triple gain.'));
       body.appendChild(rows(D.COURSES.map(co => {
-        const reason = wait > 0 ? 'Again in ' + wait + 'w' : s.money < c ? needMoney(c) : '';
+        const reason = wait > 0 ? ['Again ', clk(wait)] : s.money < c ? needMoney(c) : '';
         return row({ img: ui.sym(kIcon(co.skill || co.stat), { scale: 4, label: co.name }), title: co.name, extra: [el('span', { cls: 'mn-cl' }, [K(co.skill || co.stat, st[co.stat])]), reason ? why(reason) : null], right: mny(c), off: !!reason,
           tap: guard(() => { const r = Core.act('train', id, co.stat); if (!r.ok) return;
             if (window.ZMoments && ZMoments.revealTrain) { try { ZMoments.revealTrain(st, r, () => { try { if (Core.stack().slice(-1)[0] === 'staff-train') api.pop(); else Core.rerender(); } catch (e) { /* ignore */ } }); return; } catch (e) { /* use ours */ } }
@@ -674,6 +683,14 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       })));
     } });
   }
+  function hireOptions(api, replace) {
+    const s = S(), full = s.staff.length >= E.staffCap(s);
+    return ui.choices(E.hireTiers(s).map(t => ({ label: t.name, note: full ? 'Staff room full' : t.lock ? 'Needs ' + t.lock : t.note + (t.star >= 0.1 ? ' · stars likely' : ''), cost: t.cost, disabled: full || !!t.lock })), i => {
+      const r = Core.act('advertise', i); if (!r.ok) return;
+      if (replace) api.replace(candidatesDef()); else push(candidatesDef());
+      if (window.ZMoments && ZMoments.revealHire) { try { ZMoments.revealHire(r.candidates, () => { try { Core.rerender(); } catch (e) { /* ignore */ } }); } catch (e) { /* list is already there */ } }
+    });
+  }
   function hireScreen() {
     push({ id: 'staff-hire', title: 'Advertise', render(body, api) {
       const s = S(), full = s.staff.length >= E.staffCap(s);
@@ -686,7 +703,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   }
   function candidatesDef() {
     return { id: 'staff-candidates', title: 'Who turned up', render(body, api) {
-      const s = S(), full = s.staff.length >= E.staffCap(s);
+      const s = S(), full = s.staff.length >= E.staffCap(s); body.appendChild(keyRow('s'));
       body.appendChild(rows((s.candidates || []).map((c, i) => row({ img: pUrl(c.role, 3), title: c.name, sub: D.ROLES[c.role].name + ' · Lv ' + c.lvl, line: el('span', { cls: 'mn-cl' }, [c.star ? ui.sym('star', { scale: 2, label: 'Standout', text: '*' }) : null].concat(SKILLS.map(k => K(k, c[k])))),
         act: ui.btn('Hire', guard(() => { const r = Core.act('hireCandidate', i); if (r.ok) { ui.toast(c.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', disabled: full, sub: full ? 'Full' : money(E.salary(c)) + '/wk' }) })), 'Nobody left.'));
     } };
@@ -822,7 +839,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   function yearsScreen() {
     push({ id: 'years', title: 'Years', render(body) {
       const s = S();
-      body.appendChild(el('div', { cls: 'chips', style: { justifyContent: 'center' } }, [ui.statChip('ready-event', s.life.events, { name: 'Events' }), ui.statChip('m-projects', s.life.expeditions, { name: 'Trips' }), ui.statChip('ready-breed', s.life.births, { name: 'Births' }), ui.statChip('trophy', s.trophies, { name: 'Trophies' })]));
+      body.appendChild(el('div', { cls: 'mn-capwrap' }, [capChip('ready-event', 'Events', s.life.events), capChip('m-projects', 'Trips', s.life.expeditions), capChip('ready-breed', 'Births', s.life.births), capChip('trophy', 'Trophies', s.trophies)]));
       if (!s.history.length) { body.appendChild(el('div', { cls: 'empty' }, 'No finished year yet.')); return; }
       const t = el('div', { cls: 'list' }, el('div', { cls: 'mn-yr h' }, span('', 'Yr'), span('', 'Place'), span('r', 'Visitors'), span('r', 'Profit'), span('r', 'Best')));
       s.history.slice().reverse().forEach(h => t.appendChild(el('div', { cls: 'mn-yr' }, span('', h.year), span('', '#' + h.place), span('r', fmt.num(h.visitors)), span('r', money(h.income - h.cost)), span('r', h.bestReview ? h.bestReview + '/40' : '-'))));
@@ -862,13 +879,16 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     push({ id: 'how', title: 'How to play', render(body) {
       const L = [['m-system', 'Tap the zoo for the menu. Time stops.'], ['m-animals', 'Expeditions bring animals. House them.'], ['ready-breed', 'Heart: a pair can breed.'], ['ready-event', 'Flag: an event can start.'], ['choice', '!: something needs you.'], ['m-build', 'Build, then tap a hex and Place.'], ['star', 'You cannot lose. 20 years, then a score.']];
       body.appendChild(rows(L.map(l => row({ img: iUrl(l[0], 4), title: l[1] }))));
-      body.appendChild(ui.section('Symbols'));
-      const lg = (icon, word) => el('div', { cls: 'lg' }, ui.sym(icon, { scale: 3, label: word, text: word.slice(0, 2) }), span('', word));
+      const lg = (icon, word) => el('div', { cls: 'lg' }, typeof icon === 'string' ? ui.sym(icon, { scale: 3, label: word, text: word.slice(0, 2) }) : icon, span('', word));
       const nm = (tbl, k, d) => (tbl && tbl[k] && tbl[k].name) || d;
-      body.appendChild(el('div', { cls: 'mn-legend' }, [].concat(
-        ASTATS.map(k => lg(aIcon(k), nm(D.ASTAT, k, k))), SKILLS.map(k => lg(kIcon(k), nm(D.SKILL, k, k))),
-        [lg('sex-m', 'Male'), lg('sex-f', 'Female'), lg('juv', 'Baby'), lg('coin', 'Money'), lg('rp', 'Research'), lg('time', 'Weeks'), lg('lock', 'Locked'), lg('new', 'New'), lg('ok', 'Done'), lg('odds', 'Odds')],
-        ['d', 'c', 'b', 'a', 's', 'ss'].map(g => lg('grade-' + g, 'Grade ' + g.toUpperCase())))));
+      const badge = el('span', { cls: 'badge', style: { position: 'static', display: 'inline-block' } }, '2');
+      const grp = (t, items) => { body.appendChild(ui.section(t)); body.appendChild(el('div', { cls: 'mn-legend' }, items)); };
+      grp('Symbols', [].concat(ASTATS.map(k => lg(aIcon(k), nm(D.ASTAT, k, k))), SKILLS.map(k => lg(kIcon(k), nm(D.SKILL, k, k))),
+        [lg('sex-m', 'Male'), lg('sex-f', 'Female'), lg('juv', 'Baby'), lg('new', 'New'), lg('ok', 'Done'), lg('lock', 'Locked'), lg('odds', 'Odds'), lg('time', 'Weeks')],
+        ['d', 'c', 'b', 'a', 's', 'ss'].map(g => lg('grade-' + g, 'Grade ' + g.toUpperCase()))));
+      grp('Zoo', [lg('coin', 'Money'), lg('rp', 'Research'), lg('rep', 'Fame'), lg('visitors', 'Visitors'), lg(ui.stars(3, 3), 'Rank'), lg(ui.flames(2, 3), 'Buzz'), lg('habitat', 'Habitat'), lg('pen', 'Pen'), lg('land', 'Land'), lg('trophy', 'Trophy'), lg('star', 'Rarity'),
+        lg('medal-gold', 'Gold'), lg('medal-silver', 'Silver'), lg('medal-bronze', 'Bronze'), lg(badge, 'Needs you')]);
+      grp('On the floor', [lg('ready-event', 'Event ready'), lg('ready-breed', 'Pair ready'), lg('busy', 'Working'), lg('sick', 'Unwell'), lg('choice', 'Answer me'), lg(el('span', { style: { width: '40px' } }, ui.bar(0.6)), 'Progress'), lg('flame', 'Buzz')]);
       body.appendChild(ui.note('-- - + ++ : poor to great.'));
     } });
   }
@@ -913,17 +933,17 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       body.classList.add('mn-tight');
       body.appendChild(el('div', { cls: 'mn-logo' }, imgEl(logoUrl('WILDSIDE', 6, '#ffcf33', '#fff2a8'), 'lg1'), imgEl(logoUrl('ZOO', 9, '#58b84a', '#a8f08c'), 'lg2')));
       body.appendChild(el('div', { cls: 'mn-scene' }, ['zebra', 'giraffe', null, 'lion', 'elephant'].map(id => (id ? imgEl(spUrl(id, {}, 2)) : imgEl(gateUrl())))));
-      body.appendChild(el('div', { cls: 'mn-slots' }, Core.slots().map(sl => slotCard(sl, api))));
+      body.appendChild(el('div', { cls: 'mn-slots' }, (() => { const all = Core.slots(), used = all.filter(x => !x.empty), best = used.length ? used.reduce((a, b) => ((b.savedAt || 0) > (a.savedAt || 0) ? b : a)) : null; return all.map(sl => slotCard(sl, api, best && sl.slot === best.slot)); })()));
     } });
   }
-  function slotCard(sl, api) {
+  function slotCard(sl, api, recent) {
     if (sl.empty) return el('button', { type: 'button', cls: 'mn-slot empty', tap: guard(() => newZooName(sl.slot)) }, span('mn-sn', sl.slot), span('mn-new', 'New zoo'));
-    const species = Array.isArray(sl.species) ? sl.species.slice(0, 2) : [];
-    const card = el('div', { cls: 'mn-slot' },
+    const species = Array.isArray(sl.species) ? sl.species.slice(0, 2) : [], vf = sl.variantFlags || [];
+    const card = el('div', { cls: 'mn-slot' + (recent ? ' recent' : '') },
       el('button', { type: 'button', cls: 'mn-slothit', 'aria-label': 'Play ' + sl.zooName, tap: guard(() => { if (Core.loadSlot(sl.slot)) { if (Core.stack().indexOf('title') >= 0) Core.popAll(); } else ui.toast('Could not open that save', 'bad'); }) },
-        span('mn-sn', sl.slot),
-        el('span', { cls: 'mn-sinfo' }, span('mn-sname', sl.zooName), span('mn-sline', (sl.dateText || 'Year ' + sl.year), ' · ', money(sl.money)),
-          el('span', { cls: 'mn-sline' }, ui.stars(sl.rankStars || 1, 10), ' ', species.length ? species.map(id => imgEl(spUrl(id, {}, 2), 'mn-mini')) : [imgEl(iUrl('m-animals', 2), 'mn-mini'), ' ' + (sl.animals || 0)], sl.finished ? ' · Done' : ''))),
+        span('mn-sn', sl.slot), species.length ? el('span', { cls: 'mn-ports' }, species.map((id, i) => imgEl(spUrl(id, { variant: !!vf[i] }, 2), 'mn-port'))) : null,
+        el('span', { cls: 'mn-sinfo' }, span('mn-sname', sl.zooName, recent ? span('mn-cont', 'Continue') : null), span('mn-sline', (sl.dateText || 'Year ' + sl.year), ' · ', money(sl.money)),
+          el('span', { cls: 'mn-sline' }, ui.stars(sl.rankStars || 1, 10), ' ', [cnt('m-animals', sl.animals || 0)], sl.finished ? ' · Done' : ''))),
       el('button', { type: 'button', cls: 'mn-del', 'aria-label': 'Delete slot ' + sl.slot, tap: guard(() => ui.confirm('Delete "' + sl.zooName + '" for good?', () => { Core.deleteSlot(sl.slot); if (Core.stack().slice(-1)[0] === 'title') api.rerender(); }, { danger: true, yes: 'Delete' })) }, imgEl(pixIcon('remove', '#9a8a70', 2))));
     return card;
   }
@@ -969,7 +989,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   const TUT = [
     { text: 'Tap the zoo to open the menu.', done: () => Core.stack().length > 0 },
     { text: 'Open Projects and send an expedition.', done: (s, b) => didN(s, 'startExpedition') > (b.startExpedition || 0), glow: { menu: 'Projects', projects: 'Expedition' } },
-    { text: 'Flag icon: ready. Hold an event.', done: (s, b) => didN(s, 'startEvent') > (b.startEvent || 0), glow: { menu: 'Projects', projects: 'Event' } },
+    { text: 'Flag on habitat: ready. Hold an event.', done: (s, b) => didN(s, 'startEvent') > (b.startEvent || 0), glow: { menu: 'Projects', projects: 'Event' } },
     { text: 'Build a bench: Build, Facilities.', done: (s, b) => benches(s) > (b.bench || 0), glow: { menu: 'Build', build: 'Facilities', 'build-facs': 'Garden Bench' } },
     { text: 'Answer pop-ups when they appear. Have fun!', auto: 7000 }
   ];

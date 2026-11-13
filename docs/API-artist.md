@@ -59,11 +59,11 @@ Fences and the entrance also have `sortDy`.
 **Icons (`ZSprites.ICONS`)**: on-floor markers, 11 px round white badges: `ready-event` (red flag), `ready-breed` (pink heart),
 `busy` (hourglass), `sick` (green cross), `choice` (yellow badge with an exclamation mark). Plain 9 to 11 px: `star`, `flame`, `coin`,
 `rp` (blue flask), `heart`, `rep` (medal). Menu icons, 11 to 15 px: `m-projects` (clipboard), `m-build` (hammer), `m-animals` (paw),
-`m-staff` (keeper), `m-research` (green flask), `m-info` (book), `m-system` (gear).
+`m-staff` (keeper), `m-research` (the same blue flask as `rp`, larger, on purpose), `m-info` (book), `m-system` (gear).
 
 **Symbols that replace words (also in `ZSprites.ICONS`, 9 to 13 px, anchor centre-bottom, made to be enlarged 2x to 4x with `iconUrl`)**:
 animal stats `stat-charm` (pink four-point sparkle, Charm), `stat-vigor` (yellow lightning bolt, Energy), `stat-wit` (blue lightbulb,
-Smarts); staff skills `skill-care` (green paw), `skill-sci` (teal microscope), `skill-exp` (gold compass), `skill-charm` (purple microphone,
+Smarts); staff skills `skill-care` (green paw), `skill-sci` (three teal test tubes in a wooden rack), `skill-exp` (gold compass), `skill-charm` (purple microphone,
 Hosting); `sex-m`, `sex-f`, `juv` (egg), `time` (clock), `visitors` (little person), `odds` (die), `cost-rp` (same picture as `rp`),
 `lock`, `new` (red and yellow burst), `ok` (green tick), `no` (red cross mark), `habitat` (fence piece), `pen` (crate), `land`
 (signpost), `trophy`, `medal-gold`, `medal-silver`, `medal-bronze`, and grade rosettes `grade-ss` (gold), `grade-s` (red),

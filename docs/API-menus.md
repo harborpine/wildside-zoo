@@ -79,3 +79,11 @@ Animal stats are icon plus number (`ui.astat`; Charm, Energy, Smarts), staff ski
 ## Tests
 
 `node test/menus-shot.js` (use `?play=1`; includes chip and legend checks) and `node test/menus-title.js` (title, slots, tutorial steps, Skip, reload mid-tutorial, delete confirm, Title screen round trip, no-scroll at seven sizes).
+
+## Round 3 follow-ups
+
+- **Hiring**: the advert tiers now sit on the Staff screen itself (no separate Hire screen to open). Pick a tier: the "Who turned up" list is pushed, then `ZMoments.revealHire` plays over it, and tapping through returns to that single list, where Hire is one tap per row. From the floor with two applicants: floor, Staff, tier, two reveal taps, Hire = 6 taps (`node test/menus-hire.js`).
+- **Words beside symbols**: Years and the staff screen use captioned chips; Animals, Staff and "Who turned up" start with a one-line key (icon + word) for the stat or skill icons; an animal's stat boxes carry the name. Durations are the clock symbol with the number; "/wk" only on wages.
+- **Legend** (How to play): Symbols (stats, skills, sex, baby, new, done, locked, odds, weeks, grades), Zoo (money, research, fame, visitors, rank stars, buzz flame, habitat, pen, land, trophy, rarity, medals, red count badge), On the floor (event flag, pair heart, working, unwell, answer mark, progress bar, buzz).
+- **Title**: fits three slots without scrolling down to 320x568 (the animal row and the 3rd-line of each card hide under 700 px high). Used slots show up to two portraits from `species` / `variantFlags`; the most recently saved used slot has a green number box and outline (and a "Continue" tag on taller screens).
+- **Tutorial** step 3 reads "Flag on habitat: ready. Hold an event."
