@@ -118,6 +118,7 @@ function extras() {
   S.DECOS.forEach(function (d) { for (var s = 0; s < 4; s++) { put(S.deco(d, s), x, 150, K); x += 52; } label(d, x - 130, 172); });
   var names = S.ICONS, K2 = 6;
   names.forEach(function (n, i) { var ix = 60 + (i % 10) * 114, iy = 290 + Math.floor(i / 10) * 130; put(S.icon(n), ix, iy, K2); put(S.icon(n), ix + 44, iy, 2); var s = S.icon(n); label(n + ' ' + s.w + 'x' + s.h, ix + 10, iy + 20, '#16301a', 12); });
+  put(S.animal('zebra', {}), 560, 650, K); put(S.deco('crate', 0), 660, 650, K); put(S.animal('lion', { flip: true }), 770, 650, K); label('crate beside a zebra', 660, 672, '#16301a', 12);
   put(S.icon('nope'), 60, 640, K2); label('fallback', 60, 660, '#16301a', 12);
   put(S.animal('nope', {}), 200, 640, K); label('unknown animal', 200, 660, '#16301a', 12);
   put(S.person('nope', {}), 340, 640, K); label('unknown person', 340, 660, '#16301a', 12);
@@ -167,6 +168,7 @@ function scene(which) {
   var k1 = H[0][1][0], pk = P(k1); add(S.person(staffKinds[0], { frame: 0 }), pk.x + 12, pk.y - 4);
   var ent = cell[key(ax(2, 16)[0], 16)], pe = P(ent); add(S.entrance(), pe.x, pe.y, pe.y + 6);
   add(S.person(which === 2 ? 'director' : 'trader', {}), pe.x + 18, pe.y - 12);
+  add(S.deco('crate', 0), pe.x - 30, pe.y - 22); add(S.animal('zebra', {}), pe.x - 52, pe.y - 18);
   items.sort(function (a, c2) { return a.d - c2.d; });
   items.forEach(function (it) { b.drawImage(it.s.c, Math.round(it.x - it.s.ax), Math.round(it.y - it.s.ay)); });
   // on-floor icons float above everything

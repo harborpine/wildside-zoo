@@ -118,6 +118,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
 @keyframes mnglow{0%{outline-color:#ffcf33}50%{outline-color:#fff}100%{outline-color:#ffcf33}}
 .mn-glow{outline:4px solid #ffcf33;outline-offset:-4px;animation:mnglow .9s steps(2) infinite}
 .mn-capwrap{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}.mn-slot.recent .mn-sn{background:var(--green);color:#fff}
+@media (max-width:360px){.row.mn-split{flex-wrap:wrap}.row.mn-split .mn-hit{flex:1 1 100%}.row.mn-split>.btn{flex:1 0 100%;margin:2px 0 4px}.mn-cl{flex-wrap:wrap}.mn-cl .chip{max-width:100%}}
 .mn-key{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink2);justify-content:center}.mn-cap{font-size:11px;padding:0 4px;color:var(--ink2);display:flex;align-items:center}.mn-capchip{align-items:center}.mn-legend .lg2{display:flex;align-items:center;gap:8px;min-height:34px}
 .mn-cnt{display:inline-flex;align-items:center;gap:2px}.mn-legend{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 10px}.mn-legend .lg{display:flex;align-items:center;gap:8px;min-height:34px;font-size:14px}.mn-legend .lg .sym{height:26px;width:auto}.mn-legend .lg img.sym{height:26px}
 .mn-hit{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:56px;padding:0;margin:0;border:0;background:none;text-align:left;font:inherit;font-weight:700;color:inherit;cursor:pointer}
@@ -255,7 +256,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
         { icon: pUrl('explorer', 5), label: 'Expedition', sub: ex.why, disabled: !ex.ok, onTap: expStart },
         { icon: iUrl('ready-breed', 6), label: 'Breeding', sub: pairs.length ? pn(pairs.length, 'pair', 'pairs') + ' ready' : 'None ready', disabled: !pairs.length || !free, onTap: breedPairs },
         { icon: iUrl('ready-event', 6), label: 'Event', sub: evWhy || pn(evs.length, 'habitat', 'habitats') + ' ready', disabled: !!evWhy, onTap: eventHabsScreen },
-        { icon: iUrl('rep', 6), label: 'Advertise', sub: runningC ? runningC + ' running' : '', onTap: campaignScreen }
+        { icon: iUrl('rep', 6), label: 'Advertise', sub: !(E.isOpen ? E.isOpen(s) : true) ? 'Needs habitat' : runningC ? runningC + ' running' : '', disabled: !(E.isOpen ? E.isOpen(s) : true), onTap: campaignScreen }
       ], 2, 72));
     } });
   }
@@ -402,7 +403,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     push({ id: 'campaigns', title: 'Advertise', render(body, api) {
       const s = S();
       body.appendChild(rows(E.campaigns(s).map((c, i) => {
-        const reason = c.weeksLeft > 0 ? ['On ', clk(c.weeksLeft)] : c.lock ? 'Needs ' + c.lock : s.money < c.cost ? needMoney(c.cost) : '';
+        const reason = !isOpen(s) ? 'Needs habitat' : c.weeksLeft > 0 ? ['On ', clk(c.weeksLeft)] : c.lock ? 'Needs ' + c.lock : s.money < c.cost ? needMoney(c.cost) : '';
         return row({ img: iUrl('rep', 4), title: c.name, sub: c.note, extra: reason ? why(reason) : null, right: mny(c.cost), off: !!reason,
           tap: () => ui.confirm('Run ' + c.name + ' for ' + money(c.cost) + '?', () => { const r = Core.act('runCampaign', i); if (r.ok) { ui.toast(c.name + ' running', 'good'); api.rerender(); } }, { yes: 'Run it' }) });
       })));
@@ -995,7 +996,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     { text: 'Tap your land to open the menu.', done: () => Core.stack().length > 0, glow: BLANK_GLOW },
     { text: 'Build, Habitats: place a Savanna home.', done: (s, b) => habCount(s) > (b.hab || 0), glow: BLANK_GLOW, hold: 2600 },
     { text: 'Now place a Snack Stand.', done: (s, b) => count(s, 'snack') > (b.snack || 0), glow: { menu: 'Build', build: 'Facilities', 'build-facs': 'Snack Stand' } },
-    { text: 'Place a Garden Bench beside it.', done: (s, b) => count(s, 'bench') > (b.bench || 0), glow: { menu: 'Build', build: 'Facilities', 'build-facs': 'Garden Bench' } },
+    { text: 'Place a Bench next to the stand.', done: (s, b) => count(s, 'bench') > (b.bench || 0), glow: { menu: 'Build', build: 'Facilities', 'build-facs': 'Garden Bench' } },
     { text: 'Flag on the habitat: hold an event.', done: (s, b) => didN(s, 'startEvent') > (b.startEvent || 0), glow: { menu: 'Projects', projects: 'Event', 'event-habs': 'Savanna', 'event-theme': 'Feeding' } },
     { text: "That's it. Tap the zoo any time.", auto: 7000 }
   ];
@@ -1021,6 +1022,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     const stackNow = Core.stack();
     if (stackNow.indexOf('title') >= 0) { coachRemove(); return; }
     let changed = false, g = 0;
+    if (t.step >= 2 && t.step < TUT.length - 1 && !isOpen(s)) { t.step = 1; t.b = Object.assign({}, t.b, { hab: 0 }); changed = true; }   // the habitat was removed: ask for one again
     while (t.on && g++ < 6) {
       const st = TUT[t.step]; if (!st) { t.on = false; changed = true; break; }
       if (st.auto) break;
@@ -1035,7 +1037,8 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       coachEl = el('div', { cls: 'mn-coach', role: 'status' }, span('mn-ct'), el('button', { type: 'button', cls: 'mn-skip', tap: () => { const t2 = S() && S().ui && S().ui.tutorial; if (t2) { t2.on = false; try { Core.save(); } catch (e) { /* ignore */ } } coachRemove(); } }, 'Skip'));
     }
     const placing = !!(window.ZRender && ZRender.placing && ZRender.placing());
-    coachEl.firstChild.textContent = placing ? PLACE_TEXT : st.text; coachEl.dataset.step = t.step;
+    const pn2 = document.getElementById('placement-note'), combo = placing && pn2 && /Completes/.test(pn2.textContent);
+    coachEl.firstChild.textContent = placing ? (combo ? 'This spot completes a combo!' : PLACE_TEXT) : st.text; coachEl.dataset.step = t.step;
     const panel = top && top.querySelector('.panel'), stage = document.getElementById('stage');
     coachEl.classList.toggle('inpanel', !!panel);
     const parent = panel || stage;

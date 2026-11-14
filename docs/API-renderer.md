@@ -41,6 +41,18 @@
     Only one animal per habitat walks at a time. Callers and happening characters stand just outside the gate pillars.
 17. `debug()` also returns `gateKinds`, `gateMarks`, `gateArrived`, `icons` (per habitat id, e.g. `["sick","ready-event","bar"]`) and `moving`.
 
+18. **Bare land (a brand-new zoo with nothing built).** The camera opens with the gate about four fifths of the way down and
+    owned land filling the view. No visitors until there is something to visit. Staff start apart just inside the gate and potter
+    about there until the first habitat exists. Empty item lists are safe everywhere.
+19. **Holding pen on the floor.** Whenever `ZE.holding(S)` is non-empty, a crate (`ZSprites.deco('crate')`, falling back to the
+    doubled `pen` icon, then a built-in box) stands on a free grass hex just inside the gate, up and to the left, with up to three
+    waiting animals beside it. It keeps off paths and the gate arch, has no decoration on its hex, moves if something is built
+    there, hides under a placement ghost, and vanishes when the pen is empty. A tap on it is an ordinary tap.
+20. **Arrival hop.** An animal that newly appears in a habitat (housed, born, bought, moved) does a short hop with a heart pop-up.
+    Not shown when a save is loaded or a new game starts. It plays only while running, so in repeat placement it waits for Done.
+21. **Decorations make way for the ghost.** During placement, decorations on the ghost's hexes are hidden, and trees on the hexes
+    just in front of it too. `debug()` also returns `pen` (`{q, r, crate, count, hidden, onPath}`), `inHab`, `hopping`, `staffAt`, `gateXY`.
+
 ## Functions
 
 | Call | What it does |
@@ -113,7 +125,7 @@ rep, fun star, learning rp) and a flame when `fired`, `birth` -> two hearts, `ex
 ## Test files
 
 - `test/render-floor.html`: floor-only harness with a demo zoo built through real engine calls. `?stub=1` skips `sprites.js`,
-  `?rows=N` sets owned rows (default 14, a mid-game zoo with open grass between things; a real new game owns 8), `?full=1` adds two more habitats.
+  `?blank=1` gives a bare new zoo, `?rows=N` sets owned rows (default 14, a mid-game zoo with open grass between things; a real new game owns 8), `?full=1` adds two more habitats.
 - `test/render-shot.js`: `node test/render-shot.js [chromium|webkit|both] [--stub]`. Headless. Writes `test/shots/render-floor.png`,
   `render-drag.png`, `render-fx.png`, `render-zoomout.png`, `render-place-valid.png`, `render-place-invalid.png`,
   `render-place-habitat.png`, `render-place-combo.png` (WebKit copies end in `-webkit.png`) and checks: buffer size and crisp

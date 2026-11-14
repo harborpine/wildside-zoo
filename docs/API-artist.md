@@ -45,7 +45,7 @@ Fences and the entrance also have `sortDy`.
 | `fence(biome, edge)` | Edge 0..5 in `ZGeo.EDGES` order. Anchor at the hex centre. Has `sortDy`. Eight styles: wood rails, bamboo slats, red posts and rope, ice wall, stone wall, glass panels, steel posts with warning wires, gold railing. Unknown biome: savanna style. |
 | `building(facId, {frame})` | Every id in `ZD.FAC_ORDER`. Anchor at the hex centre. Only `fountain` animates (2 frames, `BUILDING_FRAMES`). Unknown id: a plain hut. |
 | `entrance()` | Two pillars and a green arch with a paw emblem. Anchor at the hex centre of the gate hex. |
-| `deco(kind, seed)` | `tree` (4 looks: big, small, pine, fruit), `bush`, `flowers`, `rock`, `lamp`. Anchor at the base. |
+| `deco(kind, seed)` | `tree` (4 looks: big, small, pine, fruit), `bush`, `flowers`, `rock`, `lamp`, `crate` (wooden slatted travel crate / low holding pen, about 24 x 20, for animals waiting near the gate). Anchor at the base. |
 | `icon(name)` | Anchor centre-bottom. Unknown name: a small grey dot. |
 | `url(sprite, scale=3)` | PNG data URL, crisp scale-up, cached. |
 | `animalUrl(id, opts, scale)`, `personUrl(kind, opts, scale)`, `iconUrl(name, scale)`, `buildingUrl(id, scale)`, `tileUrl(kind, scale)` | Shortcuts for menus. |

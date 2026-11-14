@@ -173,6 +173,24 @@ async function run(name) {
   check((await ev(page, () => ZT.errors.slice())).length === 0, 'walking every box of a blank zoo raised no errors');
   await ctx.close();
 
+  // ---------------------------------------------------------------- narrow phone, Advertise before opening, tutorial after removing the habitat
+  ({ ctx, page } = await mk(320, 568, URL + '?play=blank'));
+  await ev(page, () => { ZCore.WEEK_MS[1] = 1e9; ZCore.WEEK_MS[2] = 1e9; ZMenus.startTutorial(); });
+  await page.touchscreen.tap(160, 300); await sleep(600); await tap(page, 'Projects');
+  check(await ev(page, () => [...document.querySelectorAll('.layer:not([hidden]) .gbox')].some(b => b.textContent.startsWith('Advertise') && b.classList.contains('disabled') && /Needs habitat/.test(b.textContent))), 'Advertise is greyed with "Needs habitat" before the zoo opens');
+  await tap(page, 'Back'); await tap(page, 'Back').catch(() => 0); await ev(page, () => ZT.popAll());
+  await page.touchscreen.tap(160, 300); await sleep(500); await tap(page, 'Animals'); await shot(page, 'narrow-pen');
+  const nr = await ev(page, () => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), t = L.querySelector('.row .t'), r = t.getBoundingClientRect(), bt = L.querySelector('.row .btn').getBoundingClientRect(), row = L.querySelector('.row').getBoundingClientRect(); return { nameW: Math.round(r.width), btnBelow: bt.top >= r.bottom - 2, inside: bt.right <= row.right + 1, text: t.textContent }; });
+  check(nr.nameW >= 60 && nr.btnBelow && nr.inside, '320 px: the pen row keeps the name readable and puts House under it (' + JSON.stringify(nr) + ')');
+  await ev(page, () => ZT.popAll()); await page.touchscreen.tap(160, 300); await sleep(500); await tap(page, 'Staff'); await shot(page, 'narrow-staff');
+  const sr = await ev(page, () => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), pr = L.querySelector('.panel').getBoundingClientRect(); return { out: [...L.querySelectorAll('.row .chip')].filter(c => c.getBoundingClientRect().right > pr.right + 1).length, over: L.querySelector('.pbody').scrollWidth - L.querySelector('.pbody').clientWidth }; });
+  check(sr.out === 0 && sr.over <= 1, '320 px: staff skill chips stay inside the panel (' + JSON.stringify(sr) + ')');
+  await ev(page, () => { ZT.popAll(); const S = ZT.S; let q = 0, r = 0, ok = false; for (let rr = 19; rr >= 0 && !ok; rr--) for (let c = 0; c < ZD.GRID_W && !ok; c++) { const p = ZE.fromOffset(c, rr); if (ZE.canPlace(S, 'hab', 'savanna', p[0], p[1], 0)) { q = p[0]; r = p[1]; ok = true; } } ZCore.act('build', 'hab', 'savanna', q, r, 0); });
+  await sleep(900); const st2 = await step(page);
+  await ev(page, () => { const h = ZT.S.items.find(i => i.k === 'hab'); ZCore.act('remove', h.id); }); await sleep(3300);
+  check(st2 === 2 && await step(page) === 1 && (await coach(page) || '').startsWith('Build, Habitats'), 'removing the only habitat mid-tutorial brings the habitat step back (' + st2 + ' then ' + await step(page) + ')');
+  await ctx.close();
+
   // title fits without scrolling at every size, even with three used slots
   for (const [w, hh] of TITLE_SIZES) {
     const c2 = await browser.newContext({ viewport: { width: w, height: hh }, deviceScaleFactor: 2, hasTouch: true, isMobile: true }), p2 = await c2.newPage();

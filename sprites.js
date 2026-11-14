@@ -1168,7 +1168,7 @@
   // =====================================================================================================================
   // DECORATIONS, anchored at the base
   // =====================================================================================================================
-  var DECOS = ['tree', 'bush', 'flowers', 'rock', 'lamp'];
+  var DECOS = ['tree', 'bush', 'flowers', 'rock', 'lamp', 'crate'];
   function drawDeco(kind, seed) {
     var P, r = rng(seed * 17 + kind.length), n, x, y;
     if (kind === 'tree') {
@@ -1208,6 +1208,15 @@
       else { P.poly([[-5, -1], [-4, -4], [0, -6], [4, -4], [5, -1]], 'A', 'a'); P.set(-1, -5, 'B'); P.set(0, -5, 'B'); }
       P.set(-6, -1, 'G'); P.set(-7, -1, 'G'); P.set(-6, -2, 'G');
       return P.bake([7, 1]);
+    }
+    if (kind === 'crate') { // wooden travel crate / low holding pen: slatted sides, open slatted top
+      P = Bp({ A: '#d8a868', D: '#8a5c34', T: '#b07c44', K2: '#4a3626', M: '#8a8a9a' });
+      var o = box(P, 0, -5, 5, 5, 8, 'A', 'T', 'A'), u;
+      for (u = 2; u < 10; u += 3) { o.rl(u, 2, 1, 4, 'K2', 1); o.rr(u - 1, 2, 1, 4, 'K2', 2); }
+      o.rl(0, 6, 10, 2, 'A', 0); o.rr(0, 6, 10, 2, 'T', 1); o.rl(0, 0, 10, 2, 'T', 1); o.rr(0, 0, 10, 2, 'D', 1); o.rl(0, 0, 1, 8, 'T', 1); o.rl(9, 0, 1, 8, 'T', 1); o.rr(9, 0, 1, 8, 'D', 1);
+      for (u = 3; u < 10; u += 3) P.line(o.Lx + u, o.Ly - 8 + u / 2 - 1, o.Lx + u + 8, o.Ly - 8 + u / 2 - 5, 'D', 1);
+      o.fl(4, 7, 'M', 1); o.fl(5, 7, 'M', 1);
+      return P.bake([11, 3, null, 0.2, 1, -3]);
     }
     // lamp
     P = new Pt({ A: '#4a4a5c', Y: '#fff0a0', G: '#f4c838' }, 24, 40, 12, 32);

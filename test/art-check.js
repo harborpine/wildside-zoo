@@ -35,7 +35,7 @@ const { chromium } = require('./pw.js');
     const bfb = S.building('no-such-building', {});
     D.FAC_ORDER.forEach(id => { const s = S.building(id, {}); if (!ok(s) || same(s, bfb)) bad.push('building ' + id); });
     if (!ok(S.entrance())) bad.push('entrance');
-    ['tree', 'bush', 'flowers', 'rock', 'lamp'].forEach(k => { if (!ok(S.deco(k, 1))) bad.push('deco ' + k); });
+    ['tree', 'bush', 'flowers', 'rock', 'lamp', 'crate'].forEach(k => { if (!ok(S.deco(k, 1))) bad.push('deco ' + k); });
     const ifb = S.icon('no-such-icon');
     ['ready-event', 'ready-breed', 'busy', 'sick', 'choice', 'star', 'flame', 'coin', 'rp', 'heart', 'rep', 'm-projects', 'm-build', 'm-animals', 'm-staff', 'm-research', 'm-info', 'm-system', 'stat-charm', 'stat-vigor', 'stat-wit', 'skill-care', 'skill-sci', 'skill-exp', 'skill-charm', 'sex-m', 'sex-f', 'juv', 'time', 'visitors', 'odds', 'cost-rp', 'lock', 'new', 'ok', 'no', 'habitat', 'pen', 'land', 'trophy', 'medal-gold', 'medal-silver', 'medal-bronze', 'grade-ss', 'grade-s', 'grade-a', 'grade-b', 'grade-c', 'grade-d'].forEach(n => { const s = S.icon(n); if (!ok(s) || same(s, ifb) || S.ICONS.indexOf(n) < 0) bad.push('icon ' + n); });
     for (const u of [S.url(S.icon('coin')), S.animalUrl('lion', {}, 4), S.iconUrl('star', 2), S.personUrl('keeper', {}, 3)]) if (String(u).indexOf('data:image/png') !== 0) bad.push('url helper');

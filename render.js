@@ -273,11 +273,13 @@
     const gs = m.gate, gateBox = gs && ent ? { x0: ent.x - gs.ax - 8, x1: ent.x - gs.ax + gs.c.width + 8, y0: ent.y - gs.ay - 6, y1: ent.y - gs.ay + gs.c.height + 16 } : null;
     const entNb = c => ent && DIR6.some(d => c.q === ent.q + d[0] && c.r === ent.r + d[1]);
     // nothing decorative where the gate arch or its pillars would hide it (or stand in front of it), nor on the hexes touching the gate
+    // the holding pen's spot: a free grass hex just inside the gate, off the paths and clear of the arch
+    m.pen = null; if (ent) { let bs = 1e18; const wantX = ent.x - W * 1.1, wantY = ent.y - HH * 1.3; cells.forEach(c => { if (!c.owned || m.occ[c.k] || m.path[c.k] || c.k === ent.k || standKeys[c.k]) return; if (gateBox && c.x > gateBox.x0 - 14 && c.x < gateBox.x1 + 14 && c.y > gateBox.y0 && c.y < gateBox.y1) return; const d = (c.x - wantX) * (c.x - wantX) + (c.y - wantY) * (c.y - wantY) * 2; if (d < bs) { bs = d; m.pen = c; } }); }
     let decoCell = null;
     const addDeco = (sp, x, y, k) => { if (gateBox && x > gateBox.x0 && x < gateBox.x1 && y > gateBox.y0 && y < gateBox.y1) return; add(sp, x, y, k, { ck: decoCell, tall: sp.c.height > 22 }); };
     const builtAbove = c => DIR6.some(d => G.toScreen(d[0], d[1]).y < -HH * 0.6 && m.occ[key(c.q + d[0], c.r + d[1])]) || (ent && Math.abs(c.x - ent.x) < W * 1.3 && Math.abs(c.y - ent.y) < HH * 3.5);
     cells.forEach(c => {
-      decoCell = c.k; if (c.road || (m.occ[c.k] && c.owned) || entNb(c)) return;
+      decoCell = c.k; if (c.road || (m.occ[c.k] && c.owned) || entNb(c) || (m.pen && c.k === m.pen.k)) return;
       const h = hash(c.q, c.r, 11), ox = Math.round((hash(c.q, c.r, 12) - 0.5) * 18), oy = Math.round((hash(c.q, c.r, 13) - 0.5) * HH * 0.6), seed = Math.floor(h * 9973);
       if (!c.owned) { // wild land: dim trees, thicker outside the map
         if (nearRoad(c)) return;
@@ -448,10 +450,22 @@
     return o;
   }
   function syncStatus(S) {
+    syncPen(S);
     statuses = {}; (S.items || []).forEach(it => { if (it.k === 'hab') statuses[it.id] = statusOf(S, it); });
     statuses._exp = (S.projects || []).filter(p => projectHab(S, p) == null).map(p => ({ progress: clamp((S.week - p.start) / Math.max(1, p.end - p.start), 0, 1), choice: !!p.choice }));
   }
 
+  let crate = null, crateSrc = null, penned = [];
+  function crateSprite() { // the Artist's crate (ZSprites.deco('crate')); else the small 'pen' icon doubled; else a plain built-in crate
+    const zs = root.ZSprites;
+    if (zs && ready('deco') && (!zs.DECOS || zs.DECOS.indexOf('crate') >= 0)) { try { const c2 = zs.deco('crate'), t2 = zs.deco('no-such-deco-kind'); if (c2 && c2.c && c2.c.width > 0 && (!t2 || t2.c !== c2.c)) return c2; } catch (e) { /* fall through */ } }
+    const ic = ready('icon') ? spr('icon', 'pen') : null;
+    if (crate && crateSrc === (ic ? ic.c : null)) return crate; crateSrc = ic ? ic.c : null;
+    if (ic) crate = mk(ic.c.width * 2, ic.c.height * 2, ic.c.width, ic.c.height * 2 - 2, x => { x.imageSmoothingEnabled = false; x.drawImage(ic.c, 0, 0, ic.c.width * 2, ic.c.height * 2); });
+    else crate = mk(22, 20, 11, 18, x => { x.fillStyle = '#3b2a1a'; x.fillRect(0, 0, 22, 20); x.fillStyle = '#b98850'; x.fillRect(2, 2, 18, 16); x.fillStyle = '#8a6238'; for (let i = 5; i < 18; i += 5) x.fillRect(i, 2, 2, 16); });
+    return crate;
+  }
+  function syncPen(S) { let hold = []; try { hold = Z.holding ? Z.holding(S) : (S.animals || []).filter(a => a.hab == null); } catch (e) { hold = []; } penned = hold.slice(0, 3).map(a => ({ sp: a.sp, variant: !!a.variant, juv: Z.isJuv ? !!Z.isJuv(S, a) : false })); }
   function iconsOf(s) { const ic = []; if (s.choice) ic.push('choice'); if (s.sick) ic.push('sick'); if (s.event) ic.push('ready-event'); if (s.breed) ic.push('ready-breed'); if (s.busy && s.progress == null) ic.push('busy'); if (s.buzz) ic.push('flame'); return ic; }
 
   // ---------------------------------------------------------------- floating pop-ups
@@ -649,7 +663,7 @@
   R.placing = () => !!P;
 
   // ---------------------------------------------------------------- drawing
-  const list = [], over = [];
+  const list = [], over = []; let penHidden = false;
   function frame(t) {
     if (!started) return; root.requestAnimationFrame(frame);
     const t0 = now(), dt = clamp((t - lastT) / 1000 || 0, 0, 0.1); lastT = t;
@@ -720,6 +734,13 @@
     };
     for (let i = 0; i < walkers.length; i++) person(walkers[i]);
     for (const k in gatePeople) person(gatePeople[k]);
+    // the holding pen: a crate just inside the gate with up to three waiting animals beside it (hidden under a placement ghost)
+    penHidden = false;
+    if (penned.length && M.pen) {
+      if (under && under[M.pen.k] === 1) penHidden = true;
+      else { const pc = M.pen, cs = crateSprite(), SPOT = [[14, -3], [3, 12], [23, 11]]; list.push({ s: cs, x: pc.x - 13, y: pc.y - 6, key: pc.y - 6 + 0.05, a: 1 }); // crate at the back left, animals to its right and in front, never on it
+        penned.forEach((a, i) => { const sp = spr('animal', a.sp, { variant: a.variant, juv: a.juv, frame: 0, flip: i === 1 }), bob = running && Math.sin(clock * 2 + i * 2.1) > 0.92 ? 1 : 0; list.push({ s: sp, x: pc.x + SPOT[i][0], y: pc.y + SPOT[i][1] - bob, key: pc.y + SPOT[i][1] + 0.1, a: 1 }); }); }
+    }
     list.sort((a, b) => a.key - b.key);
     for (let i = 0; i < list.length; i++) { const e = list[i], s = e.s; if (e.a !== 1) c.globalAlpha = e.a; c.drawImage(s.c, Math.round(e.x - s.ax) - cx, Math.round(e.y - s.ay) - cy); if (e.a !== 1) c.globalAlpha = 1; }
     stats.sprites = list.length;
@@ -784,6 +805,7 @@
       running: running, zoom: zoom, realSprites: usingReal(), spriteGetters: spriteState(), spriteErrors: Object.assign({}, stats.warned), animals: Object.keys(animals).length, visitors: walkers.filter(w => w.staff == null).length, staff: walkers.filter(w => w.staff != null && !w.hidden).length,
       inHab: (() => { let n = 0; for (const id in animals) { const a = animals[id], h = M && M.habs[a.hab]; if (h && h.cells.some(c => { const t = G.toAxial(a.x, a.y); return t.q === c.q && t.r === c.r; })) n++; } return n; })(), hopping: Object.keys(animals).filter(id => animals[id].hop > 0).length,
       staffAt: walkers.filter(w => w.staff != null && !w.hidden).map(w => [Math.round(w.x), Math.round(w.y)]), gateXY: M && M.ent ? [M.ent.x, M.ent.y] : null,
+      pen: M && M.pen ? { q: M.pen.q, r: M.pen.r, crate: (() => { const c = crateSprite(); return c.c.width + 'x' + c.c.height; })(), count: penned.length, hidden: penHidden, onPath: !!M.path[M.pen.k] } : null,
       gate: Object.keys(gatePeople).length, gateKinds: Object.keys(gatePeople).map(k => gatePeople[k].kind), gateArrived: Object.keys(gatePeople).filter(k => !gatePeople[k].wp.length).length, gateMarks: Object.keys(gatePeople).filter(k => gatePeople[k].mark).map(k => gatePeople[k].kind),
       icons: (() => { const o = {}; for (const id in statuses) if (id !== '_exp') { const s2 = statuses[id]; o[id] = iconsOf(s2).concat(s2.busy && s2.progress != null ? ['bar'] : []); } return o; })(), moving: (() => { const o = {}; for (const id in animals) if (animals[id].moving) o[animals[id].hab] = (o[animals[id].hab] || 0) + 1; return o; })(), floaters: floaters.length, combos: M ? M.combos.length : 0, statics: M ? M.statics.length : 0, paths: M ? M.pathKeys.length : 0,
       placement: P ? { q: P.q, r: P.r, rot: P.rot, ok: P.ok, state: P.state, msg: P.msg, makes: P.makes, breaks: P.breaks } : null };
