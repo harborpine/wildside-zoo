@@ -253,3 +253,11 @@ Icon keys come from `ZSprites` (`stat-charm`, `stat-vigor`, `stat-wit`, `skill-c
 * `ui.cost({money, rp, weeks})`: coin, flask and clock symbols with numbers (`<span class="costline">`).
 * Layout note: children of `.pbody` no longer shrink (`flex-shrink: 0`), so a long screen scrolls instead of squashing its rows.
 * Shown in `?demo=1` (list screen: "Symbols"). Tested by `test/shell-shot.js`.
+
+## Installed-app full screen and Screen check (round 5)
+
+* **Installed (home screen) mode** (`navigator.standalone === true`, `display-mode: standalone`, or `?standalone=1` for tests): `#app` always gets the whole screen height (`max(innerHeight, documentElement.clientHeight, visualViewport.height, screen.height)` set inline, plus `html.sa #app { height: 100vh }` as fallback), top 0. The visual viewport is **not** used there (iOS reports it short by about the status-bar height in an installed app, which left an empty band under the news line).
+  The visualViewport behaviour (`--app-h`, `--app-top`, class `vv`) now only runs in Safari with toolbars. `html`, `body`, `#app` and `#news` all use `--ink`, so no sliver of a different colour can show. The green wide-window background only applies above 500 px wide.
+* The news line is still a band at the very bottom, padded by the bottom safe-area inset only.
+* Test flags: `?standalone=1` forces the installed branch, `?inset=34` pretends a 34 px bottom inset (sets `--safe-b`).
+* **`ZCore.screens.screenCheck()`** (only when `ZCore.devTools`; returns null otherwise): pushes a "Screen check" screen listing standalone yes/no, screen, inner size, visualViewport size and offsetTop, documentElement size, `#app` box, news line top and bottom, the four safe-area insets, pixel ratio and user agent. Menus: add a button in System that calls it.

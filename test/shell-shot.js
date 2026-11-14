@@ -157,6 +157,13 @@ async function run(name) {
     await p.evaluate(() => ZT.title()); await sleep(300);
     check(await p.evaluate(() => ZT.S === null && ZT.stack().length === 1 && document.body.classList.contains('title-on')), 'title shows over a zoo with nothing built');
     await c.close(); }
+  for (const [w, h] of [[393, 852], [440, 956]]) {   // installed-app branch with a simulated 34 px home-indicator inset
+    const { c, p } = await fresh({ width: w, height: h }, '?play=1&standalone=1&inset=34');
+    const g = await p.evaluate(() => { const a = document.getElementById('app').getBoundingClientRect(), n = document.getElementById('news'), nb = n.getBoundingClientRect(), cs = getComputedStyle(n); const probe = document.elementFromPoint(innerWidth / 2, innerHeight - 2); return { appBottom: Math.round(a.bottom), appTop: Math.round(a.top), h: innerHeight, newsBottom: Math.round(nb.bottom), padB: parseFloat(cs.paddingBottom), textBottom: Math.round(nb.bottom - parseFloat(cs.paddingBottom)), under: probe && (probe.id || probe.tagName), sa: document.documentElement.classList.contains('sa') }; });
+    check(g.sa && g.appTop === 0 && g.appBottom === g.h && g.newsBottom === g.h && g.padB >= 34 && g.textBottom <= g.h - 34 && g.under === 'news', 'installed-app mode at ' + w + 'x' + h + ': app fills to the very bottom, news text clears the inset, no band below (' + JSON.stringify(g) + ')');
+    await p.evaluate(() => ZCore.screens.screenCheck()); await sleep(300); await shot('screencheck-' + w, p);
+    check(await p.evaluate(() => ZT.stack().join() === 'screencheck' && document.querySelector('.pbody').textContent.indexOf('safe top') >= 0), 'Screen check readout shows (' + w + ')');
+    await c.close(); }
   { const { c, p } = await fresh({ width: 320, height: 568 }, '?play=1');
     const wd = await p.evaluate(() => { ZCore.push({ id: 'w', title: 'T', render(b) { b.appendChild(ZCore.ui.chipRow([ZCore.ui.astat('charm', 78), ZCore.ui.astat('vigor', 61), ZCore.ui.astat('wit', 49), ZCore.ui.grade('a')])); b.appendChild(ZCore.ui.grid([{ icon: 'm-build', label: 'Build' }, { icon: 'm-info', label: 'Info' }, { icon: 'm-system', label: 'System' }])); } }); const a = document.getElementById('app'), d = document.scrollingElement; return { app: a.scrollWidth, w: a.clientWidth, page: d.scrollWidth, vw: innerWidth, over: [...document.querySelectorAll('.layer:not([hidden]) *')].filter(e => e.getBoundingClientRect().right > innerWidth + 1 && !e.closest('.chips')).length }; });
     check(wd.app <= 320 && wd.page <= 320 && wd.over === 0, 'nothing exceeds the screen width at 320 px (' + JSON.stringify(wd) + ')');

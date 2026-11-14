@@ -5,6 +5,7 @@
   const D = window.ZD, E = window.ZE;
   const SAVE_KEY = 'wildside-zoo-v3', LEGACY_KEY = 'wildside-zoo-v3-legacy', PREV_LOG_KEY = 'wildside-zoo-v3-prevlog';
   const SAVE_V = 3, LOG_FORMAT = 1;
+  const STANDALONE = navigator.standalone === true || /[?&]standalone=1/.test(location.search) || !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches);
   const DEV_TOOLS = true;   // the one switch for developer-only features: Note for Claude, Copy log, Download log. Set false for a store build.
   const LANDSCAPE = window.matchMedia ? window.matchMedia('(orientation: landscape) and (max-height: 500px) and (pointer: coarse)') : null;
   const WEEK_MS = [0, 10000, 5000];          // real milliseconds per in-game week at speed 1 and 2 (about 6.7 real hours per 20 years at the owner's pace)
@@ -315,6 +316,22 @@
     } catch (e) { toast('Could not download. Use Copy log.', 'bad'); return false; }
   }
   function addNote(text) { if (!DEV_TOOLS) return false; text = String(text || '').trim().slice(0, 600); if (!text || !S) return false; S.glog.notes.push({ w: S.week, text }); log('note', { text }); queueSave(); toast('Note saved in the log', 'good'); return true; }
+  function insets() {
+    const p = el('div', { style: { position: 'fixed', left: '0', top: '0', visibility: 'hidden', paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)', paddingLeft: 'env(safe-area-inset-left, 0px)', paddingRight: 'env(safe-area-inset-right, 0px)' } });
+    document.body.appendChild(p); const c = getComputedStyle(p), r = { top: c.paddingTop, bottom: c.paddingBottom, left: c.paddingLeft, right: c.paddingRight }; p.remove(); return r;
+  }
+  function screenCheck() {
+    if (!DEV_TOOLS) return null;
+    return push({ id: 'screencheck', title: 'Screen check', render(body, api) {
+      const v = window.visualViewport, ab = $('app').getBoundingClientRect(), nb = $('news').getBoundingClientRect(), I = insets(), de = document.documentElement;
+      const rows = [['standalone', (navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)) ? 'yes' : 'no' + (STANDALONE ? ' (forced)' : '')], ['screen', screen.width + ' x ' + screen.height], ['inner', innerWidth + ' x ' + innerHeight],
+        ['visualViewport', v ? Math.round(v.width) + ' x ' + Math.round(v.height) + ', top ' + Math.round(v.offsetTop) : 'none'], ['documentElement', de.clientWidth + ' x ' + de.clientHeight],
+        ['#app box', 'x ' + Math.round(ab.x) + ' y ' + Math.round(ab.y) + ', ' + Math.round(ab.width) + ' x ' + Math.round(ab.height) + ', bottom ' + Math.round(ab.bottom)], ['news line', 'top ' + Math.round(nb.top) + ' bottom ' + Math.round(nb.bottom)],
+        ['safe top / bottom', I.top + ' / ' + I.bottom], ['safe left / right', I.left + ' / ' + I.right], ['pixel ratio', String(devicePixelRatio)], ['browser', navigator.userAgent]];
+      body.appendChild(list(rows.map(r => ({ title: r[0], sub: r[1] }))));
+      body.appendChild(note('Take a screenshot of this and send it.'));
+    } });
+  }
   function logScreen() {
     return push({ id: 'log', title: 'Game log', render(body, api) {
       if (!DEV_TOOLS) { body.appendChild(note('Nothing to show here.')); return; }
@@ -476,8 +493,23 @@
     document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && stack.length && !stack[stack.length - 1].modal) pop(); });
     document.addEventListener('gesturestart', ev => ev.preventDefault());
     document.addEventListener('contextmenu', ev => { if (!/^(TEXTAREA|INPUT)$/.test(ev.target.tagName)) ev.preventDefault(); });
-    const vvFix = () => { const v = window.visualViewport, app = $('app'); if (!v || !app) return; app.style.setProperty('--app-h', Math.round(v.height) + 'px'); app.style.setProperty('--app-top', Math.round(v.offsetTop) + 'px'); app.classList.add('vv'); };
-    if (window.visualViewport) { visualViewport.addEventListener('resize', vvFix); visualViewport.addEventListener('scroll', vvFix); vvFix(); }
+    // Screen fitting. Installed (home screen) app: always fill the WHOLE screen, never the visual viewport (iOS reports it short by the status-bar height there).
+    // Safari with toolbars: follow the visible area as the bars show and hide.
+    const app = $('app'), qs = location.search, forced = /[?&]standalone=1/.test(qs), ins = /[?&]inset=([0-9]+)/.exec(qs);
+    if (ins) document.documentElement.style.setProperty('--safe-b', ins[1] + 'px');   // test only: pretend there is a bottom inset
+    const fit = () => {
+      if (!app) return;
+      if (STANDALONE) {
+        document.documentElement.classList.add('sa');
+        const h = Math.max(innerHeight, document.documentElement.clientHeight, (window.visualViewport && visualViewport.height) || 0, (navigator.standalone === true || forced) && screen.width <= 600 ? Math.max(screen.height, screen.width) : 0);
+        app.style.height = h + 'px'; app.style.top = '0px'; app.classList.remove('vv');
+      } else if (window.visualViewport) {
+        const v = visualViewport; app.style.setProperty('--app-h', Math.round(v.height) + 'px'); app.style.setProperty('--app-top', Math.round(v.offsetTop) + 'px'); app.classList.add('vv');
+      }
+    };
+    window.addEventListener('resize', fit); window.addEventListener('orientationchange', () => setTimeout(fit, 150));
+    if (window.visualViewport && !STANDALONE) { visualViewport.addEventListener('resize', fit); visualViewport.addEventListener('scroll', fit); }
+    fit(); setTimeout(fit, 400);
     document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else lastT = performance.now(); });
     window.addEventListener('pagehide', () => save());
   }
@@ -506,7 +538,7 @@
     newGame, save, load, slots, loadSlot, deleteSlot, toTitle, showTitle, setSpeed, act, push, pop, popAll, replace, rerender, stack: () => stack.map(e => e.id), top: () => (stack.length ? stack[stack.length - 1].api : null),
     openMenu, onReport, flushReports, running: isRunning, saveLegacy,
     log, logText, copyLog, downloadLog, addNote, updateStrip, weekProgress: () => (WEEK_MS[speed] ? Math.min(1, acc / WEEK_MS[speed]) : 0),
-    screens: { log: logScreen, title: titleScreen }, toast, boot
+    screens: { log: logScreen, title: titleScreen, screenCheck }, toast, boot
   };
   window.ZCore = Core;
   window.ZT = {
