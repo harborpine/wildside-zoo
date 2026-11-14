@@ -53,6 +53,25 @@
 21. **Decorations make way for the ghost.** During placement, decorations on the ghost's hexes are hidden, and trees on the hexes
     just in front of it too. `debug()` also returns `pen` (`{q, r, crate, count, hidden, onPath}`), `inHab`, `hopping`, `staffAt`, `gateXY`.
 
+22. **Style-D art (density 2) is ON.** The one switch is `const DENSITY` near the top of `geo.js` (2 = style D, 1 = the old art).
+    `geo.js` multiplies A, B, W, H, HW, HH by it and exposes `ZGeo.DENSITY`; `render.js` calls `ZSprites.setDensity(ZGeo.DENSITY)`
+    the moment it loads (it loads right after `sprites.js`, before `core.js`, `menus.js` and `moments.js`), so every sprite and every
+    menu image is made at the right density. Nothing in `core.js` needed to change. Test pages may set `window.ZWZ_DENSITY = 1`
+    before `geo.js` loads to compare (`test/render-floor.html?d=1`); the game never does.
+    - Buffer pixels are now fine pixels (half an old art pixel). Zoom 1 is `round(deviceWidth / 390)` device px per buffer pixel:
+      a 3x phone draws 3 device px (1 CSS px) per buffer pixel (old: 6), a 2x phone 2 (1 CSS px), a 1x screen 1. The view is the same
+      size as before (about 4 hexes across), with twice the detail.
+    - Zoom 0 is `round(deviceWidth / 560)`, at least one step back: on a 3x phone 2 device px (the same pulled-back view as before);
+      on a 2x phone only 1 device px is possible, so it pulls back further than before (about 7.5 hexes across instead of 5.4);
+      on a 1x screen both zoom levels are the same.
+    - Every hand-tuned number (pop-up rise and offsets, icon spacing and backing, progress bars, walker and animal speeds, standing
+      spots, gate slots, holding-pen crate and its animals, arrival hop, decoration scatter, camera padding and scroll margins, fling
+      speed, culling margins) is in old art pixels times K (= density). Combo outlines and the placement edge are 2 fine pixels wide
+      with a 6-pixel dark halo and dashes 8 long, so they keep their weight. Pop-up digits and the built-in fallback shapes are drawn
+      at the old size and blown up K times with crisp pixels.
+    - `debug().buffer` now has `density` and `artScale` (CSS px per OLD art pixel); `scale` and `deviceScale` are per buffer pixel.
+    - Frame cost at 393x852 DPR 3, mid-game zoo, headless: Chromium about 1.1 ms, WebKit about 1.9 ms per frame (old art: 0.8 / 0.7 ms).
+
 ## Functions
 
 | Call | What it does |
@@ -126,7 +145,10 @@ rep, fun star, learning rp) and a flame when `fired`, `birth` -> two hearts, `ex
 
 - `test/render-floor.html`: floor-only harness with a demo zoo built through real engine calls. `?stub=1` skips `sprites.js`,
   `?blank=1` gives a bare new zoo, `?rows=N` sets owned rows (default 14, a mid-game zoo with open grass between things; a real new game owns 8), `?full=1` adds two more habitats.
-- `test/render-shot.js`: `node test/render-shot.js [chromium|webkit|both] [--stub]`. Headless. Writes `test/shots/render-floor.png`,
+- `test/render-d2.js`: `node test/render-d2.js [chromium|webkit|both]`. At 393x852 DPR 3: `render-d2-floor.png`, `render-d2-blank.png`,
+  `render-d2-place.png`, `render-d2-compare.png` (old density left, style D right, same camera spot), `render-d2-zoom.png` (close-up),
+  checks the scale numbers and that frame cost stays under 8 ms.
+- `test/render-shot.js`: `node test/render-shot.js [chromium|webkit|both] [--stub]`. All its pixel expectations follow `ZGeo.DENSITY`. Headless. Writes `test/shots/render-floor.png`,
   `render-drag.png`, `render-fx.png`, `render-zoomout.png`, `render-place-valid.png`, `render-place-invalid.png`,
   `render-place-habitat.png`, `render-place-combo.png` (WebKit copies end in `-webkit.png`) and checks: buffer size and crisp
   scale-up, tap hit-testing on every reachable grid hex (mouse and touch, centre and off-centre), drag distance, drag does not tap,

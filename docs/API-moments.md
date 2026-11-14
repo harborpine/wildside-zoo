@@ -44,6 +44,7 @@ Tests: `node test/moments-shot.js [chromium] [webkit] [--quick] [--only=late,car
 * **Applicants report** (timed hiring): plays `revealHire` (one tap to skip, one to leave), then opens the "Who turned up" list through `ZMenus.screens.candidates` (or `whoTurnedUp`) if Menus exposes one.
 * **Choices:** a staff skill shows its icon, its word and the person's value; "+1.5 to 2.5 points, flop -1" is an up arrow with the range and a down arrow with the flop.
 * **Setbacks (bad happenings):** a calm blue-grey title bar and card, never the red used for real failures; every option still resolves. Good happenings are unchanged.
+* **Carried-over animal ('Bring along'):** `moments.js` checks every 0.7 s and, once per animal, shows its Sell / Keep / **Later** flow at the first quiet moment (no screen open, no report pending). With the tutorial on it waits until the first habitat exists. On bare land the only place is the pen and its weekly upkeep reads 0 (free while closed). Later dismisses it for good (it still waits; reopen with `ZMoments.showArrival`). Tracked in `S.flags.legacyAsked`.
 * The grade badge never sits on top of an animal picture: it is beside the name.
 
 ## Report handlers (registered by `ZMoments.init`)

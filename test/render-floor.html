@@ -16,11 +16,13 @@
 <div id="col"><canvas id="floor"></canvas><div id="placement-note"></div><div id="placement-bar"></div></div>
 <script>
 /* Renderer test harness (floor only). ?stub=1 skips sprites.js so the built-in flat shapes are used. ?rows=N sets owned rows.
-   A seeded Math.random keeps screenshots repeatable. */
+   A seeded Math.random keeps screenshots repeatable. ?d=1 / ?d=2 force an art density (default: geo.js's switch).
+   Wished-for spots below are in old art pixels and multiplied by ZGeo.DENSITY. */
 (function () { let s = 12345; Math.random = function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; })();
 window.RT = { errors: [], taps: [], placed: [], cancelled: 0, done: 0, log: [] };
 window.addEventListener('error', function (e) { RT.errors.push((e.filename || '').split('/').pop() + ': ' + e.message); });
 var STUB = /[?&]stub=1/.test(location.search);
+var DM = /[?&]d=(1|2)\b/.exec(location.search); if (DM) window.ZWZ_DENSITY = +DM[1]; // ?d=1 shows the old density for side-by-side comparisons (the game uses geo.js's switch)
 ['../data.js', '../engine.js', '../geo.js'].concat(STUB ? [] : ['../sprites.js']).concat(['../render.js']).forEach(function (src) { document.write('<script src="' + src + '"><\/script>'); });
 </script>
 <script>
@@ -43,7 +45,8 @@ var STUB = /[?&]stub=1/.test(location.search);
   var ent = Z.entrance ? Z.entrance(S) : null;
   var cells = [];
   for (var r = 0; r < D.GRID_H; r++) for (var c = 0; c < D.GRID_W; c++) { var a = Z.fromOffset(c, r); if (Z.inLand(S, a[0], a[1])) cells.push({ q: a[0], r: a[1], p: ZGeo.toScreen(a[0], a[1]) }); }
-  var ex = ent ? ZGeo.toScreen(ent.q, ent.r) : { x: 240, y: 380 };
+  var KD = ZGeo.DENSITY || 1;
+  var ex = ent ? ZGeo.toScreen(ent.q, ent.r) : { x: 240 * KD, y: 380 * KD };
   var occ = function () { return Z.occupancy(S); };
   var DIRS = ZGeo.EDGES.map(function (e) { return e[0]; });
   // habitats: nearest valid spot to a wished-for point (relative to the entrance), keeping a one-hex walkway around each
@@ -55,7 +58,7 @@ var STUB = /[?&]stub=1/.test(location.search);
         var cs = Z.cellsOf('hab', t, cell.q, cell.r, rot), clear = true, sx = 0, sy = 0;
         cs.forEach(function (k) { var p = ZGeo.toScreen(k[0], k[1]); sx += p.x; sy += p.y; DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (g[q + ',' + rr] || (ent && q === ent.q && rr === ent.r)) clear = false; }); });
         if (!clear) continue;
-        var d2 = Math.pow(sx / cs.length - (ex.x + dx), 2) + Math.pow((sy / cs.length - (ex.y + dy)) * 2, 2);
+        var d2 = Math.pow(sx / cs.length - (ex.x + dx * KD), 2) + Math.pow((sy / cs.length - (ex.y + dy)) * 2, 2);
         if (!best || d2 < best.d) best = { d: d2, q: cell.q, r: cell.r, rot: rot };
       }
     });
@@ -67,7 +70,7 @@ var STUB = /[?&]stub=1/.test(location.search);
   function placeFac(t, hab, nth) {
     var list = [];
     if (!hab) return null;
-    Z.cells(hab).forEach(function (k) { DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (Z.canPlace(S, 'fac', t, q, rr, 0) && !(Math.abs(ZGeo.toScreen(q, rr).x - ex.x) < 60 && ex.y - ZGeo.toScreen(q, rr).y < 70) && !list.some(function (o) { return o.q === q && o.r === rr; })) { var p = ZGeo.toScreen(q, rr); list.push({ q: q, r: rr, d: Math.abs(p.x - ex.x) + Math.abs(p.y - ex.y) * 2 }); } }); });
+    Z.cells(hab).forEach(function (k) { DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (Z.canPlace(S, 'fac', t, q, rr, 0) && !(Math.abs(ZGeo.toScreen(q, rr).x - ex.x) < 60 * KD && ex.y - ZGeo.toScreen(q, rr).y < 70 * KD) && !list.some(function (o) { return o.q === q && o.r === rr; })) { var p = ZGeo.toScreen(q, rr); list.push({ q: q, r: rr, d: Math.abs(p.x - ex.x) + Math.abs(p.y - ex.y) * 2 }); } }); });
     list.sort(function (a, b) { return a.d - b.d; });
     var pick = list[Math.min(nth || 0, list.length - 1)]; if (!pick) { log.push('no spot for ' + t); return null; }
     var res = Z.build(S, 'fac', t, pick.q, pick.r, 0); if (!res.ok) log.push(t + ': ' + res.msg);

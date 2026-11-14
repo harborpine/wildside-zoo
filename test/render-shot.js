@@ -29,12 +29,12 @@ async function run(name) {
   const tapCount = () => page.evaluate(() => RT.taps.length);
 
   await sleep(3500);
-  const d0 = await dbg();
+  const d0 = await dbg(), K = await page.evaluate(() => ZGeo.DENSITY || 1); // K = buffer pixels per old art pixel (2 with the style-D art)
   notes.push('sprites: ' + (d0.realSprites ? 'REAL sprites.js' : 'built-in stub shapes') + (Object.keys(d0.spriteErrors).length ? ' (sprite errors: ' + JSON.stringify(d0.spriteErrors) + ')' : ''));
   notes.push('harness log: ' + JSON.stringify(await page.evaluate(() => RT.log)));
-  notes.push('buffer ' + d0.buffer.w + 'x' + d0.buffer.h + ' at ' + d0.buffer.scale + ' CSS px (' + d0.buffer.deviceScale + ' device px) per art pixel; drawn sprites ' + d0.sprites + ', animals ' + d0.animals + ', visitors ' + d0.visitors + ', staff ' + d0.staff + ', combos outlined ' + d0.combos + ', path hexes ' + d0.paths);
+  notes.push('density ' + K + ': buffer ' + d0.buffer.w + 'x' + d0.buffer.h + ' at ' + d0.buffer.scale + ' CSS px (' + d0.buffer.deviceScale + ' device px) per buffer pixel; drawn sprites ' + d0.sprites + ', animals ' + d0.animals + ', visitors ' + d0.visitors + ', staff ' + d0.staff + ', combos outlined ' + d0.combos + ', path hexes ' + d0.paths);
   notes.push('frame cost ' + d0.frameMs + ' ms, ' + d0.fps + ' fps (headless)');
-  ok(d0.buffer.deviceScale === 4 && Math.abs(d0.buffer.w - 195) <= 1, 'buffer should be 195 wide at 4 device px, got ' + JSON.stringify(d0.buffer));
+  ok(d0.buffer.deviceScale === 4 / K && Math.abs(d0.buffer.w - 195 * K) <= 1, 'buffer should be ' + 195 * K + ' wide at ' + 4 / K + ' device px (the same view as 195 old art pixels), got ' + JSON.stringify(d0.buffer));
   ok(d0.animals > 10, 'animals on the floor: ' + d0.animals); ok(d0.visitors > 5, 'visitors on the floor: ' + d0.visitors); ok(d0.sprites > 40, 'sprites drawn: ' + d0.sprites);
   await shot('floor');
 
@@ -45,7 +45,7 @@ async function run(name) {
 
   // --- tap hit-testing over the whole grid (centre each hex, tap it, also tap off-centre points inside it)
   const grid = await page.evaluate(() => { const out = [], occ = ZE.occupancy(RT.S); for (let r = 0; r < ZD.GRID_H; r++) for (let c = 0; c < ZD.GRID_W; c++) { const a = ZE.fromOffset(c, r); out.push({ q: a[0], r: a[1], item: occ[a[0] + ',' + a[1]] || null, owned: ZE.inLand(RT.S, a[0], a[1]) }); } return out; });
-  let tapped = 0, wrong = 0, ownedTapped = 0; const ownedAll = grid.filter(g => g.owned).length; const OFF = [[0, 0], [-19, 0], [19, 2], [0, -12], [8, 11], [-14, -7]];
+  let tapped = 0, wrong = 0, ownedTapped = 0; const ownedAll = grid.filter(g => g.owned).length; const OFF = [[0, 0], [-19, 0], [19, 2], [0, -12], [8, 11], [-14, -7]].map(o => [o[0] * K, o[1] * K]);
   for (let i = 0; i < grid.length; i += 1) {
     const g = grid[i]; await page.evaluate(([q, r]) => ZRender.centerOn(q, r, true), [g.q, g.r]);
     const o = OFF[i % OFF.length], p = await posOf(g.q, g.r, o[0], o[1]); if (p.x < 2 || p.y < 2 || p.x > p.w - 2 || p.y > p.h - 2) continue;
@@ -65,9 +65,9 @@ async function run(name) {
   const c0 = (await dbg()).cam, n0 = await tapCount();
   await page.mouse.move(300, 420); await page.mouse.down(); for (let i = 1; i <= 8; i++) { await page.mouse.move(300 - i * 18, 420 + i * 10); await sleep(16); } const cMid = (await dbg()).cam; await page.mouse.up();
   await sleep(700); const c1 = (await dbg()).cam;
-  ok(Math.abs((cMid.x - c0.x) - 72) < 3 && Math.abs((cMid.y - c0.y) + 40) < 3, 'drag of 144,-80 CSS px should move the camera 72,-40 art px, moved ' + (cMid.x - c0.x).toFixed(1) + ',' + (cMid.y - c0.y).toFixed(1));
-  ok(await tapCount() === n0, 'a drag fired a tap'); ok(c1.x > cMid.x + 1, 'no inertia after a flick (camera stayed at ' + cMid.x.toFixed(1) + ')');
-  notes.push('drag: camera moved ' + (cMid.x - c0.x).toFixed(1) + ',' + (cMid.y - c0.y).toFixed(1) + ' art px for a 144,-80 px drag, then coasted ' + (c1.x - cMid.x).toFixed(1) + ' more; no tap fired');
+  ok(Math.abs((cMid.x - c0.x) - 72 * K) < 3 * K && Math.abs((cMid.y - c0.y) + 40 * K) < 3 * K, 'drag of 144,-80 CSS px should move the camera ' + 72 * K + ',' + -40 * K + ' buffer px, moved ' + (cMid.x - c0.x).toFixed(1) + ',' + (cMid.y - c0.y).toFixed(1));
+  ok(await tapCount() === n0, 'a drag fired a tap'); ok(c1.x > cMid.x + K, 'no inertia after a flick (camera stayed at ' + cMid.x.toFixed(1) + ')');
+  notes.push('drag: camera moved ' + (cMid.x - c0.x).toFixed(1) + ',' + (cMid.y - c0.y).toFixed(1) + ' buffer px for a 144,-80 px drag, then coasted ' + (c1.x - cMid.x).toFixed(1) + ' more; no tap fired');
   await shot('drag');
   await page.mouse.move(60, 200); await page.mouse.down(); for (let i = 1; i <= 30; i++) await page.mouse.move(60 + i * 60, 200 + i * 60); await page.mouse.up(); await sleep(900);
   const cA = (await dbg()).cam; await page.mouse.move(60, 200); await page.mouse.down(); await page.mouse.move(200, 330, { steps: 4 }); await page.mouse.up(); await sleep(600); const cB = (await dbg()).cam;
@@ -89,11 +89,11 @@ async function run(name) {
 
   // --- zoomed-out level
   await page.evaluate(([q, r]) => { ZRender.setZoom(0); ZRender.centerOn(q, r - 6, true); }, [ent.q, ent.r]); await sleep(500);
-  const dZ = await dbg(); ok(dZ.zoom === 0 && dZ.buffer.deviceScale === 3, 'zoom 0 should be 3 device px per art pixel, got ' + dZ.buffer.deviceScale);
+  const dZ = await dbg(); ok(dZ.zoom === 0 && dZ.buffer.deviceScale === (K === 2 ? 1 : 3), 'zoom 0 should be ' + (K === 2 ? 1 : 3) + ' device px per buffer pixel on a 2x screen, got ' + dZ.buffer.deviceScale);
   await shot('zoomout');
-  let zw = 0, zt = 0; for (let i = 0; i < grid.length; i += 7) { const g = grid[i], p = await posOf(g.q, g.r, 5, -3); if (p.x < 2 || p.y < 2 || p.x > p.w - 2 || p.y > p.h - 2) continue; await page.mouse.click(p.x, p.y); const t = await lastTap(); zt++; if (!t || t.q !== g.q || t.r !== g.r) zw++; }
+  let zw = 0, zt = 0; for (let i = 0; i < grid.length; i += 7) { const g = grid[i], p = await posOf(g.q, g.r, 5 * K, -3 * K); if (p.x < 2 || p.y < 2 || p.x > p.w - 2 || p.y > p.h - 2) continue; await page.mouse.click(p.x, p.y); const t = await lastTap(); zt++; if (!t || t.q !== g.q || t.r !== g.r) zw++; }
   ok(zt > 8 && zw === 0, 'zoomed out: ' + zw + ' of ' + zt + ' taps wrong'); notes.push('zoomed out: buffer ' + dZ.buffer.w + 'x' + dZ.buffer.h + ', ' + (zt - zw) + '/' + zt + ' taps right');
-  await page.evaluate(() => ZRender.setZoom(1)); await sleep(200); ok((await dbg()).buffer.deviceScale === 4, 'zoom 1 did not come back');
+  await page.evaluate(() => ZRender.setZoom(1)); await sleep(200); ok((await dbg()).buffer.deviceScale === 4 / K, 'zoom 1 did not come back');
 
   // --- placement mode
   const spots = await page.evaluate(() => {
@@ -209,7 +209,8 @@ async function runBlank(name) {
     await page.screenshot({ path: path.join(shots, 'render-blank' + sfx + '.png') });
     const d = await dbg();
     ok(d.animals === 0 && d.visitors === 0 && d.combos === 0 && Object.keys(d.icons).length === 0, 'bare land should show no animals, visitors, outlines or icons: ' + JSON.stringify({ a: d.animals, v: d.visitors, c: d.combos, i: d.icons }));
-    ok(d.staff === 2 && d.staffAt.every(p => Math.hypot(p[0] - d.gateXY[0], p[1] - d.gateXY[1]) < 120), 'the two staff should be visible near the gate: ' + JSON.stringify(d.staffAt) + ' gate ' + JSON.stringify(d.gateXY));
+    const K = await page.evaluate(() => ZGeo.DENSITY || 1);
+    ok(d.staff === 2 && d.staffAt.every(p => Math.hypot(p[0] - d.gateXY[0], p[1] - d.gateXY[1]) < 120 * K), 'the two staff should be visible near the gate: ' + JSON.stringify(d.staffAt) + ' gate ' + JSON.stringify(d.gateXY));
     const view = await page.evaluate(() => { const S = RT.S, b = document.getElementById('floor').getBoundingClientRect(), e = ZRender.entrance(), g = ZRender.hexToClient(e.q, e.r); let own = 0, tot = 0; for (let y = 10; y < b.height; y += 20) for (let x = 10; x < b.width; x += 20) { const h = ZRender.clientToHex(b.left + x, b.top + y); tot++; if (ZE.inLand(S, h.q, h.r)) own++; } return { gate: [Math.round(g.x - b.left), Math.round(g.y - b.top)], w: b.width, h: b.height, owned: Math.round(100 * own / tot) }; });
     ok(view.gate[0] > 60 && view.gate[0] < view.w - 60 && view.gate[1] > view.h * 0.55 && view.gate[1] < view.h * 0.92, 'opening camera: the gate should be on screen in the lower part: ' + JSON.stringify(view)); ok(view.owned >= 50, 'opening camera: owned land covers only ' + view.owned + '% of the floor');
     notes.push('bare land: gate at ' + view.gate + ' of ' + view.w + 'x' + view.h + ', owned land ' + view.owned + '% of the view, staff at ' + JSON.stringify(d.staffAt) + ' (gate ' + JSON.stringify(d.gateXY) + '), sprites ' + d.sprites);

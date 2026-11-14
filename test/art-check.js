@@ -64,6 +64,7 @@ function check(dens) { // runs in the page
     const page = await browser.newPage(); const errs = [];
     page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.text()); });
     page.on('pageerror', e => errs.push(String(e)));
+    await page.addInitScript(() => { window.ZWZ_DENSITY = 1; }); // the sheet tests density 1 geometry and doubles it itself
     await page.goto('file:///' + path.join(__dirname, 'art-sheet.html').replace(/\\/g, '/') + '?s=extras');
     await page.waitForFunction('window.__done === true');
     const res = await page.evaluate(check, dens);

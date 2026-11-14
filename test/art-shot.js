@@ -18,6 +18,7 @@ const ALL = BIOMES.map(b => 'animals-' + b).concat(['people', 'tiles', 'fences',
     const page = await ctx.newPage(); const errs = [];
     page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.text()); });
     page.on('pageerror', e => errs.push(String(e)));
+    await page.addInitScript(() => { window.ZWZ_DENSITY = 1; }); // sheets build their own geometry
     await page.goto('file:///' + path.join(__dirname, 'art-sheet.html').replace(/\\/g, '/') + '?s=' + s + (d2 ? '&d=2' : ''));
     await page.waitForFunction('window.__done === true', null, { timeout: 30000 });
     const e2 = await page.evaluate('window.__err');

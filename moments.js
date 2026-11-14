@@ -300,7 +300,7 @@
     M.clearParts(); M.clear(); card.textContent = ''; card.className = 'mo-card mo-fast';
     card.appendChild(el('div', { cls: 'mo-head', style: { padding: '0 4px' } }, el('div', { cls: 'mo-pic tiny', style: { height: '56px' } }, pic(aUrl(f.sp, { variant: !!f.variant }, 3))), el('div', { cls: 'mo-who' }, animalName(f))));
     const entry = E.arrival(S(), id);
-    let fee = null; try { if (E.holdFee && entry) fee = Math.round(E.holdFee(S(), entry.a)); } catch (e) { /* none */ }
+    let fee = null; try { if (E.holdFee && entry) fee = (E.isOpen && !E.isOpen(S())) ? 0 : Math.round(E.holdFee(S(), entry.a)); } catch (e) { /* none */ }
     const rows = el('div', { cls: 'mo-rows' });
     (E.arrivalChoices(S(), id) || []).forEach(c => {
       const it = c.hab != null ? E.item(S(), c.hab) : null;
@@ -332,7 +332,8 @@
       M.clearParts();
       const sell = ui.btn(fmt.money(price), () => { const r = Z.act('sellArrival', id); if (r && r.ok) { ui.toast('Sold ' + fmt.money(r.price != null ? r.price : price), 'good'); afterDecision(); } }, { cls: 'warn', icon: iUrl('coin', 3) });
       const keep = ui.btn('Keep', () => showWhere(), { cls: 'primary', icon: iUrl('ok', 3) });
-      M.foot(el('div', { cls: 'btnrow' }, sell, keep));
+      const later = entry.src === 'legacy' ? ui.btn('Later', () => M.end(), { cls: 'ghost', icon: iUrl('time', 3) }) : null;
+      M.foot(el('div', { cls: 'btnrow' }, sell, keep, later));
     };
     const showWhere = () => whereList(card, st, f, afterDecision);
     st.at(T(1500), showButtons);
@@ -1057,6 +1058,7 @@
     reg('showresult', (r, d) => showResultMoment(r, d));
     reg('yearend', (r, d) => yearEndMoment(r, d));
     reg('final', (r, d) => finalMoment(r, d));
+    reg('holdwarn', (r, d) => simpleCard('mo-holdwarn', { tone: 'calm', kicker: 'Holding pen', img: sym('pen', '', 'holding pen', 8), imgCls: 'small', title: String(r.count != null ? r.count : ''), lines: [el('div', { cls: 'mo-chips' }, chip('coin', moneyOf(r.cost || 0)), sym('time', '', 'per week', 3))] }, d));
     reg('applicants', (r, d) => {
       const list = (r.candidates && r.candidates.length ? r.candidates : S().candidates) || [];
       if (!list.length) { d(); return; }
@@ -1081,5 +1083,19 @@
     },
     pendingChoices: () => (S().projects || []).filter(p => p.choice).map(p => p.id)
   };
+  // The animal carried over from the last zoo ("Bring along") is offered once, at a quiet moment: nothing else on screen, and
+  // if the tutorial is on, once the first habitat exists so the opening is not interrupted.
+  function offerLegacyOnce() {
+    try {
+      const st = Z.S; if (!st || !hasArrivals() || Z.busy || Z.stack().length || (st.reports && st.reports.length)) return;
+      const e = (st.arrivals || []).find(x => x.src === 'legacy'); if (!e) return;
+      st.flags = st.flags || {}; const asked = st.flags.legacyAsked || (st.flags.legacyAsked = []);
+      if (asked.indexOf(e.a.id) >= 0) return;
+      const tut = st.ui && st.ui.tutorial && st.ui.tutorial.on;
+      if (tut && !(E.isOpen && E.isOpen(st))) return;
+      asked.push(e.a.id); showArrival(e.a.id);
+    } catch (err) { rec(err, 'legacy offer'); }
+  }
+  try { setInterval(offerLegacyOnce, 700); } catch (e) { /* none */ }
   try { init(); } catch (e) { rec(e, 'init'); }
 })();

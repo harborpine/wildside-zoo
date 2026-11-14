@@ -94,6 +94,7 @@ async function run(name) {
   await pushReport({ type: 'secret', region: 'paleo' }); await drive('secret paleo', { shots: 'secret' }); await settled('secret');
   await pushReport({ type: 'secret', region: 'mythic' }); await drive('secret mythic'); await settled('secret mythic');
   await pushReport({ type: 'vip', id: 'critic', money: 20000, rep: 120, boost: 0.2 }); await drive('vip', { shots: 'vip' }); await settled('vip');
+  await pushReport({ type: 'holdwarn', count: 3, cost: 120, paid: 120, profit: 80, debt: 40 }); await drive('holdwarn', { shots: 'holdwarn' }); await settled('holdwarn');
   await pushReport({ type: 'vip', id: 'nobody', money: 0, rep: 0, boost: 0 }); await drive('vip unknown id'); await settled('vip unknown id');
   await pushReport({ type: 'combo', id: 'does-not-exist', anchor: 1, members: [] }); await sleep(300); await settled('combo with unknown id (skipped)');
 
@@ -652,6 +653,30 @@ async function run(name) {
       check(await ev(() => !!document.querySelector('.mo-foot .btn.warn')), 'stray taken in: keep or let go is offered');
       await page.locator('.mo-foot .btn.primary').tap(); await sleep(400); await page.locator('.layer:not([hidden]) .mo-row.tap').last().tap(); await sleep(600);
       await settled('stray'); check(await ev(() => ZT.S.arrivals.length === 0 && ZT.S.animals.length >= 3), 'stray kept');
+      // the carried-over animal ("Bring along") is offered once on a new bare zoo
+      const legacyAnimal = await ev(() => { ZT.newGame({}); return JSON.parse(JSON.stringify(ZT.S.animals[0])); });
+      await ev(a => { ZT.newGame({ starter: false, animal: a }); }, legacyAnimal);
+      await waitStack(s => s.stack.some(i => /mo-animal/.test(i)), 5000); await sleep(2500); await shot('legacy-offer');
+      check(await ev(() => !!document.querySelector('.mo-foot .btn.warn') && !!document.querySelector('.mo-foot .btn.ghost')), 'carried-over animal: Sell, Keep and Later are offered on its own');
+      await page.locator('.mo-foot .btn.primary').tap(); await sleep(400); await shot('legacy-where');
+      const pen = await ev(() => { const r = [...document.querySelectorAll('.layer:not([hidden]) .mo-row.tap')]; const t = r[r.length - 1]; const fee = t.querySelector('.mo-fee'); return { n: r.length, fee: fee ? fee.textContent.trim() : null }; });
+      check(pen.n === 1 && pen.fee === '0', 'on bare land the only place is the pen and its upkeep reads 0 (' + JSON.stringify(pen) + ')');
+      await page.locator('.layer:not([hidden]) .mo-row.tap').first().tap(); await sleep(700);
+      await sleep(2000);
+      check(await ev(() => ZT.S.arrivals.length === 0 && ZT.stack().length === 0), 'carried-over animal kept in the pen, and it is not offered again');
+      // later: dismissed once, not asked again, still reachable
+      await ev(a => { ZT.newGame({ starter: false, animal: a }); }, legacyAnimal);
+      await waitStack(s => s.stack.some(i => /mo-animal/.test(i)), 5000); await sleep(2500);
+      await page.locator('.mo-foot .btn.ghost').tap(); await sleep(2200);
+      check(await ev(() => ZT.stack().length === 0 && ZT.S.arrivals.length === 1), 'Later: dismissed and not shown again by itself (the arrival still waits)');
+      // tutorial on: not before the first habitat exists
+      await ev(a => { ZT.newGame({ starter: false, animal: a, tutorial: true }); }, legacyAnimal);
+      await sleep(2200);
+      check(await ev(() => !ZT.stack().some(i => /mo-animal/.test(i))), 'tutorial on: no pop-up while the zoo is still closed');
+      await ev(() => { const S = ZT.S; S.money = 1e6; const cells = []; for (let row = 19; row >= 0; row--) for (let col = 0; col < 10; col++) cells.push(ZE.fromOffset(col, row)); for (const [q, r] of cells) if (ZE.canPlace(S, 'hab', 'savanna', q, r, 0)) { if (ZCore.act('build', 'hab', 'savanna', q, r, 0).ok) break; } });
+      await waitStack(s => s.stack.some(i => /mo-animal/.test(i)), 5000);
+      check(await ev(() => ZT.stack().some(i => /mo-animal/.test(i))), 'tutorial on: offered once the first habitat is built');
+      await ev(() => ZT.popAll()); await sleep(200);
     }
     // timed hiring: the applicants report plays the reveal, then hands over to the list
     const hasHire = await ev(() => !!ZE.hiringInfo);

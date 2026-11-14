@@ -6,6 +6,12 @@
 (function (root) {
   'use strict';
   const G = root.ZGeo, D = root.ZD, Z = root.ZE, R = {};
+  // Art density (style D). The one switch is ZGeo.DENSITY in geo.js. K = buffer pixels per old art pixel: every hand-tuned
+  // pixel number below (offsets, speeds, margins, bars, line widths) is written in old art pixels and multiplied by K, so the
+  // game looks and behaves the same at density 2, just with twice the detail. The sprites are told the density right here,
+  // as soon as this file loads (before core.js, menus.js or anything else asks ZSprites for a picture).
+  const K = G.DENSITY === 2 ? 2 : 1;
+  try { if (root.ZSprites && typeof root.ZSprites.setDensity === 'function') root.ZSprites.setDensity(K); } catch (e) { /* the flat fallbacks still work */ }
   const W = G.W, HH = G.HH, HW = G.HW || W / 2;
   const DIR6 = G.EDGES.map(e => e[0]);
   const key = (q, r) => q + ',' + r;
@@ -35,40 +41,42 @@
     return hi < lo ? [0, 0] : [Math.round(lo), Math.round(hi)];
   }
   function hexFill(x, cx, cy, col) { x.fillStyle = col; for (let y = -HH; y < HH; y++) { const s = hexSpan(y); if (s[1] > s[0]) x.fillRect(cx + s[0], cy + y, s[1] - s[0], 1); } }
+  // small fallback shapes are drawn in old art pixels and blown up K times with crisp pixels (ground shapes come from ZGeo directly)
+  const upK = s => { if (K === 1) return s; const o = mk(s.w * K, s.h * K, s.ax * K, s.ay * K, x => { x.imageSmoothingEnabled = false; x.drawImage(s.c, 0, 0, s.w * K, s.h * K); }); if (typeof s.sortDy === 'number') o.sortDy = s.sortDy * K; return o; };
   const FB = {
     tile: function (kind, seed) {
       kind = String(kind); const v = kind === 'grass' ? (seed || 0) % 3 : 0;
-      return fb('t:' + kind + v, () => mk(W, HH * 2 + 3, HW, HH, x => {
+      return fb('t:' + kind + v, () => mk(W, HH * 2 + 3 * K, HW, HH, x => {
         let col = '#6cbf4b';
         if (kind === 'grass') col = ['#6cbf4b', '#66b947', '#72c450'][v]; else if (kind === 'path') col = '#dcc898'; else if (kind === 'locked') col = '#3c6a44';
         else if (kind === 'water') col = '#4a9ad6'; else if (kind.indexOf('hab:') === 0) { const b = D.BIOMES[kind.slice(4)]; col = b ? b.color : '#bbb'; }
-        hexFill(x, HW, HH + 3, 'rgba(0,0,0,0.35)'); hexFill(x, HW, HH, col);
+        hexFill(x, HW, HH + 3 * K, 'rgba(0,0,0,0.35)'); hexFill(x, HW, HH, col);
       }));
     },
     fence: function (biome, edge) {
       return fb('f:' + biome + edge, () => {
-        const e = G.EDGES[edge], a = G.CORNERS[e[1]], b = G.CORNERS[e[2]], H = 7;
-        const s = mk(W + 2, HH * 2 + H + 2, HW + 1, HH + H, x => {
+        const e = G.EDGES[edge], a = G.CORNERS[e[1]], b = G.CORNERS[e[2]], H = 7 * K;
+        const s = mk(W + 2 * K, HH * 2 + H + 2 * K, HW + K, HH + H, x => {
           const steps = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]));
-          for (let i = 0; i <= steps; i++) { const px = Math.round(a[0] + (b[0] - a[0]) * i / steps), py = Math.round(a[1] + (b[1] - a[1]) * i / steps); x.fillStyle = '#5b4630'; x.fillRect(HW + 1 + px - 1, HH + H + py - H, 2, H); x.fillStyle = '#8a6c48'; x.fillRect(HW + 1 + px - 1, HH + H + py - H, 2, 2); }
+          for (let i = 0; i <= steps; i++) { const px = Math.round(a[0] + (b[0] - a[0]) * i / steps), py = Math.round(a[1] + (b[1] - a[1]) * i / steps); x.fillStyle = '#5b4630'; x.fillRect(HW + K + px - K, HH + H + py - H, 2 * K, H); x.fillStyle = '#8a6c48'; x.fillRect(HW + K + px - K, HH + H + py - H, 2 * K, 2 * K); }
         });
         s.sortDy = (a[1] + b[1]) / 2; return s;
       });
     },
-    building: function (id) { return fb('b:' + id, () => mk(30, 34, 15, 26, x => { x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(2, 26, 28, 6); x.fillStyle = hue(id, 50, 62); x.fillRect(2, 10, 26, 20); x.fillStyle = hue(id, 50, 48); x.fillRect(16, 10, 12, 20); x.fillStyle = hue(id + 'r', 60, 45); x.fillRect(0, 2, 30, 9); x.fillStyle = '#3a2a22'; x.fillRect(7, 21, 5, 9); })); },
-    entrance: function () { return fb('gate', () => mk(60, 36, 30, 32, x => { x.fillStyle = '#7a5a3c'; x.fillRect(2, 8, 6, 26); x.fillRect(52, 8, 6, 26); x.fillStyle = '#c0453a'; x.fillRect(0, 2, 60, 9); x.fillStyle = '#f2d36b'; x.fillRect(22, 4, 16, 5); })); },
-    animal: function (sp, o) { o = o || {}; const j = o.juv ? 1 : 0; return fb('a:' + sp + j + (o.variant ? 'v' : ''), () => { const w = j ? 10 : 16, h = j ? 8 : 12; return mk(w, h, w / 2, h, x => { x.fillStyle = hue(sp + (o.variant ? 'v' : ''), 50, 55); x.fillRect(1, 1, w - 2, h - 4); x.fillRect(w - 5, 0, 5, 5); x.fillStyle = '#2b2520'; x.fillRect(2, h - 3, 2, 3); x.fillRect(w - 5, h - 3, 2, 3); x.fillRect(w - 2, 1, 1, 1); }); }); },
-    person: function (kind, o) { o = o || {}; const k = kind === 'visitor' ? 'v' + ((o.seed || 0) % 8) : kind; return fb('p:' + k, () => mk(8, 16, 4, 16, x => { x.fillStyle = '#f0c8a0'; x.fillRect(2, 0, 4, 5); x.fillStyle = hue(k, 65, 50); x.fillRect(1, 5, 6, 7); x.fillStyle = '#34405a'; x.fillRect(2, 12, 2, 4); x.fillRect(4, 12, 2, 4); })); },
+    building: function (id) { return fb('b:' + id, () => upK(mk(30, 34, 15, 26, x => { x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(2, 26, 28, 6); x.fillStyle = hue(id, 50, 62); x.fillRect(2, 10, 26, 20); x.fillStyle = hue(id, 50, 48); x.fillRect(16, 10, 12, 20); x.fillStyle = hue(id + 'r', 60, 45); x.fillRect(0, 2, 30, 9); x.fillStyle = '#3a2a22'; x.fillRect(7, 21, 5, 9); }))); },
+    entrance: function () { return fb('gate', () => upK(mk(60, 36, 30, 32, x => { x.fillStyle = '#7a5a3c'; x.fillRect(2, 8, 6, 26); x.fillRect(52, 8, 6, 26); x.fillStyle = '#c0453a'; x.fillRect(0, 2, 60, 9); x.fillStyle = '#f2d36b'; x.fillRect(22, 4, 16, 5); }))); },
+    animal: function (sp, o) { o = o || {}; const j = o.juv ? 1 : 0; return fb('a:' + sp + j + (o.variant ? 'v' : ''), () => { const w = j ? 10 : 16, h = j ? 8 : 12; return upK(mk(w, h, w / 2, h, x => { x.fillStyle = hue(sp + (o.variant ? 'v' : ''), 50, 55); x.fillRect(1, 1, w - 2, h - 4); x.fillRect(w - 5, 0, 5, 5); x.fillStyle = '#2b2520'; x.fillRect(2, h - 3, 2, 3); x.fillRect(w - 5, h - 3, 2, 3); x.fillRect(w - 2, 1, 1, 1); })); }); },
+    person: function (kind, o) { o = o || {}; const k = kind === 'visitor' ? 'v' + ((o.seed || 0) % 8) : kind; return fb('p:' + k, () => upK(mk(8, 16, 4, 16, x => { x.fillStyle = '#f0c8a0'; x.fillRect(2, 0, 4, 5); x.fillStyle = hue(k, 65, 50); x.fillRect(1, 5, 6, 7); x.fillStyle = '#34405a'; x.fillRect(2, 12, 2, 4); x.fillRect(4, 12, 2, 4); }))); },
     deco: function (kind) {
-      return fb('d:' + kind, () => {
+      return fb('d:' + kind, () => upK((() => {
         if (kind === 'tree') return mk(18, 26, 9, 25, x => { x.fillStyle = '#6b4a2e'; x.fillRect(7, 16, 4, 9); x.fillStyle = '#2f7d3a'; x.fillRect(2, 2, 14, 16); x.fillStyle = '#3f9a48'; x.fillRect(4, 0, 10, 12); });
         if (kind === 'bush') return mk(12, 8, 6, 8, x => { x.fillStyle = '#3a8d44'; x.fillRect(0, 2, 12, 6); x.fillRect(2, 0, 8, 3); });
         if (kind === 'rock') return mk(10, 7, 5, 7, x => { x.fillStyle = '#8d8f98'; x.fillRect(0, 2, 10, 5); x.fillRect(2, 0, 6, 3); });
         if (kind === 'lamp') return mk(4, 18, 2, 18, x => { x.fillStyle = '#3d3d48'; x.fillRect(1, 4, 2, 14); x.fillStyle = '#ffe9a0'; x.fillRect(0, 0, 4, 4); });
         return mk(10, 5, 5, 4, x => { x.fillStyle = '#f2e25c'; x.fillRect(1, 1, 2, 2); x.fillStyle = '#f08fb1'; x.fillRect(5, 0, 2, 2); x.fillStyle = '#ffffff'; x.fillRect(8, 2, 2, 2); });
-      });
+      })()));
     },
-    icon: function (name) { return fb('i:' + name, () => mk(9, 9, 4, 9, x => { x.fillStyle = '#1d1a22'; x.fillRect(1, 0, 7, 9); x.fillRect(0, 1, 9, 7); x.fillStyle = hue(name, 85, 62); x.fillRect(1, 1, 7, 7); })); }
+    icon: function (name) { return fb('i:' + name, () => upK(mk(9, 9, 4, 9, x => { x.fillStyle = '#1d1a22'; x.fillRect(1, 0, 7, 9); x.fillRect(0, 1, 9, 7); x.fillStyle = hue(name, 85, 62); x.fillRect(1, 1, 7, 7); }))); }
   };
   // A half-finished sprites file hands back one shared placeholder for getters it has not drawn yet. Spot that by asking each
   // getter for two different things: if both come back as the very same canvas, that getter is not ready, so use the built-in shapes.
@@ -111,7 +119,7 @@
     const k = str + col; if (textCache[k]) return textCache[k];
     const w = str.length * 4 + 1, h = 7;
     const put = (x, ox, oy, c) => { x.fillStyle = c; for (let i = 0; i < str.length; i++) { const g = GLYPH[str[i]]; if (!g) continue; for (let p = 0; p < 15; p++) if (g[p] === '1') x.fillRect(ox + i * 4 + p % 3, oy + (p / 3 | 0), 1, 1); } };
-    return (textCache[k] = mk(w, h, 0, h, x => { for (let dy = 0; dy <= 2; dy++) for (let dx = 0; dx <= 2; dx++) put(x, dx, dy, '#1d1a22'); put(x, 1, 1, col); }));
+    return (textCache[k] = upK(mk(w, h, 0, h, x => { for (let dy = 0; dy <= 2; dy++) for (let dx = 0; dx <= 2; dx++) put(x, dx, dy, '#1d1a22'); put(x, 1, 1, col); })));
   }
   const shortNum = v => { v = Math.round(v); const a = Math.abs(v); const s = a >= 1e6 ? (a / 1e6).toFixed(a < 1e7 ? 1 : 0) + 'm' : a >= 1e4 ? Math.round(a / 1e3) + 'k' : a >= 1e3 ? (a / 1e3).toFixed(1) + 'k' : String(a); return (v < 0 ? '-' : '+') + s; };
   const maskCache = {};
@@ -120,7 +128,7 @@
   function outlineSprite(cells, col, col2) {
     const set = {}; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     cells.forEach(c => { set[key(c[0], c[1])] = 1; const p = G.toScreen(c[0], c[1]); x0 = Math.min(x0, p.x - HW); x1 = Math.max(x1, p.x + HW); y0 = Math.min(y0, p.y - HH); y1 = Math.max(y1, p.y + HH); });
-    x0 -= 2; y0 -= 2; const w = x1 - x0 + 4, h = y1 - y0 + 5, out = [];
+    x0 -= 2 * K; y0 -= 2 * K; const w = x1 - x0 + 4 * K, h = y1 - y0 + 5 * K, out = [];
     for (let f = 0; f < 2; f++) out.push(mk(w, h, 0, 0, x => {
       for (let pass = 0; pass < 2; pass++) cells.forEach(c => {
         const p = G.toScreen(c[0], c[1]);
@@ -128,10 +136,10 @@
           if (set[key(c[0] + e[0][0], c[1] + e[0][1])]) return;
           const a = G.CORNERS[e[1]], b = G.CORNERS[e[2]], steps = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]));
           for (let i = 0; i <= steps; i++) {
-            const px = clamp(Math.round(a[0] + (b[0] - a[0]) * i / steps), -HW, HW - 1), py = clamp(Math.round(a[1] + (b[1] - a[1]) * i / steps), -HH, HH - 1);
+            const px = clamp(Math.round(a[0] + (b[0] - a[0]) * i / steps), -HW, HW - K), py = clamp(Math.round(a[1] + (b[1] - a[1]) * i / steps), -HH, HH - K);
             const X = p.x + px - x0, Y = p.y + py - y0;
-            if (pass === 0) { x.fillStyle = 'rgba(20,18,30,0.55)'; x.fillRect(X - 1, Y - 1, 3, 3); }
-            else { x.fillStyle = (((i + p.x + py) >> 2) + f) & 1 ? col : (col2 || col); x.fillRect(X, Y, 1, 1); }
+            if (pass === 0) { x.fillStyle = 'rgba(20,18,30,0.55)'; x.fillRect(X - K, Y - K, 3 * K, 3 * K); }
+            else { x.fillStyle = (Math.floor((i + p.x + py) / (4 * K)) + f) & 1 ? col : (col2 || col); x.fillRect(X, Y, K, K); }
           }
         });
       });
@@ -182,10 +190,10 @@
       if (Z.inLand(S, a[0], a[1])) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
     }
     if (x0 > 1e8) { x0 = gx0; x1 = gx1; y0 = gy0; y1 = gy1; }
-    const bnd = m.bounds = { x0: x0 - HW - 22, x1: x1 + HW + 22, y0: y0 - HH - 62, y1: y1 + HH + 44 };
+    const bnd = m.bounds = { x0: x0 - HW - 22 * K, x1: x1 + HW + 22 * K, y0: y0 - HH - 62 * K, y1: y1 + HH + 44 * K };
     // the floor canvas covers everything the camera can ever show (also when the view is bigger than the scroll area), so forest
     // tiles reach the screen edges at every scroll position
-    const covW = Math.max(vw, 430), covH = Math.max(vh, 900), slackX = Math.max(0, (covW - (bnd.x1 - bnd.x0)) / 2) + 8, slackY = Math.max(0, (covH - (bnd.y1 - bnd.y0)) / 2) + 8;
+    const covW = Math.max(vw, 430 * K), covH = Math.max(vh, 900 * K), slackX = Math.max(0, (covW - (bnd.x1 - bnd.x0)) / 2) + 8 * K, slackY = Math.max(0, (covH - (bnd.y1 - bnd.y0)) / 2) + 8 * K;
     const fx0 = Math.floor(bnd.x0 - slackX), fy0 = Math.floor(bnd.y0 - slackY), fw = Math.ceil(bnd.x1 - bnd.x0 + slackX * 2), fh = Math.ceil(bnd.y1 - bnd.y0 + slackY * 2);
     m.cover = { w: covW, h: covH };
     const cells = [], grid = {}; let q0 = 1e9, q1 = -1e9, r0 = 1e9, r1 = -1e9;
@@ -239,7 +247,7 @@
     // (floor rectangle fx0, fy0, fw, fh was worked out above with the bounds)
     const fl = document.createElement('canvas'); fl.width = fw; fl.height = fh; const fc = fl.getContext('2d');
     const lockedT = spr('tile', 'locked', 0);
-    try { const pc = document.createElement('canvas'); pc.width = pc.height = 1; const px = pc.getContext('2d'); px.drawImage(lockedT.c, -Math.round(lockedT.ax), -Math.round(lockedT.ay) + 2); const d = px.getImageData(0, 0, 1, 1).data; m.bg = d[3] > 200 ? 'rgb(' + Math.round(d[0] * 0.8) + ',' + Math.round(d[1] * 0.8) + ',' + Math.round(d[2] * 0.82) + ')' : '#2c4f3a'; } catch (e) { m.bg = '#2c4f3a'; }
+    try { const pc = document.createElement('canvas'); pc.width = pc.height = 1; const px = pc.getContext('2d'); px.drawImage(lockedT.c, -Math.round(lockedT.ax), -Math.round(lockedT.ay) + 2 * K); const d = px.getImageData(0, 0, 1, 1).data; m.bg = d[3] > 200 ? 'rgb(' + Math.round(d[0] * 0.8) + ',' + Math.round(d[1] * 0.8) + ',' + Math.round(d[2] * 0.82) + ')' : '#2c4f3a'; } catch (e) { m.bg = '#2c4f3a'; }
     fc.fillStyle = m.bg; fc.fillRect(0, 0, fw, fh);
     const put = (s, x, y) => fc.drawImage(s.c, Math.round(x - s.ax) - fx0, Math.round(y - s.ay) - fy0);
     cells.forEach(c => {
@@ -270,30 +278,30 @@
     m.dests.forEach(d => { if (m.habs[d.it.id]) m.habs[d.it.id].dest = d; });
     if (ent) { const s = spr('entrance'); add(s, ent.x, ent.y, G.depth(ent.q, ent.r, typeof s.sortDy === 'number' ? s.sortDy : 0), { gate: true }); m.gate = s; }
     const standKeys = {}; m.dests.forEach(d => d.stands.forEach(s => { standKeys[s.k] = 1; }));
-    const gs = m.gate, gateBox = gs && ent ? { x0: ent.x - gs.ax - 8, x1: ent.x - gs.ax + gs.c.width + 8, y0: ent.y - gs.ay - 6, y1: ent.y - gs.ay + gs.c.height + 16 } : null;
+    const gs = m.gate, gateBox = gs && ent ? { x0: ent.x - gs.ax - 8 * K, x1: ent.x - gs.ax + gs.c.width + 8 * K, y0: ent.y - gs.ay - 6 * K, y1: ent.y - gs.ay + gs.c.height + 16 * K } : null;
     const entNb = c => ent && DIR6.some(d => c.q === ent.q + d[0] && c.r === ent.r + d[1]);
     // nothing decorative where the gate arch or its pillars would hide it (or stand in front of it), nor on the hexes touching the gate
     // the holding pen's spot: a free grass hex just inside the gate, off the paths and clear of the arch
-    m.pen = null; if (ent) { let bs = 1e18; const wantX = ent.x - W * 1.1, wantY = ent.y - HH * 1.3; cells.forEach(c => { if (!c.owned || m.occ[c.k] || m.path[c.k] || c.k === ent.k || standKeys[c.k]) return; if (gateBox && c.x > gateBox.x0 - 14 && c.x < gateBox.x1 + 14 && c.y > gateBox.y0 && c.y < gateBox.y1) return; const d = (c.x - wantX) * (c.x - wantX) + (c.y - wantY) * (c.y - wantY) * 2; if (d < bs) { bs = d; m.pen = c; } }); }
+    m.pen = null; if (ent) { let bs = 1e18; const wantX = ent.x - W * 1.1, wantY = ent.y - HH * 1.3; cells.forEach(c => { if (!c.owned || m.occ[c.k] || m.path[c.k] || c.k === ent.k || standKeys[c.k]) return; if (gateBox && c.x > gateBox.x0 - 14 * K && c.x < gateBox.x1 + 14 * K && c.y > gateBox.y0 && c.y < gateBox.y1) return; const d = (c.x - wantX) * (c.x - wantX) + (c.y - wantY) * (c.y - wantY) * 2; if (d < bs) { bs = d; m.pen = c; } }); }
     let decoCell = null;
-    const addDeco = (sp, x, y, k) => { if (gateBox && x > gateBox.x0 && x < gateBox.x1 && y > gateBox.y0 && y < gateBox.y1) return; add(sp, x, y, k, { ck: decoCell, tall: sp.c.height > 22 }); };
+    const addDeco = (sp, x, y, k) => { if (gateBox && x > gateBox.x0 && x < gateBox.x1 && y > gateBox.y0 && y < gateBox.y1) return; add(sp, x, y, k, { ck: decoCell, tall: sp.c.height > 22 * K }); };
     const builtAbove = c => DIR6.some(d => G.toScreen(d[0], d[1]).y < -HH * 0.6 && m.occ[key(c.q + d[0], c.r + d[1])]) || (ent && Math.abs(c.x - ent.x) < W * 1.3 && Math.abs(c.y - ent.y) < HH * 3.5);
     cells.forEach(c => {
       decoCell = c.k; if (c.road || (m.occ[c.k] && c.owned) || entNb(c) || (m.pen && c.k === m.pen.k)) return;
-      const h = hash(c.q, c.r, 11), ox = Math.round((hash(c.q, c.r, 12) - 0.5) * 18), oy = Math.round((hash(c.q, c.r, 13) - 0.5) * HH * 0.6), seed = Math.floor(h * 9973);
+      const h = hash(c.q, c.r, 11), ox = Math.round((hash(c.q, c.r, 12) - 0.5) * 18 * K), oy = Math.round((hash(c.q, c.r, 13) - 0.5) * HH * 0.6), seed = Math.floor(h * 9973);
       if (!c.owned) { // wild land: dim trees, thicker outside the map
         if (nearRoad(c)) return;
         const dens = c.grid ? 0.42 : 0.6; if (h < dens) addDeco(dimmed(spr('deco', h < dens * 0.75 ? 'tree' : 'bush', seed)), c.x + ox, c.y + oy, c.y + oy);
-        if (!c.grid && hash(c.q, c.r, 14) < 0.35) addDeco(dimmed(spr('deco', 'tree', seed + 3)), c.x - ox, c.y - oy + 2, c.y - oy + 2);
+        if (!c.grid && hash(c.q, c.r, 14) < 0.35) addDeco(dimmed(spr('deco', 'tree', seed + 3)), c.x - ox, c.y - oy + 2 * K, c.y - oy + 2 * K);
         return;
       }
       if (ent && c.k === ent.k) return;
-      if (m.path[c.k]) { if (!standKeys[c.k] && h < 0.16) addDeco(spr('deco', 'lamp', seed), c.x + (ox < 0 ? -17 : 17), c.y - 1, c.y - 1); return; }
+      if (m.path[c.k]) { if (!standKeys[c.k] && h < 0.16) addDeco(spr('deco', 'lamp', seed), c.x + (ox < 0 ? -17 : 17) * K, c.y - K, c.y - K); return; }
       let kind = h < 0.2 ? 'tree' : h < 0.38 ? 'bush' : h < 0.6 ? 'flowers' : h < 0.68 ? 'rock' : null;
       if (kind === 'tree' && builtAbove(c)) kind = 'bush';
       if (!kind) return;
       addDeco(spr('deco', kind, seed), c.x + ox, c.y + oy, c.y + oy);
-      if (kind === 'flowers') addDeco(spr('deco', 'flowers', seed + 1), c.x - Math.round(ox * 0.8) + 3, c.y - oy + 1, c.y - oy + 1);
+      if (kind === 'flowers') addDeco(spr('deco', 'flowers', seed + 1), c.x - Math.round(ox * 0.8) + 3 * K, c.y - oy + K, c.y - oy + K);
     });
     m.statics.sort((a, b) => a.key - b.key);
     // combo outlines
@@ -316,7 +324,7 @@
     // two standing spots per hex (back-left and front-right) so a pair never stands on top of each other
     const slot = other ? 1 - other.slot : (Math.random() < 0.5 ? 0 : 1), oy = Math.round(slot ? rnd(HH * 0.12, HH * 0.4) : rnd(-HH * 0.4, -HH * 0.12));
     // keep the whole body inside the hex: wide animals stand nearer the middle
-    const bw = a.sp ? spr('animal', a.sp, { juv: a.juv }).w : 16, sp2 = hexSpan(oy), lo = sp2[0] + 3 + bw / 2, hi = sp2[1] - 3 - bw / 2, mid = (lo + hi) / 2, ox = Math.round(hi <= lo ? mid : slot ? rnd(mid + (hi - mid) * 0.4, hi) : rnd(lo, mid - (mid - lo) * 0.4));
+    const bw = a.sp ? spr('animal', a.sp, { juv: a.juv }).w : 16 * K, sp2 = hexSpan(oy), lo = sp2[0] + 3 * K + bw / 2, hi = sp2[1] - 3 * K - bw / 2, mid = (lo + hi) / 2, ox = Math.round(hi <= lo ? mid : slot ? rnd(mid + (hi - mid) * 0.4, hi) : rnd(lo, mid - (mid - lo) * 0.4));
     a.cell = ci; a.slot = slot; a.ox = ox; a.tx = c.x + ox; a.ty = c.y + oy;
     if (snap) { a.x = a.tx; a.y = a.ty; }
   }
@@ -327,10 +335,10 @@
       per[an.hab] = (per[an.hab] || 0) + 1; if (per[an.hab] > h.cells.length * CAP) return;
       seen[an.id] = 1; let a = animals[an.id]; const sig = h.it.q + ',' + h.it.r + ',' + (h.it.rot || 0);
       if (!a || a.hab !== an.hab || a.sig !== sig) {
-        a = animals[an.id] = { id: an.id, hab: an.hab, sig: sig, x: 0, y: 0, cell: null, wait: rnd(0, 4), t: rnd(0, 9), flip: Math.random() < 0.5, moving: false, speed: rnd(6, 9), sp: an.sp, juv: Z.isJuv ? !!Z.isJuv(S, an) : false };
+        a = animals[an.id] = { id: an.id, hab: an.hab, sig: sig, x: 0, y: 0, cell: null, wait: rnd(0, 4), t: rnd(0, 9), flip: Math.random() < 0.5, moving: false, speed: rnd(6, 9) * K, sp: an.sp, juv: Z.isJuv ? !!Z.isJuv(S, an) : false };
         const cnt = h.cells.map(() => 0); for (const id in animals) { const o = animals[id]; if (o !== a && o.hab === an.hab && o.cell != null && cnt[o.cell] != null) cnt[o.cell]++; }
         let ci = 0; cnt.forEach((n, i) => { if (n < cnt[ci]) ci = i; }); placeInCell(a, h, ci, true);
-        if (animalsSeeded) { a.hop = 1.3; a.wait = 1.4; floatAt(a.x, a.y - 18, 'heart', null, 0.15 + Math.random() * 0.3); }
+        if (animalsSeeded) { a.hop = 1.3; a.wait = 1.4; floatAt(a.x, a.y - 18 * K, 'heart', null, 0.15 + Math.random() * 0.3); }
       }
       a.sp = an.sp; a.variant = !!an.variant; a.juv = Z.isJuv ? !!Z.isJuv(S, an) : false;
     });
@@ -349,7 +357,7 @@
       placeInCell(a, h, pick(cho), false);
     } else { a.x += dx / d * sp; a.y += dy / d * sp; if (Math.abs(dx) > 0.4) a.flip = dx < 0; a.moving = true; }
   }
-  function newWalker(kind, seed) { return { kind: kind, seed: seed, x: 0, y: 0, wp: [], wait: 0, t: rnd(0, 9), flip: false, moving: false, speed: rnd(11, 16), ox: Math.round(rnd(-7, 7)), oy: Math.round(rnd(-HH * 0.25, HH * 0.25)), node: null, left: 0, last: null, dead: false, hidden: false, post: null, staff: null }; }
+  function newWalker(kind, seed) { return { kind: kind, seed: seed, x: 0, y: 0, wp: [], wait: 0, t: rnd(0, 9), flip: false, moving: false, speed: rnd(11, 16) * K, ox: Math.round(rnd(-7, 7) * K), oy: Math.round(rnd(-HH * 0.25, HH * 0.25)), node: null, left: 0, last: null, dead: false, hidden: false, post: null, staff: null }; }
   function goTo(w, destKey, stand) { // queue hex-by-hex waypoints from the walker's node to destKey; optional stand = look-at spot
     const r = route(w.node, destKey); if (!r) return false;
     r.forEach(k => { const n = M.nodes[k]; w.wp.push({ x: n.x + w.ox, y: n.y + w.oy, k: k }); });
@@ -408,7 +416,7 @@
     const seen = {};
     (S.staff || []).forEach(s => {
       seen[s.id] = 1; let w = walkers.find(x => x.staff === s.id);
-      if (!w) { if (!M.pathKeys.length) return; w = newWalker(s.role, s.id); w.staff = s.id; w.speed = rnd(10, 13); let startK = pick(M.pathKeys); if (M.pathKeys.length < 2 && M.ent && M.nodes[M.ent.k]) { const inside = M.nodes[M.ent.k].nb.filter(k => M.nodes[k].y < M.ent.y); if (inside.length) startK = inside[walkers.filter(x => x.staff != null).length % inside.length]; } // bare land: start just inside the gate, apart from each other
+      if (!w) { if (!M.pathKeys.length) return; w = newWalker(s.role, s.id); w.staff = s.id; w.speed = rnd(10, 13) * K; let startK = pick(M.pathKeys); if (M.pathKeys.length < 2 && M.ent && M.nodes[M.ent.k]) { const inside = M.nodes[M.ent.k].nb.filter(k => M.nodes[k].y < M.ent.y); if (inside.length) startK = inside[walkers.filter(x => x.staff != null).length % inside.length]; } // bare land: start just inside the gate, apart from each other
       const n = M.nodes[startK]; w.node = n.k; w.x = n.x + w.ox; w.y = n.y + w.oy; w.wait = rnd(0, 2); walkers.push(w); }
       w.kind = s.role; const p = busy[s.id], hid = p ? projectHab(S, p) : null, post = p && hid != null && M.habs[hid] ? hid : null;
       w.hidden = !!p && post == null;
@@ -422,11 +430,11 @@
       else if (S.headhunt) here.push({ k: 'c:headhunter', kind: 'headhunter' });
     } catch (e) { /* none */ }
     if (S.happening && S.happening.who) here.push({ k: 'h:' + (S.happening.key || '') + S.happening.who, kind: S.happening.who, mark: 'choice' });
-    const ghw = M.gate ? Math.max(M.gate.ax, M.gate.c.width - M.gate.ax) : 26; // stand just outside the pillars, in front of the arch line, never behind it
-    const SLOT = [[-(ghw + 7), 4], [ghw + 7, 4], [-(ghw + 18), -5], [ghw + 18, -5], [-(ghw + 28), 6], [ghw + 28, 6]], keep = {};
+    const ghw = M.gate ? Math.max(M.gate.ax, M.gate.c.width - M.gate.ax) : 26 * K; // stand just outside the pillars, in front of the arch line, never behind it
+    const SLOT = [[-(ghw + 7 * K), 4 * K], [ghw + 7 * K, 4 * K], [-(ghw + 18 * K), -5 * K], [ghw + 18 * K, -5 * K], [-(ghw + 28 * K), 6 * K], [ghw + 28 * K, 6 * K]], keep = {};
     if (M.ent) here.forEach((c, i) => {
       keep[c.k] = 1; let g = gatePeople[c.k]; const sl = SLOT[i % SLOT.length];
-      if (!g) { g = gatePeople[c.k] = newWalker(c.kind, strHash(c.k)); g.gate = true; g.mark = c.mark; g.speed = 24; g.slot = -1; const s = first || !M.road.length ? null : M.road[Math.min(3, M.road.length - 1)]; g.x = s ? s.x : M.ent.x + sl[0]; g.y = s ? s.y : M.ent.y + sl[1]; }
+      if (!g) { g = gatePeople[c.k] = newWalker(c.kind, strHash(c.k)); g.gate = true; g.mark = c.mark; g.speed = 24 * K; g.slot = -1; const s = first || !M.road.length ? null : M.road[Math.min(3, M.road.length - 1)]; g.x = s ? s.x : M.ent.x + sl[0]; g.y = s ? s.y : M.ent.y + sl[1]; }
       if (g.slot !== i) { g.slot = i; g.wp = [{ x: M.ent.x + sl[0], y: M.ent.y + sl[1], wait: 1e9, face: sl[0] > 0 }]; g.wait = 0; }
     });
     for (const k in gatePeople) if (!keep[k]) delete gatePeople[k];
@@ -461,8 +469,8 @@
     if (zs && ready('deco') && (!zs.DECOS || zs.DECOS.indexOf('crate') >= 0)) { try { const c2 = zs.deco('crate'), t2 = zs.deco('no-such-deco-kind'); if (c2 && c2.c && c2.c.width > 0 && (!t2 || t2.c !== c2.c)) return c2; } catch (e) { /* fall through */ } }
     const ic = ready('icon') ? spr('icon', 'pen') : null;
     if (crate && crateSrc === (ic ? ic.c : null)) return crate; crateSrc = ic ? ic.c : null;
-    if (ic) crate = mk(ic.c.width * 2, ic.c.height * 2, ic.c.width, ic.c.height * 2 - 2, x => { x.imageSmoothingEnabled = false; x.drawImage(ic.c, 0, 0, ic.c.width * 2, ic.c.height * 2); });
-    else crate = mk(22, 20, 11, 18, x => { x.fillStyle = '#3b2a1a'; x.fillRect(0, 0, 22, 20); x.fillStyle = '#b98850'; x.fillRect(2, 2, 18, 16); x.fillStyle = '#8a6238'; for (let i = 5; i < 18; i += 5) x.fillRect(i, 2, 2, 16); });
+    if (ic) crate = mk(ic.c.width * 2, ic.c.height * 2, ic.c.width, ic.c.height * 2 - 2 * K, x => { x.imageSmoothingEnabled = false; x.drawImage(ic.c, 0, 0, ic.c.width * 2, ic.c.height * 2); });
+    else crate = upK(mk(22, 20, 11, 18, x => { x.fillStyle = '#3b2a1a'; x.fillRect(0, 0, 22, 20); x.fillStyle = '#b98850'; x.fillRect(2, 2, 18, 16); x.fillStyle = '#8a6238'; for (let i = 5; i < 18; i += 5) x.fillRect(i, 2, 2, 16); }));
     return crate;
   }
   function syncPen(S) { let hold = []; try { hold = Z.holding ? Z.holding(S) : (S.animals || []).filter(a => a.hab == null); } catch (e) { hold = []; } penned = hold.slice(0, 3).map(a => ({ sp: a.sp, variant: !!a.variant, juv: Z.isJuv ? !!Z.isJuv(S, a) : false })); }
@@ -470,8 +478,8 @@
 
   // ---------------------------------------------------------------- floating pop-ups
   function floatAt(x, y, icon, num, delay) { floaters.push({ x: Math.round(x), y: Math.round(y), icon: icon ? spr('icon', icon) : null, txt: num != null && isFinite(num) && Math.round(num) !== 0 ? textSprite(shortNum(num), num < 0 ? '#ff8a7a' : '#ffffff') : null, t: -(delay || 0) }); }
-  function posOfItem(id) { const h = M.habs[id]; if (h) return { x: h.top.x, y: h.top.y - HH - 4 }; const it = M.items[id]; if (it) { const p = G.toScreen(it.q, it.r); return { x: p.x, y: p.y - 26 }; } return null; }
-  const gatePos = () => M.ent ? { x: M.ent.x, y: M.ent.y - 30 } : { x: cam.x + vw / 2, y: cam.y + vh / 2 };
+  function posOfItem(id) { const h = M.habs[id]; if (h) return { x: h.top.x, y: h.top.y - HH - 4 * K }; const it = M.items[id]; if (it) { const p = G.toScreen(it.q, it.r); return { x: p.x, y: p.y - 26 * K }; } return null; }
+  const gatePos = () => M.ent ? { x: M.ent.x, y: M.ent.y - 30 * K } : { x: cam.x + vw / 2, y: cam.y + vh / 2 };
   const GAIN_ICON = { animals: 'heart', habitat: 'rep', fun: 'star', learning: 'rp' };
   const TYPE_ICON = { money: 'coin', coin: 'coin', income: 'coin', rp: 'rp', research: 'rp', rep: 'rep', birth: 'heart', heart: 'heart', buzz: 'flame', exp: 'star', sick: 'sick', choice: 'choice', 'super': 'star' };
   function consumeFx(S) {
@@ -480,12 +488,12 @@
     S.fx.forEach(f => {
       if (!f) return; let p = null;
       if (f.hab != null) p = posOfItem(f.hab); if (!p && f.item != null) p = posOfItem(f.item);
-      if (!p && f.type === 'super') { const w = walkers.find(x => x.staff != null && (x.staff === f.staff || x.staff === f.id || x.staff === f.who) && !x.hidden); if (w) p = { x: w.x, y: w.y - 20 }; }
-      if (!p && f.q != null && f.r != null) { const s = G.toScreen(f.q, f.r); p = { x: s.x, y: s.y - 14 }; } if (!p) p = gatePos();
+      if (!p && f.type === 'super') { const w = walkers.find(x => x.staff != null && (x.staff === f.staff || x.staff === f.id || x.staff === f.who) && !x.hidden); if (w) p = { x: w.x, y: w.y - 20 * K }; }
+      if (!p && f.q != null && f.r != null) { const s = G.toScreen(f.q, f.r); p = { x: s.x, y: s.y - 14 * K }; } if (!p) p = gatePos();
       if (f.type === 'money') engineMoneyFx = true;
-      if (f.type === 'event' && f.gains) { let i = 0; Object.keys(f.gains).forEach(k => { const v = Math.round(f.gains[k]); if (v > 0) { floatAt(p.x + (i % 2 ? 13 : -13), p.y + 4, GAIN_ICON[k] || 'star', v, i * 0.28); i++; } }); if (f.fired) floatAt(p.x, p.y - 8, 'flame', null, 1.1); return; }
-      if (f.type === 'birth') { floatAt(p.x - 5, p.y + 6, 'heart', null, 0); floatAt(p.x + 7, p.y + 10, 'heart', null, 0.3); return; }
-      if (f.type === 'exp' || f.type === 'super') { floatAt(p.x - 9, p.y, 'star', null, 0); floatAt(p.x + 9, p.y + 2, 'star', null, 0.25); return; }
+      if (f.type === 'event' && f.gains) { let i = 0; Object.keys(f.gains).forEach(k => { const v = Math.round(f.gains[k]); if (v > 0) { floatAt(p.x + (i % 2 ? 13 : -13) * K, p.y + 4 * K, GAIN_ICON[k] || 'star', v, i * 0.28); i++; } }); if (f.fired) floatAt(p.x, p.y - 8 * K, 'flame', null, 1.1); return; }
+      if (f.type === 'birth') { floatAt(p.x - 5 * K, p.y + 6 * K, 'heart', null, 0); floatAt(p.x + 7 * K, p.y + 10 * K, 'heart', null, 0.3); return; }
+      if (f.type === 'exp' || f.type === 'super') { floatAt(p.x - 9 * K, p.y, 'star', null, 0); floatAt(p.x + 9 * K, p.y + 2 * K, 'star', null, 0.25); return; }
       const num = [f.amt, f.amount, f.n, f.value, f.v].find(x => typeof x === 'number');
       floatAt(p.x, p.y, f.icon || TYPE_ICON[f.type] || 'star', num, Math.min(1.2, (nth++) * 0.12));
     });
@@ -504,7 +512,7 @@
   function aimCamera(S) { // opening view: everything built plus the gate, centred if it fits; otherwise the gate low on the screen
     const ent = M.ent; let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; const inc = (x, y) => { a0 = Math.min(a0, x); a1 = Math.max(a1, x); b0 = Math.min(b0, y); b1 = Math.max(b1, y); };
     if (ent) inc(ent.x, ent.y); (S.items || []).forEach(it => itemCells(it).forEach(c => { const p = G.toScreen(c[0], c[1]); inc(p.x, p.y); }));
-    if (a0 > 1e8) return; const padT = HH + 36, padB = HH + 30, padX = HW + 12;
+    if (a0 > 1e8) return; const padT = HH + 36 * K, padB = HH + 30 * K, padX = HW + 12 * K;
     if (ent && !(S.items || []).length) { cam.x = ent.x - vw / 2; cam.y = ent.y - vh * 0.82; cam.vx = cam.vy = 0; cam.tx = cam.ty = null; return; } // bare land: owned land fills the view, gate near the bottom
     cam.x = (a1 - a0 + padX * 2 <= vw ? (a0 + a1) / 2 : ent ? ent.x : a0) - vw / 2;
     cam.y = b1 - b0 + padT + padB <= vh ? (b0 - padT + b1 + padB) / 2 - vh / 2 : ent ? ent.y - vh * 0.85 : b0 - padT;
@@ -520,7 +528,7 @@
     const cx = cam.x + vw / 2, cy = cam.y + vh / 2, had = vw > 0;
     dpr = root.devicePixelRatio || 1; cssW = rect.width; cssH = rect.height;
     devW = Math.max(1, Math.round(cssW * dpr)); devH = Math.max(1, Math.round(cssH * dpr));
-    const n1 = Math.max(1, Math.round(devW / 195)), n0 = Math.max(1, Math.min(n1 - 1, Math.round(devW / 280)));
+    const n1 = Math.max(1, Math.round(devW / (195 * K))), n0 = Math.max(1, Math.min(n1 - 1, Math.round(devW / (280 * K))));
     N = zoom ? n1 : n0;
     if (canvas.width !== devW) canvas.width = devW; if (canvas.height !== devH) canvas.height = devH;
     vw = devW / N; vh = devH / N; if (M && M.cover && (vw > M.cover.w || vh > M.cover.h)) mapDirty = true;
@@ -563,7 +571,7 @@
       return;
     }
     const a = ptr.samples[0], b = ptr.samples[ptr.samples.length - 1], dt = (b.t - a.t) / 1000, k = (devW / cssW) / N;
-    if (dt > 0.02 && now() - b.t < 90) { cam.vx = clamp(-(b.x - a.x) * k / dt, -900, 900); cam.vy = clamp(-(b.y - a.y) * k / dt, -900, 900); }
+    if (dt > 0.02 && now() - b.t < 90) { cam.vx = clamp(-(b.x - a.x) * k / dt, -900 * K, 900 * K); cam.vy = clamp(-(b.y - a.y) * k / dt, -900 * K, 900 * K); }
   }
   function onWheel(e) { cam.x += e.deltaX / N; cam.y += e.deltaY / N; cam.vx = cam.vy = 0; cam.tx = cam.ty = null; clampCam(); e.preventDefault(); }
 
@@ -595,7 +603,7 @@
   function showGhost() { // glide the camera only if the ghost's footprint is not comfortably on screen
     if (!P) return; let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; Z.cellsOf(P.spec.kind, P.spec.t, P.q, P.r, P.rot).forEach(c => { const p = G.toScreen(c[0], c[1]); a0 = Math.min(a0, p.x); a1 = Math.max(a1, p.x); b0 = Math.min(b0, p.y); b1 = Math.max(b1, p.y); });
     const barH = P.dom && P.dom.bar ? (P.dom.bar.getBoundingClientRect().height + 40) / (cssH || 1) * vh : vh * 0.2;
-    if (a0 - HW < cam.x + 4 || a1 + HW > cam.x + vw - 4 || b0 - HH - 20 < cam.y || b1 + HH > cam.y + vh - barH) { const ox = cam.x, oy = cam.y; cam.x = (a0 + a1) / 2 - vw / 2; cam.y = (b0 + b1) / 2 - vh * 0.42; clampCam(); cam.tx = cam.x; cam.ty = cam.y; cam.x = ox; cam.y = oy; cam.vx = cam.vy = 0; }
+    if (a0 - HW < cam.x + 4 * K || a1 + HW > cam.x + vw - 4 * K || b0 - HH - 20 * K < cam.y || b1 + HH > cam.y + vh - barH) { const ox = cam.x, oy = cam.y; cam.x = (a0 + a1) / 2 - vw / 2; cam.y = (b0 + b1) / 2 - vh * 0.42; clampCam(); cam.tx = cam.x; cam.ty = cam.y; cam.x = ox; cam.y = oy; cam.vx = cam.vy = 0; }
   }
   // Place is the one prominent (green) button, grey while the spot is invalid; Rotate and Cancel/Done are neutral. Set inline so it holds
   // whichever position each button has in the bar. Colours come from the Shell's theme variables, with fallbacks.
@@ -676,8 +684,8 @@
       if (mapDirty || !M || M.sig !== signature(S)) rebuild(S); else { syncAnimals(S); syncWalkers(S, false); syncStatus(S); }
     }
     // camera
-    if (cam.tx != null) { const k = 1 - Math.exp(-dt * 9); cam.x += (cam.tx - cam.x) * k; cam.y += (cam.ty - cam.y) * k; if (Math.abs(cam.tx - cam.x) + Math.abs(cam.ty - cam.y) < 0.4) { cam.x = cam.tx; cam.y = cam.ty; cam.tx = cam.ty = null; } }
-    else if (ptr.id == null && (cam.vx || cam.vy)) { cam.x += cam.vx * dt; cam.y += cam.vy * dt; const f = Math.exp(-dt * 5.5); cam.vx *= f; cam.vy *= f; if (Math.hypot(cam.vx, cam.vy) < 6) cam.vx = cam.vy = 0; }
+    if (cam.tx != null) { const k = 1 - Math.exp(-dt * 9); cam.x += (cam.tx - cam.x) * k; cam.y += (cam.ty - cam.y) * k; if (Math.abs(cam.tx - cam.x) + Math.abs(cam.ty - cam.y) < 0.4 * K) { cam.x = cam.tx; cam.y = cam.ty; cam.tx = cam.ty = null; } }
+    else if (ptr.id == null && (cam.vx || cam.vy)) { cam.x += cam.vx * dt; cam.y += cam.vy * dt; const f = Math.exp(-dt * 5.5); cam.vx *= f; cam.vy *= f; if (Math.hypot(cam.vx, cam.vy) < 6 * K) cam.vx = cam.vy = 0; }
     clampCam();
     // world
     if (running) {
@@ -717,20 +725,20 @@
       } else { const p = G.toScreen(P.q, P.r), s = spr('building', sp.t, {}); list.push({ s: s, x: p.x, y: p.y, key: G.depth(P.q, P.r, 0) + 0.21, a: 0.85 }); }
     }
     // one depth-sorted list
-    const L = cx - 40, Rr = cx + bw + 40, T = cy - 10, B = cy + bh + 60, moveId = P ? P.spec.moveId : null;
+    const L = cx - 40 * K, Rr = cx + bw + 40 * K, T = cy - 10 * K, B = cy + bh + 60 * K, moveId = P ? P.spec.moveId : null;
     let under = null; if (P && P.cells) { under = {}; P.cells.forEach(cell => { under[key(cell.q, cell.r)] = 1; }); P.cells.forEach(cell => DIR6.forEach(d => { const k2 = key(cell.q + d[0], cell.r + d[1]); if (G.toScreen(d[0], d[1]).y > 0 && !under[k2]) under[k2] = 2; })); } // (2 = the hex is just in front of the ghost: only tall things there are hidden) // decorations under the ghost are hidden so they never fight a placement
     for (let i = 0; i < M.statics.length; i++) { const e = M.statics[i]; if (e.x < L || e.x > Rr || e.y < T || e.y > B) continue; if (under && e.ck && under[e.ck] && (under[e.ck] === 1 || e.tall)) continue; if (moveId != null && e.id === moveId) { list.push({ s: e.s, x: e.x, y: e.y, key: e.key, a: 0.35 }); continue; } list.push(e); }
     const AF = frames('ANIMAL_FRAMES'), PF = frames('PERSON_FRAMES');
     for (const id in animals) {
       const a = animals[id]; if (a.x < L || a.x > Rr || a.y < T || a.y > B) continue;
       const fr = a.moving && running && AF > 1 ? Math.floor(a.t * 6) % AF : 0;
-      list.push({ s: spr('animal', a.sp, { variant: a.variant, juv: a.juv, frame: fr, flip: a.flip }), x: a.x, y: a.y - (a.hop > 0 ? Math.round(Math.abs(Math.sin(a.hop * 9)) * 5) : 0), key: a.y + 0.1, a: 1 });
+      list.push({ s: spr('animal', a.sp, { variant: a.variant, juv: a.juv, frame: fr, flip: a.flip }), x: a.x, y: a.y - (a.hop > 0 ? Math.round(Math.abs(Math.sin(a.hop * 9)) * 5) * K : 0), key: a.y + 0.1, a: 1 });
     }
     const person = w => {
       if (w.hidden || w.x < L || w.x > Rr || w.y < T || w.y > B) return;
       const fr = w.moving && running && PF > 1 ? Math.floor(w.t * 7) % PF : 0, s = spr('person', w.kind, { frame: fr, flip: w.flip, seed: w.seed });
       list.push({ s: s, x: w.x, y: w.y, key: w.y + 0.15, a: 1 });
-      if (w.mark) over.push({ s: spr('icon', w.mark), x: w.x, y: w.y - s.ay - 2 + (running ? Math.round(Math.sin(clock * 4)) : 0) });
+      if (w.mark) over.push({ s: spr('icon', w.mark), x: w.x, y: w.y - s.ay - 2 * K + (running ? Math.round(Math.sin(clock * 4)) * K : 0) });
     };
     for (let i = 0; i < walkers.length; i++) person(walkers[i]);
     for (const k in gatePeople) person(gatePeople[k]);
@@ -738,8 +746,8 @@
     penHidden = false;
     if (penned.length && M.pen) {
       if (under && under[M.pen.k] === 1) penHidden = true;
-      else { const pc = M.pen, cs = crateSprite(), SPOT = [[14, -3], [3, 12], [23, 11]]; list.push({ s: cs, x: pc.x - 13, y: pc.y - 6, key: pc.y - 6 + 0.05, a: 1 }); // crate at the back left, animals to its right and in front, never on it
-        penned.forEach((a, i) => { const sp = spr('animal', a.sp, { variant: a.variant, juv: a.juv, frame: 0, flip: i === 1 }), bob = running && Math.sin(clock * 2 + i * 2.1) > 0.92 ? 1 : 0; list.push({ s: sp, x: pc.x + SPOT[i][0], y: pc.y + SPOT[i][1] - bob, key: pc.y + SPOT[i][1] + 0.1, a: 1 }); }); }
+      else { const pc = M.pen, cs = crateSprite(), SPOT = [[14 * K, -3 * K], [3 * K, 12 * K], [23 * K, 11 * K]]; list.push({ s: cs, x: pc.x - 13 * K, y: pc.y - 6 * K, key: pc.y - 6 * K + 0.05, a: 1 }); // crate at the back left, animals to its right and in front, never on it
+        penned.forEach((a, i) => { const sp = spr('animal', a.sp, { variant: a.variant, juv: a.juv, frame: 0, flip: i === 1 }), bob = running && Math.sin(clock * 2 + i * 2.1) > 0.92 ? K : 0; list.push({ s: sp, x: pc.x + SPOT[i][0], y: pc.y + SPOT[i][1] - bob, key: pc.y + SPOT[i][1] + 0.1, a: 1 }); }); }
     }
     list.sort((a, b) => a.key - b.key);
     for (let i = 0; i < list.length; i++) { const e = list[i], s = e.s; if (e.a !== 1) c.globalAlpha = e.a; c.drawImage(s.c, Math.round(e.x - s.ax) - cx, Math.round(e.y - s.ay) - cy); if (e.a !== 1) c.globalAlpha = 1; }
@@ -747,23 +755,23 @@
     // the same combo outlines again, faintly, over the sprites, so a fence never hides which tiles belong together
     c.globalAlpha = 0.28; for (let i = 0; i < M.combos.length; i++) { const o = M.combos[i]; if (o.x - cx < bw && o.y - cy < bh && o.x + o.w > cx && o.y + o.h > cy) c.drawImage(o.f[running ? ph : 0].c, o.x - cx, o.y - cy); } c.globalAlpha = 1;
     // quiet on-floor icons and progress bars
-    const bar = (x, y, p) => { c.fillStyle = '#1d1a22'; c.fillRect(x - 10 - cx, y - cy, 20, 4); c.fillStyle = '#4a4458'; c.fillRect(x - 9 - cx, y + 1 - cy, 18, 2); c.fillStyle = '#7be36a'; c.fillRect(x - 9 - cx, y + 1 - cy, Math.round(18 * clamp(p || 0, 0, 1)), 2); };
+    const bar = (x, y, p) => { c.fillStyle = '#1d1a22'; c.fillRect(x - 10 * K - cx, y - cy, 20 * K, 4 * K); c.fillStyle = '#4a4458'; c.fillRect(x - 9 * K - cx, y + K - cy, 18 * K, 2 * K); c.fillStyle = '#7be36a'; c.fillRect(x - 9 * K - cx, y + K - cy, Math.round(18 * K * clamp(p || 0, 0, 1)), 2 * K); };
     for (const id in M.habs) {
-      const h = M.habs[id], s = statuses[id]; if (!s) continue; if (h.top.x < L || h.top.x > Rr || h.top.y < T || h.top.y > B + 40) continue;
-      const ic = iconsOf(s), mk3 = h.mark || h.top, bx = mk3.x, by = mk3.y - HH - 9;
-      if (ic.length) { const w2 = ic.length * 12 + 2; c.globalAlpha = 0.5; c.fillStyle = '#1d1a22'; c.fillRect(Math.round(bx - w2 / 2) - cx, by - 13 - cy, w2, 13); c.fillRect(Math.round(bx - w2 / 2) + 1 - cx, by - 14 - cy, w2 - 2, 15); c.globalAlpha = 1; }
-      ic.forEach((n, i) => { const sp = spr('icon', n), bob = running ? Math.round(Math.sin(clock * (n === 'choice' ? 5 : 2.2) + h.top.x)) : 0; c.drawImage(sp.c, Math.round(bx + (i - (ic.length - 1) / 2) * 12 - sp.ax) - cx, by - 1 + bob - Math.round(sp.ay) - cy); });
-      if (s.busy && s.progress != null) bar(bx, by + 1, s.progress);
+      const h = M.habs[id], s = statuses[id]; if (!s) continue; if (h.top.x < L || h.top.x > Rr || h.top.y < T || h.top.y > B + 40 * K) continue;
+      const ic = iconsOf(s), mk3 = h.mark || h.top, bx = mk3.x, by = mk3.y - HH - 9 * K;
+      if (ic.length) { const w2 = (ic.length * 12 + 2) * K; c.globalAlpha = 0.5; c.fillStyle = '#1d1a22'; c.fillRect(Math.round(bx - w2 / 2) - cx, by - 13 * K - cy, w2, 13 * K); c.fillRect(Math.round(bx - w2 / 2) + K - cx, by - 14 * K - cy, w2 - 2 * K, 15 * K); c.globalAlpha = 1; }
+      ic.forEach((n, i) => { const sp = spr('icon', n), bob = running ? Math.round(Math.sin(clock * (n === 'choice' ? 5 : 2.2) + h.top.x / K)) * K : 0; c.drawImage(sp.c, Math.round(bx + (i - (ic.length - 1) / 2) * 12 * K - sp.ax) - cx, by - K + bob - Math.round(sp.ay) - cy); });
+      if (s.busy && s.progress != null) bar(bx, by + K, s.progress);
     }
-    if (M.ent && statuses._exp) statuses._exp.forEach((e, i) => { const gx = M.ent.x, gy = M.ent.y - (M.gate ? Math.round(M.gate.ay) : 30) - 6 - i * 7; bar(gx, gy, e.progress); if (e.choice) { const sp = spr('icon', 'choice'); c.drawImage(sp.c, Math.round(gx + 16 - sp.ax) - cx, gy + 5 - Math.round(sp.ay) - cy); } });
+    if (M.ent && statuses._exp) statuses._exp.forEach((e, i) => { const gx = M.ent.x, gy = M.ent.y - (M.gate ? Math.round(M.gate.ay) : 30 * K) - 6 * K - i * 7 * K; bar(gx, gy, e.progress); if (e.choice) { const sp = spr('icon', 'choice'); c.drawImage(sp.c, Math.round(gx + 16 * K - sp.ax) - cx, gy + 5 * K - Math.round(sp.ay) - cy); } });
     for (let i = 0; i < over.length; i++) { const o = over[i]; c.drawImage(o.s.c, Math.round(o.x - o.s.ax) - cx, Math.round(o.y - o.s.ay) - cy); }
     // floating pop-ups
     for (let i = 0; i < floaters.length; i++) {
-      const f = floaters[i]; if (f.t < 0) continue; const k = f.t / 1.7, y = f.y - Math.round(20 * (1 - (1 - k) * (1 - k))) - cy; let x = f.x - cx;
+      const f = floaters[i]; if (f.t < 0) continue; const k = f.t / 1.7, y = f.y - Math.round(20 * (1 - (1 - k) * (1 - k))) * K - cy; let x = f.x - cx;
       c.globalAlpha = k > 0.7 ? Math.max(0, 1 - (k - 0.7) / 0.3) : 1;
-      const tw = (f.icon ? f.icon.c.width + 1 : 0) + (f.txt ? f.txt.w : 0); x -= Math.round(tw / 2);
-      if (f.icon) { c.drawImage(f.icon.c, x, y - f.icon.c.height); x += f.icon.c.width + 1; }
-      if (f.txt) c.drawImage(f.txt.c, x, y - f.txt.h - 1);
+      const tw = (f.icon ? f.icon.c.width + K : 0) + (f.txt ? f.txt.w : 0); x -= Math.round(tw / 2 / K) * K;
+      if (f.icon) { c.drawImage(f.icon.c, x, y - f.icon.c.height); x += f.icon.c.width + K; }
+      if (f.txt) c.drawImage(f.txt.c, x, y - f.txt.h - K);
     }
     c.globalAlpha = 1;
     // crisp integer scale-up, with the camera's sub-pixel remainder applied in device pixels so scrolling stays smooth
@@ -801,7 +809,7 @@
   R.resize = resize;
   R.entrance = () => (M && M.ent ? { q: M.ent.q, r: M.ent.r } : null);
   R.debug = function () {
-    return { sprites: stats.sprites, fps: stats.fps, frameMs: stats.frameMs, cam: { x: cam.x, y: cam.y }, buffer: { w: Math.round(vw), h: Math.round(vh), scale: N / dpr, deviceScale: N, dpr: dpr },
+    return { sprites: stats.sprites, fps: stats.fps, frameMs: stats.frameMs, cam: { x: cam.x, y: cam.y }, buffer: { w: Math.round(vw), h: Math.round(vh), scale: N / dpr, deviceScale: N, dpr: dpr, density: K, artScale: N * K / dpr },
       running: running, zoom: zoom, realSprites: usingReal(), spriteGetters: spriteState(), spriteErrors: Object.assign({}, stats.warned), animals: Object.keys(animals).length, visitors: walkers.filter(w => w.staff == null).length, staff: walkers.filter(w => w.staff != null && !w.hidden).length,
       inHab: (() => { let n = 0; for (const id in animals) { const a = animals[id], h = M && M.habs[a.hab]; if (h && h.cells.some(c => { const t = G.toAxial(a.x, a.y); return t.q === c.q && t.r === c.r; })) n++; } return n; })(), hopping: Object.keys(animals).filter(id => animals[id].hop > 0).length,
       staffAt: walkers.filter(w => w.staff != null && !w.hidden).map(w => [Math.round(w.x), Math.round(w.y)]), gateXY: M && M.ent ? [M.ent.x, M.ent.y] : null,
