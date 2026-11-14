@@ -173,6 +173,17 @@ async function run(name) {
     await p.evaluate(() => ZCore.screens.screenCheck()); await sleep(300); await shot('screencheck-' + w, p);
     check(await p.evaluate(() => ZT.stack().join() === 'screencheck' && document.querySelector('.pbody').textContent.indexOf('safe top') >= 0), 'Screen check readout shows (' + w + ')');
     await c.close(); }
+  { // layout viewport shorter than the physical screen (the iOS home-screen quirk): the app must still cover the whole screen, entering through the title
+    const c = await browser.newContext({ viewport: { width: 393, height: 790 }, screen: { width: 393, height: 852 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+    const p = await c.newPage(); p.on('pageerror', e => consoleErrors.push('pageerror: ' + e.message));
+    await p.goto(URL + '?standalone=1&inset=34&insett=54'); await p.waitForFunction(() => window.ZT && document.documentElement.dataset.ready); await sleep(300);
+    await p.evaluate(() => { ZT.newGame({ slot: 1 }); ZT.title(); }); await sleep(200); await p.evaluate(() => { ZT.skipReports = true; ZT.loadSlot(1); }); await sleep(300);
+    const r = await p.evaluate(() => { const a = document.getElementById('app').getBoundingClientRect(), d = getComputedStyle(document.getElementById('s-date')), mo = getComputedStyle(document.getElementById('s-money')), h = getComputedStyle(document.documentElement), b = getComputedStyle(document.body), top = document.getElementById('s-date').getBoundingClientRect().top;
+      return { appH: Math.round(a.height), screenH: screen.height, color: d.color, opacity: d.opacity, filter: d.filter, vis: d.visibility, moneyColor: mo.color, weightSame: d.fontWeight === mo.fontWeight, clipH: h.overflowY, clipB: b.overflowY, dateTop: Math.round(top), titleOn: document.body.classList.contains('title-on') }; });
+    check(r.appH >= r.screenH && r.clipH === 'visible' && r.clipB === 'visible', 'short layout viewport (790 inside an 852 screen): #app is at least screen-tall and html/body do not clip (' + JSON.stringify({ appH: r.appH, clipH: r.clipH, clipB: r.clipB }) + ')');
+    check(r.color === 'rgb(255, 255, 255)' && r.opacity === '1' && r.filter === 'none' && r.vis === 'visible' && r.weightSame && !r.titleOn && r.dateTop >= 54 + 24, 'date reached through the title screen is full white, opaque, same weight as the money, and sits 24+ px below the top inset (' + JSON.stringify({ color: r.color, opacity: r.opacity, w: r.weightSame, top: r.dateTop }) + ')');
+    await p.evaluate(() => ZCore.screens.screenCheck()); await sleep(300); await shot('screencheck-short', p);
+    await c.close(); }
   { const { c, p } = await fresh({ width: 320, height: 568 }, '?play=1');
     const wd = await p.evaluate(() => { ZCore.push({ id: 'w', title: 'T', render(b) { b.appendChild(ZCore.ui.chipRow([ZCore.ui.astat('charm', 78), ZCore.ui.astat('vigor', 61), ZCore.ui.astat('wit', 49), ZCore.ui.grade('a')])); b.appendChild(ZCore.ui.grid([{ icon: 'm-build', label: 'Build' }, { icon: 'm-info', label: 'Info' }, { icon: 'm-system', label: 'System' }])); } }); const a = document.getElementById('app'), d = document.scrollingElement; return { app: a.scrollWidth, w: a.clientWidth, page: d.scrollWidth, vw: innerWidth, over: [...document.querySelectorAll('.layer:not([hidden]) *')].filter(e => e.getBoundingClientRect().right > innerWidth + 1 && !e.closest('.chips')).length }; });
     check(wd.app <= 320 && wd.page <= 320 && wd.over === 0, 'nothing exceeds the screen width at 320 px (' + JSON.stringify(wd) + ')');

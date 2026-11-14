@@ -5,7 +5,7 @@
   const D = window.ZD, E = window.ZE;
   const SAVE_KEY = 'wildside-zoo-v3', LEGACY_KEY = 'wildside-zoo-v3-legacy', PREV_LOG_KEY = 'wildside-zoo-v3-prevlog';
   const SAVE_V = 3, LOG_FORMAT = 1;
-  const STANDALONE = navigator.standalone === true || /[?&]standalone=1/.test(location.search) || !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  const STANDALONE = navigator.standalone === true || /[?&]standalone=1/.test(location.search) || !!(window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches));
   const NEWS_MS = 4000;   // how long a news line stays on the floor
   const DEV_TOOLS = true;   // the one switch for developer-only features: Note for Claude, Copy log, Download log. Set false for a store build.
   const LANDSCAPE = window.matchMedia ? window.matchMedia('(orientation: landscape) and (max-height: 500px) and (pointer: coarse)') : null;
@@ -328,7 +328,9 @@
       const rows = [['standalone', (navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches)) ? 'yes' : 'no' + (STANDALONE ? ' (forced)' : '')], ['screen', screen.width + ' x ' + screen.height], ['inner', innerWidth + ' x ' + innerHeight],
         ['visualViewport', v ? Math.round(v.width) + ' x ' + Math.round(v.height) + ', top ' + Math.round(v.offsetTop) : 'none'], ['documentElement', de.clientWidth + ' x ' + de.clientHeight],
         ['#app box', 'x ' + Math.round(ab.x) + ' y ' + Math.round(ab.y) + ', ' + Math.round(ab.width) + ' x ' + Math.round(ab.height) + ', bottom ' + Math.round(ab.bottom)], ['news line', 'top ' + Math.round(nb.top) + ' bottom ' + Math.round(nb.bottom)],
-        ['safe top / bottom', I.top + ' / ' + I.bottom], ['safe left / right', I.left + ' / ' + I.right], ['pixel ratio', String(devicePixelRatio)], ['browser', navigator.userAgent]];
+        ['safe top / bottom', I.top + ' / ' + I.bottom], ['safe left / right', I.left + ' / ' + I.right], ['pixel ratio', String(devicePixelRatio)], ['html / body / #app height', Math.round(de.getBoundingClientRect().height) + ' / ' + Math.round(document.body.getBoundingClientRect().height) + ' / ' + Math.round(ab.height)],
+        ['clip html / body', getComputedStyle(de).overflowY + ' / ' + getComputedStyle(document.body).overflowY], ['inline app height', $('app').style.height || 'none'], ['placement bar', (() => { const r = $('placement-bar').getBoundingClientRect(); return 'top ' + Math.round(r.top) + ' bottom ' + Math.round(r.bottom) + ' h ' + Math.round(r.height); })()],
+        ['this Back button', (() => { const bk = document.querySelector('.layer:not([hidden]) .back'); if (!bk) return 'none'; const r = bk.getBoundingClientRect(); return 'top ' + Math.round(r.top) + ' bottom ' + Math.round(r.bottom); })()], ['date colour / opacity / filter', (() => { const c = getComputedStyle($('s-date')); return c.color + ' / ' + c.opacity + ' / ' + c.filter; })()], ['browser', navigator.userAgent]];
       body.appendChild(list(rows.map(r => ({ title: r[0], sub: r[1] }))));
       body.appendChild(note('Take a screenshot of this and send it.'));
     } });
@@ -505,19 +507,23 @@
     const app = $('app'), qs = location.search, forced = /[?&]standalone=1/.test(qs), ins = /[?&]inset=([0-9]+)/.exec(qs);
     const it = /[?&]insett=([0-9]+)/.exec(qs); if (it) document.documentElement.style.setProperty('--safe-t', it[1] + 'px');   // test only
     if (ins) document.documentElement.style.setProperty('--safe-b', ins[1] + 'px');   // test only: pretend there is a bottom inset
+    const iosApp = navigator.standalone === true || forced;
     const fit = () => {
       if (!app) return;
       if (STANDALONE) {
+        // never trust one measurement: the installed app must be at least as tall as the physical screen
         document.documentElement.classList.add('sa');
-        const h = Math.max(innerHeight, document.documentElement.clientHeight, (window.visualViewport && visualViewport.height) || 0, (navigator.standalone === true || forced) && screen.width <= 600 ? Math.max(screen.height, screen.width) : 0);
-        app.style.height = h + 'px'; app.style.top = '0px'; app.classList.remove('vv');
+        const de = document.documentElement, vv = window.visualViewport;
+        const h = Math.max(innerHeight, de.clientHeight, (vv && vv.height) || 0, iosApp ? Math.max(screen.height, screen.width) : 0);
+        app.style.height = h + 'px'; app.style.minHeight = h + 'px'; app.style.top = '0px'; app.classList.remove('vv');
+        if (window.scrollY) window.scrollTo(0, 0);
       } else if (window.visualViewport) {
         const v = visualViewport; app.style.setProperty('--app-h', Math.round(v.height) + 'px'); app.style.setProperty('--app-top', Math.round(v.offsetTop) + 'px'); app.classList.add('vv');
       }
     };
-    window.addEventListener('resize', fit); window.addEventListener('orientationchange', () => setTimeout(fit, 150));
+    window.addEventListener('resize', fit); window.addEventListener('orientationchange', () => setTimeout(fit, 150)); window.addEventListener('pageshow', fit); window.addEventListener('focus', fit);
     if (window.visualViewport && !STANDALONE) { visualViewport.addEventListener('resize', fit); visualViewport.addEventListener('scroll', fit); }
-    fit(); setTimeout(fit, 400);
+    fit(); [150, 500, 1200, 3000].forEach(t => setTimeout(fit, t));
     document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else lastT = performance.now(); });
     window.addEventListener('pagehide', () => save());
   }

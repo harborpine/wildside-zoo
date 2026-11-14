@@ -17,7 +17,7 @@ button { font: inherit; color: inherit; }
 
 /* ---------- page column ---------- */
 #app { position: fixed; top: 0; left: 0; right: 0; bottom: 0; margin: 0 auto; width: 100%; max-width: none; display: flex; flex-direction: column; background: var(--ink); overflow: hidden; box-shadow: 0 0 0 3px #0e170e, 0 0 40px rgba(0,0,0,.5); }
-#strip { flex: none; background: var(--ink); color: var(--cream); padding: calc(12px + var(--safe-t)) calc(10px + var(--safe-r)) 6px calc(10px + var(--safe-l)); border-bottom: 3px solid #000; }
+#strip { flex: none; background: var(--ink); color: var(--cream); padding: calc(30px + var(--safe-t)) calc(10px + var(--safe-r)) 6px calc(10px + var(--safe-l)); border-bottom: 3px solid #000; }
 .srow { display: flex; align-items: center; justify-content: space-between; min-height: 22px; gap: 8px; }
 .srow .date { font-size: 14px; letter-spacing: .02em; }
 .chipm { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; }
@@ -207,3 +207,11 @@ button, input, textarea { font-family: inherit; }
 .note, .muted, .row .s, .btn .sub, .rcard .rsub, .rcard .kicker, .rcard .hint, .odds.txt { font-weight: 500; }
 .chip, .chip .v, .sg, .cost, .bar em { font-weight: 700; font-variant-numeric: tabular-nums; }
 #news { font-weight: 600; text-shadow: 0 1px 1px rgba(0,0,0,.6); }   /* the only shadow left: text over the busy floor */
+
+/* installed app: nothing may clip the page; #app is a fixed box at least as tall as the screen (core.js sets the pixel height) */
+html.sa, html.sa body { height: auto; min-height: 0; overflow: visible; overscroll-behavior: none; }
+html.sa body { position: static; }
+html.sa #app { height: max(100vh, 100lvh); }
+/* the top strip: first line sits well below the status-bar fade; date as crisp as the money */
+.srow .date { color: #fff; font-weight: 700; opacity: 1; filter: none; }
+.chipm .v { color: #fff; }
