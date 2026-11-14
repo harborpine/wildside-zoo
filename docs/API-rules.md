@@ -1,7 +1,120 @@
 # Rules API as built (`data.js` -> `ZD`, `engine.js` -> `ZE`)
 
 Written by the Rules teammate. Everything Menus and Moments need is here. In Node the same objects come from
-`require('./data.js')` and `require('./engine.js')`. Checks: `node test/rules-check.js` (26 checks) and `node test/bot.js 0.8`.
+`require('./data.js')` and `require('./engine.js')`. Checks: `node test/rules-check.js` and `node test/bot.js 0.8`.
+
+## R5. Round 5 changes (read this first; the sections below are updated to match)
+
+Save version stays **3**. Old saves load: `deserialize` fills every new field with a default.
+
+### R5.1 Buying comparison (#1)
+
+`ZE.compareOwned(S, x) -> {haveSpecies, haveSameSex, sex, count, best, better}`
+
+- `x` may be an animal object, a trader/director offer `{a, price}`, an arrival entry `{a, ...}`, an expedition `found[]`
+  entry, a crate result `.animal`, or an animal id (looked up in `S.arrivals`, then `S.animals`).
+- Compares against animals **you own now** (`S.animals`, not pending arrivals), never against `x` itself.
+- `haveSpecies`: you own at least one of that species. `haveSameSex`: you own one of that species and the same sex.
+- `sex`: `x`'s sex. `count`: how many of that species and sex you own.
+- `best`: `{charm, vigor, wit, avg}` of your best (highest average) animal of that species and sex, or `null`.
+- `better`: `null` when `haveSameSex` is false. Otherwise stat by stat against `best`: `'yes'` = at least one stat higher and
+  none lower; `'no'` = none higher (equal counts as not better); `'mixed'` = some higher, some lower.
+- Badge suggestion: no species = "new" mark; species but not this sex = sex mark; `'yes'` up arrow; `'no'` down arrow; `'mixed'` `+-`.
+
+### R5.2 Arrivals: sell or keep, and where (#12)
+
+**The engine never puts an animal into a habitat by itself.** EVERY animal that joins the zoo waits in `S.arrivals` for the
+player's Sell / Keep / where decision: expedition finds, crate animals, trader and director purchases (`buyAnimal`), the
+stray (`stray` happening, "Take it in"), **births**, and the carried-over legacy animal (`newGame` `opts.animal`). Only the
+player's own actions put an animal into a habitat: `keepArrival`, `moveAnimal`, `moveIn`, `autoHouse`, `autoHouseAll`,
+`keepAllArrivals`. (The one exception is `newGame(..., {starter:true})`, the classic test layout, which is built with its
+zebras already housed.)
+
+| Field / call | Meaning |
+|---|---|
+| `S.arrivals` | `[{a: animal, src, at: week, hab?}]`, oldest first. `src` = `'expedition'|'crate'|'trader'|'director'|'stray'|'birth'|'legacy'`. `hab` (births only) = the parents' habitat, the suggested first choice. `a` is a full animal object (`a.hab` is `null`), **not** in `S.animals` yet: no upkeep, no draw, not counted in the pen |
+| `ZE.arrival(S, animalId)` | The entry or `undefined` |
+| `ZE.arrivalChoices(S, animalId) -> [{hab, room, fit, best}]` | Every place it could go. `hab` = habitat id, or `null` for the holding pen (always the **last** entry). Only habitats of the animal's biome are listed. `room` = free spaces now (the pen's can be 0 or less). `fit` = it can go there now (habitats: room > 0; the pen: always true). `best` = true on exactly one entry, the suggestion: for a birth the parents' habitat if it has room; otherwise a habitat with a mate first, then its own species, then most room; the pen if no habitat has room. Order: fitting habitats (best first, then most room), then full habitats (`fit:false`, show greyed), then the pen |
+| `ZE.keepArrival(S, animalId, habId|null)` | `{ok, hab}`. Moves it into `S.animals` at that habitat (`null` = pen). Refused (`ok:false`) for a full or wrong-biome habitat. The pen always accepts (it may go over capacity, as before; that only blocks starting new expeditions and breeding until sorted) |
+| `ZE.sellArrival(S, animalId)` | `{ok, price}`. Price = `ZE.animalValue(a)` (show it before: `ZE.animalValue(entry.a)`) |
+| `ZE.keepAllArrivals(S)` | `{ok, moved:[{id, hab}]}`: player button, keeps every waiting arrival at its `best` place |
+| `D.ARRIVAL_WEEKS` (2) | **Safety:** an arrival still undecided this many weeks after it came goes to the **holding pen** (never a habitat), by the tick, with a news line; the pen may overfill. On load (`deserialize`) waiting arrivals stay waiting, so a reveal interrupted by closing the app can be offered again: **the interface should show any `S.arrivals` (for example a "waiting" row on the Animals screen, or re-run Sell/Keep after loading)**; if nobody does, the tick moves them to the pen within `D.ARRIVAL_WEEKS`. Nothing ever waits forever, and selling is always possible, so nothing can deadlock |
+| `ZE.movableTo(S, habId) -> [animalId, ...]` | Animals in the holding pen, then waiting arrivals, whose biome fits that habitat (all of them, even beyond its room). Use it for a one-tap "move them in?" prompt after building or upgrading a habitat (the bare-land starter zebras use this) |
+| `ZE.moveIn(S, habId, ids?)` | `{ok, moved:[ids], left}`: moves `ids` (default `movableTo`) into that habitat until it is full; pen animals move, arrivals are kept there. `left` = how many did not fit |
+
+**Changed actions:** `build` returns `{id, housed: 0, movable: [ids]}` (nothing is moved in; `movable` = `movableTo` the new
+habitat). `upgrade` returns `{lvl, housed: 0, movable}`. `remove` sends the habitat's animals to the **holding pen** (no longer to
+other habitats). `buyAnimal` returns `{animal, pending: true, housed: false, hab: null}` and is no longer refused for lack of
+room. Stray "Take it in" adds an arrival (`src:'stray'`). `birth` report `kids[]` now carry `hab: null, pending: true,
+suggest: parentsHabId, price`: after the birth reveal, run Sell / Keep for each kid (suggest first). `autoHouse` and
+`autoHouseAll` are unchanged but are only ever player buttons; nothing in the engine calls them.
+
+**Holding upkeep.** An animal in the holding pen costs extra upkeep every week on top of its normal upkeep: `D.HOLD_UPKEEP`
+(1.0) x its normal upkeep, so the pen costs **double** (a Common $20 + $20, a Rare $90 + $90 a week). Waived while the zoo is
+closed (bare land), like all running costs. Waiting arrivals cost nothing.
+- `ZE.holdUpkeep(S) -> {perAnimal: {animalId: dollars}, total, count, mult}` (`total` = the extra per week now, 0 when closed).
+- `ZE.holdFee(S, animal)` = that one animal's extra per week if it sat in the pen.
+- `ZE.c(S).hold` = the same `total`; it is included in `ZE.c(S).cost` (and so in `S.costLast`). Weekly cost breakdown:
+  `salaries + upkeep + maint + hold = cost`.
+
+- The species counts as discovered (collection book, `isNew`, reputation) the moment it arrives, even if you then sell it.
+- `expedition` report `found[]` entries now carry `{id, sp, sex, rarity, isNew, variant, charm, vigor, wit, hab: null,
+  pending: true, price}`. `id` is the arrival's animal id. **Reveal flow:** for each found animal: the reveal as before, then
+  Sell (`price`) or Keep, then `arrivalChoices` and `keepArrival` / `sellArrival`. `hab` is always `null` now (it lives nowhere
+  until the player decides).
+- `ZE.snapshot(S).arrivals` = number waiting.
+
+### R5.3 Rarity crates at the trader (#7)
+
+Each trader visit brings **5 crates of one random rarity** (rarer rarities come on rarer visits; the odds improve with zoo
+rank, `D.CRATE_VISIT` by rank band 1-2, 3-4, 5-6, 7-8, 9-10, rarities 1..5). The old single mystery crate is gone.
+
+| Field / call | Meaning |
+|---|---|
+| `S.offers.crates` | Crates left (5 at the start of a trader visit, 0 for a director) |
+| `S.offers.crateRarity` | 1..5, the rarity of this visit's crates (`null` for a director) |
+| `ZE.crateInfo(S)` | `null` (no trader offers, or none left) or `{rarity, name, left, total: 5, cost, pool: [speciesId, ...], odds: [{rarity, name, p: 1}]}`. `name` = rarity name. `pool` = species it can contain (unlocked, non-secret regions). `cost` is per crate; it rises with rarity and rank. `odds` kept for old screens |
+| `ZE.openCrate(S)` | `{ok, animal, rarity, isNew, variant, cost, price, pending: true}`. The animal goes to `S.arrivals` (`src:'crate'`); then the same Sell / Keep / where flow as R5.2. No longer refused when the pen is full |
+| `ZE.callersHere(S)` trader entry | also has `crateRarity` |
+
+### R5.4 Habitat capacity (#10)
+
+`ZE.habCap(hab) = 4 + 2 * (lvl - 1)`: 4, 6, 8, 10, 12 for levels 1 to 5, whatever the shape. The holding pen is unchanged
+(`ZE.holdCap`: 6, or 12 with research). `D.CAP_BASE` (4), `D.CAP_STEP` (2).
+
+### R5.5 Timed hiring (#11)
+
+`advertise` now starts a **hiring job**. Applicants arrive when it finishes.
+
+| Field / call | Meaning |
+|---|---|
+| `ZE.hireTiers(S)` | each tier also has `weeks` (how long the advert runs: 2, 2, 3, 3 weeks) |
+| `ZE.advertise(S, tierIndex)` | `{ok, cost, weeks, end}`. Refused while another advert is running (`'An advert is already out.'`) or the staff room is full. No candidates in the result any more |
+| `S.hiring` | `null` or `{id: 'hire', tier, start, end, cost}` (`tier` = tier key) |
+| `ZE.hiringInfo(S)` | `null` or `{id: 'hire', type: 'hire', name: 'Hiring', detail: tier name, tier, hab: null, staff: [], weeksLeft, progress 0..1, choice: false}`: the same shape as `projectInfo`, for the running list |
+| `ZE.runningList(S)` | `[projectInfo for each project..., hiringInfo if any]`: everything running, for the Projects screen |
+| report `applicants` | `{type: 'applicants', tier, tierName, n, stars, candidates: [staff objects]}` raised when the advert finishes. The same people are now in `S.candidates`. Play the reveal (`candidates`), then the "Who turned up" list. Also an fx `{type: 'hire', gate: true}` |
+| `S.candidates` | Stay until the next advert's applicants arrive, or 12 weeks (`D.CANDIDATE_WEEKS`), whichever is first. `S.candAt` = week they arrived |
+
+### R5.6 Happenings (#5)
+
+- Less often: about **one every 12 weeks** (the gap is 10 to 14 weeks), measured with the bot. Quiet start unchanged
+  (first one 5 to 7 weeks after opening).
+- About **one in three is a mild setback**. Three new setbacks (all `bad: true`):
+
+| key | title | who | What it does / options (default *) |
+|---|---|---|---|
+| `fence` | Fence repair | builder | One habitat (`hab`) is closed for 2 weeks: its animals draw no visitors. Rush job (cost; open now) / Wait* |
+| `pipe` | Burst pipe | builder | Shops -15% for 3 weeks. Call a plumber (cost; fixed now) / Patch it* |
+| `rival` | Rival opening | (none) | No choice. Visitors -15% for 3 weeks |
+
+- Closed habitats: `ZE.isClosed(S, hab)`, `hab.closedUntil` (week; 0 = open). `ZE.habStatus` has a new field **`closed`**
+  (boolean). fx `{type: 'closed', hab}` when it closes. Events and breeding there carry on as normal.
+- Setbacks never cost a rank, an animal, a staff member or a building.
+
+### R5.7 New state fields (all filled in by `deserialize` for old saves)
+
+`S.arrivals` (`[]`), `S.hiring` (`null`), `S.offers.crateRarity`, habitat `closedUntil` (missing = 0).
 
 ## 0. Ground rules
 
@@ -44,10 +157,10 @@ Written by the Rules teammate. Everything Menus and Moments need is here. In Nod
   where it would complete them.
 - `ZE.c(S)`: derived numbers, rebuilt by `ZE.refresh(S)` after every action and tick: `{nb, active, occ, hab: {habId:
   {draw, base, adj, combo, buzz, kiosk, variety, count}}, total, spend (shop dollars per visitor), shopVal: {facId:
-  dollars per visitor}, crowd, boost (visitor boost from campaigns and happenings, -0.4..0.8), rpw (research per week),
+  dollars per visitor}, crowd, boost (visitor boost from campaigns and happenings, -0.4..0.8), rpw (research per week), hold (holding upkeep per week, R5.2),
   repw, vet, salaries, upkeep, maint, visitors, ticket, income, cost, duty}`. `ZE.refresh` is not pure (it can discover
   a combo or raise the rank and push reports); the interface should not need to call it.
-- `ZE.habStatus(S, item) -> {event, breed, busy, progress, sick, choice}` for the quiet floor icons:
+- `ZE.habStatus(S, item) -> {event, breed, busy, progress, sick, choice, closed}` for the quiet floor icons:
   `event` true = an event could start here now (animals fit, rested, someone free, money for it); `breed` true = a pair
   here could start breeding now and someone is free; `busy` `null | 'event' | 'breed'`; `progress` `0..1 | null` of that
   project; `sick` = an animal here is off show; `choice` = a project here is waiting for an answer.
@@ -64,9 +177,11 @@ Written by the Rules teammate. Everything Menus and Moments need is here. In Nod
 | `S.zooName`, `S.ng`, `S.runId` | Name, number of earlier runs, run id |
 | `S.items`, `S.animals`, `S.staff` | See below. `ZE.item/animal/staffer(S, id)` |
 | `S.projects` | Running projects (section 5) |
-| `S.offers` | `null` or `{kind:'trader'|'director', at, list:[{a: animal, price}], crates}`: whoever is selling. Stays until the next seller arrives |
+| `S.offers` | `null` or `{kind:'trader'|'director', at, list:[{a: animal, price}], crates, crateRarity}`: whoever is selling. Stays until the next seller arrives (R5.3) |
 | `S.headhunt` | `null` or a staff object on offer. Fee `ZE.headhuntFee(S.headhunt)` |
-| `S.candidates` | People who answered your last advert (staff objects, `star:true` on a standout). They leave after 8 weeks |
+| `S.candidates` | People who answered your last advert (staff objects, `star:true` on a standout). They leave after 12 weeks or when the next advert's applicants arrive |
+| `S.hiring` | `null` or the advert that is out now (R5.5) |
+| `S.arrivals` | Expedition finds and crate animals waiting for Sell / Keep (R5.2) |
 | `S.happening` | `null` or the happening that is here now (section 7) |
 | `S.yearly` | `null` or the Open Day / Festival plan waiting for an answer (section 8) |
 | `S.show` | `null` or `{stat, bar, year}`: the Winter Animal Show is open for one entry |
@@ -87,7 +202,7 @@ Written by the Rules teammate. Everything Menus and Moments need is here. In Nod
 `null` (holding pen). Helpers: `ZE.sp(a)` (species: `{id, name, biome, rarity 1..6, variant: variant name}`),
 `ZE.avg(a)`, `ZE.grade(value) -> 'D'..'SS'`, `ZE.animalLabel(a)` ('Golden Zebra'), `ZE.animalValue(a)` (sale price),
 `ZE.prestige(a)`, `ZE.animalDraw(S, a)`, `ZE.isJuv(S, a)` (under 16 weeks old), `ZE.isSick(S, a)` (off show),
-`ZE.inHab(S, habId)`, `ZE.holding(S)`, `ZE.holdCap(S)`, `ZE.habCap(habItem)`, `ZE.busyAnimals(S) -> {animalId: project}`.
+`ZE.inHab(S, habId)`, `ZE.holding(S)`, `ZE.holdCap(S)`, `ZE.habCap(habItem)` (4 + 2 per level above 1), `ZE.compareOwned(S, x)` (R5.1), `ZE.busyAnimals(S) -> {animalId: project}`.
 `ZD.RARITY.name[rarity]`. Stat names and icons: section 2a.
 
 **Staff** `{id, name, role, lvl, xp, care, sci, exp, charm, trainAt, mastered?, star?}`. `ZD.ROLES[role] = {name, main,
@@ -161,6 +276,10 @@ prefer the fields. Themes are not tied to any stat (their fit is per biome, `ZD.
 | `ZE.rankUnlocks(rank)` | Short lines: what that rank opens up |
 | `ZE.callersHere(S)` | Who stands at the gate: `[{kind:'trader'|'director', since, offers, crates}, {kind:'headhunter', since, role, name}]`. A caller stands there for 5 weeks; the offers stay open after that until the next one arrives |
 | `ZE.projectInfo(S, project)` | `{id, type, name, detail, hab, staff, weeksLeft, progress 0..1, choice:boolean, scores?}` |
+| `ZE.hiringInfo(S)`, `ZE.runningList(S)` | The advert that is out, in the same shape; everything running (R5.5) |
+| `ZE.arrivalChoices(S, animalId)`, `ZE.arrival(S, animalId)` | Where a waiting arrival could go; the entry (R5.2) |
+| `ZE.crateCost(S, rarity)` | Price of one crate of that rarity now |
+| `ZE.isClosed(S, habItem)` | That habitat is closed for repairs (R5.6) |
 | `ZE.project(S, pid)` | The project or undefined |
 | `ZE.bestHab(S, animal)` | The habitat `autoHouse` would pick, or `null` |
 | `ZE.scale(S)`, `ZE.rpScale(S)`, `ZE.rankGap(S)` | Internal price scales (you should not need them) |
@@ -180,27 +299,31 @@ All take `S` first (call them through `ZCore.act`). Each lists what it adds to `
 **Build**
 | Action | Arguments | Returns on success |
 |---|---|---|
-| `build` | `kind ('hab'|'fac'), t, q, r, rot` | `{id, housed}`; `housed` = animals moved out of the holding pen into the new habitat automatically |
+| `build` | `kind ('hab'|'fac'), t, q, r, rot` | `{id, housed: 0, movable}`; nothing moves in by itself; `movable` = `ZE.movableTo` the new habitat, for a "move them in?" prompt (`moveIn`) |
 | `move` | `itemId, q, r, rot?` | free; nothing extra |
-| `remove` | `itemId` | `{refund}` (half the build price). Its animals go to another habitat with room, else the pen. Refused while a project runs there |
-| `upgrade` | `habId` | `{lvl, housed}` |
+| `remove` | `itemId` | `{refund}` (half the build price). Its animals go to the holding pen. Refused while a project runs there |
+| `upgrade` | `habId` | `{lvl, housed: 0, movable}` |
+| `moveIn` | `habId, ids?` | `{moved, left}` (R5.2) |
 | `buyLand` | none | `{rows}` |
 
 **Animals**
 | Action | Arguments | Returns on success |
 |---|---|---|
-| `buyAnimal` | `offerIndex` in `S.offers.list` | `{housed, hab, animal}` |
+| `buyAnimal` | `offerIndex` in `S.offers.list` | `{animal, pending: true, price, housed: false, hab: null}`: the animal waits in `S.arrivals` (R5.2) |
 | `sellAnimal` | `animalId` | `{price}` |
 | `moveAnimal` | `animalId, habId|null` | nothing extra (`null` = to the holding pen) |
 | `autoHouse` | `animalId` | `{hab}`: moves an animal from the pen to the best habitat with room (one with a mate first) |
 | `autoHouseAll` | none | `{moved:[{id, hab}], left}`; `left` = still in the pen |
 | `renameAnimal` | `animalId, name` | nothing extra (at most 12 characters) |
-| `openCrate` | none | `{animal, rarity, isNew, variant, housed, hab, cost}`. Read `ZE.crateInfo(S)` first: `{cost, odds:[{rarity, name, p}], left} | null` (null = no trader in town or crate gone; one crate per trader visit). Reveal: rarity first, then the animal and its stats |
+| `openCrate` | none | `{animal, rarity, isNew, variant, cost, price, pending:true}`. Read `ZE.crateInfo(S)` first (R5.3: 5 crates of one rarity per trader visit). The animal waits in `S.arrivals`: reveal it, then Sell / Keep / where (R5.2) |
+| `keepArrival` | `animalId, habId|null` | `{hab}` (R5.2) |
+| `sellArrival` | `animalId` | `{price}` (R5.2) |
+| `keepAllArrivals` | none | `{moved:[{id, hab}]}` (R5.2) |
 
 **Staff**
 | Action | Arguments | Returns on success |
 |---|---|---|
-| `advertise` | `tierIndex` into `ZE.hireTiers(S)` | `{cost, candidates}` (also in `S.candidates`). `hireTiers -> [{key, name, cost, note, n, star, lock}]`; `n` = how many turn up, `star` = chance each is a standout, `lock` = '' or 'Rank 3'. Refused when the staff room is full |
+| `advertise` | `tierIndex` into `ZE.hireTiers(S)` | `{cost, weeks, end}`: starts a hiring job; the applicants come later with an `applicants` report (R5.5). `hireTiers -> [{key, name, cost, note, n, star, weeks, lock}]`; `n` = how many turn up, `star` = chance each is a standout, `lock` = '' or 'Rank 3'. Refused when the staff room is full or an advert is already out |
 | `hireCandidate` | `index` into `S.candidates` | `{staff}`. No extra fee: the advert was the price |
 | `hireHeadhunt` | none | `{staff}`; costs `ZE.headhuntFee(S.headhunt)` |
 | `train` | `staffId, stat ('care'|'sci'|'exp'|'charm')` | `{gain, super, stat, skill, value, cost}`. `super:true` is the triple result (about 1 in 8) |
@@ -265,9 +388,9 @@ a `choice` report, check `ZE.project(S, pid)` still exists and still has `.choic
 | `caller` | `kind: 'trader'|'director'|'headhunter'`. Then read `S.offers` (and `ZE.crateInfo(S)`) or `S.headhunt`. Dismissing needs no engine call |
 | `choice` | `pid` (section 5) |
 | `happening` | `key, title, text, bad:boolean, who?, hab?, animal?, newAnimal?, options?` (section 7) |
-| `expedition` | `region, found:[{id, sp, rarity, isNew, variant, charm, vigor, wit, hab}], rp, fragment, notes:[...], ups:[names who levelled up], staff:[ids]`. **Reveal order:** for each entry of `found` in order: rarity (and `isNew`), then species and variant, then the three stats; `hab` is where it was housed (`null` = holding pen). Then `rp` (research from field notes) and, if `fragment > 0`, "map piece `fragment` of 4" |
+| `expedition` | `region, found:[{id, sp, sex, rarity, isNew, variant, charm, vigor, wit, hab:null, pending:true, price}], rp, fragment, notes:[...], ups:[names who levelled up], staff:[ids]`. **Reveal order:** for each entry of `found` in order: rarity (and `isNew`), then species and variant, then the three stats, then Sell (`price`) / Keep and where (R5.2); `hab` is always `null` now. Then `rp` (research from field notes) and, if `fragment > 0`, "map piece `fragment` of 4" |
 | `secret` | `region: 'paleo'|'mythic'` (a secret region opened; comes right after the expedition report for paleo) |
-| `birth` | `fail:boolean, a, b` (parent ids), `lead` (staff id), `sp, chance` (success chance that applied), `kids:[...]`, and when it worked `twins, firstBred`. Each kid: `{id, sp, sex, name, hab, rolls:[{stat, parents, value, delta, lucky}], variantChance, variant}`. **Reveal order:** for each kid: the three `rolls` in order (charm, vigor, wit): show `parents` (the parents' average), count to `value`, flag `lucky` (a lucky jump of 6 to 10); then the variant roll: show `variantChance`, then `variant`. `hab` = where the baby lives (`null` = pen) |
+| `birth` | `fail:boolean, a, b` (parent ids), `lead` (staff id), `sp, chance` (success chance that applied), `kids:[...]`, and when it worked `twins, firstBred`. Each kid: `{id, sp, sex, name, hab, rolls:[{stat, parents, value, delta, lucky}], variantChance, variant}`. **Reveal order:** for each kid: the three `rolls` in order (charm, vigor, wit): show `parents` (the parents' average), count to `value`, flag `lucky` (a lucky jump of 6 to 10); then the variant roll: show `variantChance`, then `variant`. Each kid also has `hab: null, pending: true, suggest` (the parents' habitat) and `price`: after the reveal, run Sell / Keep / where for it (R5.2) |
 | `review` | `hab, biome, theme, aff 0..3, fitWord, firstTime` (first time this theme met this biome), `sc:{animals, habitat, fun, learning}`, `critics:[{key, name, score}]`, `total, hof, repeat, fired, star, boost, money, rep, rp, lead`. **Reveal order:** the four `critics` in array order, one at a time, each out of 10; then `total` out of 40; then the Hall of Fame moment if `hof` (34 or more); then rewards `money, rep, rp`. `star` is `null` or `{animal, stat, score, gain}` (that animal may have been sold since: guard the lookup); `boost` is `null` or `{good, score, amt, big}` |
 | `vip` | `id` (see `ZD.VIPS`), `money, rep, boost` |
 | `yearlyplan` | `id:'openday'|'festival', name, options:[{label, note, cost?}]` (section 8) |
@@ -276,10 +399,11 @@ a `choice` report, check `ZE.project(S, pid)` still exists and still has `.choic
 | `showresult` | `medal ('gold'|'silver'|'bronze'|null), score, bar, medals, stat, money, rep, animal, trophy` |
 | `yearend` | `year, table:[{name, rating, me?}]` (sorted), `place, awards:[{id, name, won, mine, bar, prize?}], prize, stats:{year, rating, place, of, awards:[ids won], visitors, income, cost, spent, species, bestReview, bestBaby, events, expeditions, births, money, rep, rank}` |
 | `final` | `score:{total, parts:[[label, points], ...]}` (after year 20; play can continue) |
+| `applicants` | `tier, tierName, n, stars, candidates:[staff]`: an advert finished (R5.5) |
 
 ## 7. Happenings
 
-About one every 6 to 8 weeks (7 on average), never in the same week as a yearly event, about 1 in 5 a mild setback.
+About one every 10 to 14 weeks (12 on average, `D.HAP_GAP`), never in the same week as a yearly event, about 1 in 3 a mild setback.
 The report and `S.happening` hold the same data:
 
 ```
@@ -312,6 +436,9 @@ S.happening = { key, title, text, who, hab, animal, newAnimal, bad, options, def
 | `cold` | A cold | vet | yes | One animal is off show for 4 weeks (`hab`, `animal`). Pay the vet (cost; back now) / Let it rest* |
 | `escape` | Slipped out | keeper | yes | Send the best carer (odds from Care; reputation up, or down a little, never below the current rank) / All hands* (safe; shops -10% for a week) |
 | `powercut` | Power cut | | yes | Research halved for 2 weeks. Rent a generator (cost; no loss) / Use candles* |
+| `fence` | Fence repair | builder | yes | One habitat (`hab`) closed for 2 weeks, no visitors from it. Rush job (cost; open now) / Wait* |
+| `pipe` | Burst pipe | builder | yes | Shops -15% for 3 weeks. Call a plumber (cost; fixed now) / Patch it* |
+| `rival` | Rival opening | | yes | No choice. Visitors -15% for 3 weeks |
 
 Person kinds (`ZD.WHO`): `teacher, donor, reporter, photographer, kid, professor, builder, volunteer, elder, vet, keeper`.
 Callers use `trader, director, headhunter`; special visitors use `vip`; project choices use the staff role ids.
@@ -341,6 +468,8 @@ With none of those, show it at the top strip or the gate.
 | `sick` | `hab` | An animal there caught a cold |
 | `choice` | `hab|null, pid` | A project wants an answer |
 | `super` | `staff` (id) | A Super! training result |
+| `closed` | `hab` | That habitat just closed for repairs (R5.6) |
+| `hire` | `gate:true` | Applicants have arrived (R5.5) |
 
 ## 10. Starting and legacy
 
@@ -350,8 +479,8 @@ seen, combos known), `opts = {zooName, staff, animal, starter}` (one staff objec
 **A new zoo is bare land.** Nothing is built (`S.items` is empty). The two starting zebras wait in the holding pen, a keeper
 and an explorer are on the team, and money is `ZD.START_MONEY` = $26,500 (+$6,000 per earlier run, up to 5). That is the
 old $20,000 (`ZD.START_MONEY_CLASSIC`) plus the price of the old free starter, a Savanna habitat ($5,000) and a Snack Stand
-($1,500), listed in `ZD.START_KIT`. Building the first Savanna habitat houses the zebras automatically (`build` returns
-`housed: 2`). Both starter items fit on the starting land from week 0; `ZE.starterSpots() -> {hab:{q,r}, snack:{q,r}}`
+($1,500), listed in `ZD.START_KIT`. Building the first Savanna habitat no longer moves the zebras in: `build` returns
+`movable` (their two ids) and the interface offers `moveIn`. Both starter items fit on the starting land from week 0; `ZE.starterSpots() -> {hab:{q,r}, snack:{q,r}}`
 gives the classic positions (rotation 0) if you want to suggest a spot.
 
 `opts.starter === true` gives the **classic start** instead: the Savanna habitat and Snack Stand already built at
@@ -362,12 +491,12 @@ gives the classic positions (rotation 0) if you want to suggest a spot.
   Time still passes and the year-end report still comes.
 - No callers, no happenings, no Open Day, Festival or Winter Show. `S.offers` is `null` (no trader, no crate),
   `callersHere` is empty. Nothing the engine does ever sells or removes the penned zebras.
-- Everything else works: research, hiring, training, expeditions (finds go to the pen), buying land.
+- Everything else works: research, hiring, training, expeditions (finds wait in `S.arrivals`; the only place to keep them is the pen), buying land.
 - The first Savanna habitat can always be built, even with too little money (the balance goes below zero and income pays
   it back), so a bare zoo can never get stuck. Nothing else is ever free.
 
 **Opening.** When the first habitat is built, `S.openedAt` is set to that week (it is `null` before, and `0` on a classic
-start), the news line says the zoo is open, and a trader with a mystery crate is in town at once (no pop-up, no report:
+start), the news line says the zoo is open, and a trader with 5 rarity crates is in town at once (no pop-up, no report:
 only `S.offers` and `callersHere`). Nothing random interrupts for `ZD.QUIET_WEEKS` (2) weeks after opening: the first
 caller report can come 2 weeks after opening at the earliest, the first happening 5 to 7 weeks after. If the player later
 removes every habitat the zoo is closed again in the same way until one is rebuilt.

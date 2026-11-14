@@ -53,7 +53,7 @@ Fences and the entrance also have `sortDy`.
 ## Lists
 
 **Person kinds (`ZSprites.PERSON_KINDS`)**: `visitor`, staff roles `keeper`, `vet`, `researcher`, `explorer`, `guide`, `zoologist`,
-`leader`, `showrunner`; callers `trader`, `headhunter`, `director`, `vip`; happening characters (from `ZD.WHO`) `teacher`, `donor`,
+`leader`, `showrunner`; callers `trader` (travelling animal dealer: teal work shirt with pockets, rust cap, satchel strap, pet carrier with a critter peeking out; no costume cues), `headhunter`, `director`, `vip`; happening characters (from `ZD.WHO`) `teacher`, `donor`,
 `reporter`, `photographer`, `kid`, `professor`, `builder`, `volunteer`, `elder`; and `person` (the generic fallback).
 
 **Icons (`ZSprites.ICONS`)**: on-floor markers, 11 px round white badges: `ready-event` (red flag), `ready-breed` (pink heart),
@@ -63,8 +63,8 @@ Fences and the entrance also have `sortDy`.
 
 **Symbols that replace words (also in `ZSprites.ICONS`, 9 to 13 px, anchor centre-bottom, made to be enlarged 2x to 4x with `iconUrl`)**:
 animal stats `stat-charm` (pink four-point sparkle, Charm), `stat-vigor` (yellow lightning bolt, Energy), `stat-wit` (blue lightbulb,
-Smarts); staff skills `skill-care` (green paw), `skill-sci` (three teal test tubes in a wooden rack), `skill-exp` (gold compass), `skill-charm` (purple microphone,
-Hosting); `sex-m`, `sex-f`, `juv` (egg), `time` (clock), `visitors` (little person), `odds` (die), `cost-rp` (same picture as `rp`),
+Smarts); staff skills `skill-care` (green paw), `skill-sci` (three teal test tubes in a wooden rack), `skill-exp` (gold compass), `skill-charm` (purple hand-held stage
+microphone, tilted like the usual mic symbol: round mesh head with a shine, silver band, dark handle; Hosting); `sex-m`, `sex-f`, `juv` (egg), `time` (clock), `visitors` (little person), `odds` (die), `cost-rp` (same picture as `rp`),
 `lock`, `new` (red and yellow burst), `ok` (green tick), `no` (red cross mark), `habitat` (fence piece), `pen` (crate), `land`
 (signpost), `trophy`, `medal-gold`, `medal-silver`, `medal-bronze`, and grade rosettes `grade-ss` (gold), `grade-s` (red),
 `grade-a` (orange), `grade-b` (green), `grade-c` (blue), `grade-d` (grey), each with its letter inside.
@@ -80,3 +80,25 @@ Hosting); `sex-m`, `sex-f`, `juv` (egg), `time` (clock), `visitors` (little pers
 - `node test/art-check.js` confirms every id in the contract returns its own sprite (not a fallback), that no two species are
   pixel-identical, and that variants, juveniles and walk frames differ from the base sprite.
 - `test/art-sheet.html?s=<sheet>` is the page both scripts use.
+- `node test/art-density.js` renders the pixel-density SAMPLE for the owner (round 5, #4): `test/shots/art-density-sample.png`
+  (the same zoo corner as A today, B 1.5x denser, C 2x denser, each 390 CSS px wide at 3x) and `test/shots/art-density-zoom.png`
+  (lion and snack stand enlarged). It loads a private copy of sprites.js with a hi-res painter (`test/art-density.html`); the live
+  game is untouched.
+
+## Density switch (style D, approved by the owner; OFF by default)
+
+- `ZSprites.setDensity(n)`: 1 = today's art (default), 2 = style D (twice the pixels per art pixel, bold 2-pixel outer outlines).
+  Call it before `init()` and before any getter; switching back and forth works (caches are kept per density). `ZSprites.DENSITY` reads it.
+- At density 1 every sprite is byte-for-byte what it was before (`node test/art-regress.js` compares 1,351 sprites against a saved copy).
+- At density 2 every getter returns sprites with **twice the pixels in each direction and anchors doubled**, and every sprite carries
+  `d` (1 or 2). Draw art pixels at half the CSS size: `ctx.drawImage(s.c, x - s.ax/s.d*k, y - s.ay/s.d*k, s.w/s.d*k, s.h/s.d*k)`
+  with your usual scale k, or simply put the canvas buffer at twice the resolution and draw 1:1.
+- `sortDy` on fences and the entrance is in the sprite's own pixels (doubled at density 2), so with a doubled ZGeo the plain sort is unchanged.
+- Tiles and fences read ZGeo. Ship density 2 together with the doubled geometry (A=[90,18], B=[24,66], W/H/HW/HH doubled): a tile is then
+  exactly `ZGeo.W` wide with anchor `(ZGeo.HW, ZGeo.HH)` and fence `sortDy === ZGeo.edgeMidY(edge)`. With today's ZGeo at density 2 the
+  shapes are also correct (just in doubled pixels). Both cases are checked by `node test/art-check.js`.
+- `url`, `iconUrl`, `animalUrl`, `personUrl`, `buildingUrl`, `tileUrl` at density 2 halve their scale (default 3 becomes 2 rounded,
+  4 becomes 2), so menu images keep their CSS size and gain the detail.
+- Owner's choices built in: polar bear design 1 (honey rare, cub), gorilla rare chestnut red, revisions 1 (toucan, eagle, T. rex skin,
+  dolphin, smooth paths, trees) and the trader redesign.
+- Sheets: `node test/art-shot.js --d2 <sheets>` (files end in `-d2`), `node test/art-final.js` (test/shots/art-final-*.png).

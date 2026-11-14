@@ -73,7 +73,10 @@ async function run(name) {
   const clear = await ev(page, () => { const c = document.querySelector('.mn-coach').getBoundingClientRect(), n = document.getElementById('placement-note').getBoundingClientRect(), b = document.getElementById('placement-bar').getBoundingClientRect(); const hit = (a, z) => !(a.bottom <= z.top || a.top >= z.bottom); return { note: hit(c, n) && n.height > 0, bar: hit(c, b) && b.height > 0 }; });
   check(!clear.note && !clear.bar, 'the strip overlaps neither the placement note nor the placement buttons'); await shot(page, 'tut-2-placing');
   let h = await freeHex(page, 'hab', 'savanna'); await page.touchscreen.tap(h.x, h.y); await sleep(250); await page.tap('#placement-bar .zr-place'); await sleep(500);
-  check(await step(page) === 2 && await ev(page, () => ZE.holding(ZT.S).length === 0), 'placing the habitat completes step 2 and the zebras move in by themselves');
+  await sleep(700); check((await stack(page)) === 'movein' && await ev(page, () => ZE.holding(ZT.S).length === 2) && await step(page) === 1, 'after the habitat is placed a Move in prompt asks; nobody is housed by itself (' + await stack(page) + ')'); await shot(page, 'tut-2-movein');
+  check(await coach(page) === null, 'the strip stays out of the way of the prompt');
+  await tap(page, 'Move in', { wait: 700 });
+  check(await step(page) === 2 && await ev(page, () => ZE.holding(ZT.S).length === 0), 'Move in houses the zebras and completes step 2');
   check(await coach(page) === null, 'the strip waits a moment so the floor shows the zebras arriving'); await shot(page, 'tut-2-zebras-in');
   await sleep(3000); check((await coach(page) || '').startsWith('Now place a Snack Stand'), 'then step 3 shows (' + await coach(page) + ')');
   // step 3: Snack Stand
@@ -177,7 +180,7 @@ async function run(name) {
   ({ ctx, page } = await mk(320, 568, URL + '?play=blank'));
   await ev(page, () => { ZCore.WEEK_MS[1] = 1e9; ZCore.WEEK_MS[2] = 1e9; ZMenus.startTutorial(); });
   await page.touchscreen.tap(160, 300); await sleep(600); await tap(page, 'Projects');
-  check(await ev(page, () => [...document.querySelectorAll('.layer:not([hidden]) .gbox')].some(b => b.textContent.startsWith('Advertise') && b.classList.contains('disabled') && /Needs habitat/.test(b.textContent))), 'Advertise is greyed with "Needs habitat" before the zoo opens');
+  check(await ev(page, () => [...document.querySelectorAll('.layer:not([hidden]) .gbox')].some(b => b.textContent.startsWith('Advertise') && b.classList.contains('disabled') && /No habitat/.test(b.textContent))), 'Advertise is greyed with "No habitat" before the zoo opens');
   await tap(page, 'Back'); await tap(page, 'Back').catch(() => 0); await ev(page, () => ZT.popAll());
   await page.touchscreen.tap(160, 300); await sleep(500); await tap(page, 'Animals'); await shot(page, 'narrow-pen');
   const nr = await ev(page, () => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), t = L.querySelector('.row .t'), r = t.getBoundingClientRect(), bt = L.querySelector('.row .btn').getBoundingClientRect(), row = L.querySelector('.row').getBoundingClientRect(); return { nameW: Math.round(r.width), btnBelow: bt.top >= r.bottom - 2, inside: bt.right <= row.right + 1, text: t.textContent }; });
@@ -185,7 +188,7 @@ async function run(name) {
   await ev(page, () => ZT.popAll()); await page.touchscreen.tap(160, 300); await sleep(500); await tap(page, 'Staff'); await shot(page, 'narrow-staff');
   const sr = await ev(page, () => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), pr = L.querySelector('.panel').getBoundingClientRect(); return { out: [...L.querySelectorAll('.row .chip')].filter(c => c.getBoundingClientRect().right > pr.right + 1).length, over: L.querySelector('.pbody').scrollWidth - L.querySelector('.pbody').clientWidth }; });
   check(sr.out === 0 && sr.over <= 1, '320 px: staff skill chips stay inside the panel (' + JSON.stringify(sr) + ')');
-  await ev(page, () => { ZT.popAll(); const S = ZT.S; let q = 0, r = 0, ok = false; for (let rr = 19; rr >= 0 && !ok; rr--) for (let c = 0; c < ZD.GRID_W && !ok; c++) { const p = ZE.fromOffset(c, rr); if (ZE.canPlace(S, 'hab', 'savanna', p[0], p[1], 0)) { q = p[0]; r = p[1]; ok = true; } } ZCore.act('build', 'hab', 'savanna', q, r, 0); });
+  await ev(page, () => { ZT.popAll(); const S = ZT.S; let q = 0, r = 0, ok = false; for (let rr = 19; rr >= 0 && !ok; rr--) for (let c = 0; c < ZD.GRID_W && !ok; c++) { const p = ZE.fromOffset(c, rr); if (ZE.canPlace(S, 'hab', 'savanna', p[0], p[1], 0)) { q = p[0]; r = p[1]; ok = true; } } const res = ZCore.act('build', 'hab', 'savanna', q, r, 0); ZCore.act('moveIn', res.id); });
   await sleep(900); const st2 = await step(page);
   await ev(page, () => { const h = ZT.S.items.find(i => i.k === 'hab'); ZCore.act('remove', h.id); }); await sleep(3300);
   check(st2 === 2 && await step(page) === 1 && (await coach(page) || '').startsWith('Build, Habitats'), 'removing the only habitat mid-tutorial brings the habitat step back (' + st2 + ' then ' + await step(page) + ')');

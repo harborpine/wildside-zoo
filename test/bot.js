@@ -12,7 +12,8 @@ function run(skill, verbose, opts) {
   const S = Z.newGame({ runs: 0 }, { starter: classic });
   if (!classic) {
     const at = Z.starterSpots(), a = Z.build(S, 'hab', 'savanna', at.hab.q, at.hab.r, 0), b = Z.build(S, 'fac', 'snack', at.snack.q, at.snack.r, 0);
-    if (!a.ok || !b.ok || a.housed !== 2 || S.money !== D.START_MONEY_CLASSIC) throw new Error('bot: could not build the starter on bare land');
+    if (!a.ok || !b.ok || a.housed !== 0 || a.movable.length !== 2 || S.money !== D.START_MONEY_CLASSIC) throw new Error('bot: could not build the starter on bare land');
+    const m = Z.moveIn(S, a.id, a.movable); if (!m.ok || m.moved.length !== 2) throw new Error('bot: could not move the zebras in');
   }
   const rows = [], idle = [], reviews = {}, seen = {}, haps = {}, choices = { asked: 0, answered: 0 };
   const count = (o, k) => { o[k] = (o[k] || 0) + 1; };
@@ -46,22 +47,29 @@ function run(skill, verbose, opts) {
       const L = Z.nextLand(S); if (L && Z.rank(S) >= L.rank && S.money > L.cost * 1.5) must(Z.buyLand(S), 'land');
       // hire through adverts
       if (S.staff.length < Z.staffCap(S)) {
-        if (!S.candidates.length) { const t = topTier(Z.hireTiers(S)); if (t >= 0) must(Z.advertise(S, t), 'advertise'); }
+        if (!S.candidates.length && !S.hiring) { const t = topTier(Z.hireTiers(S)); if (t >= 0) { must(Z.advertise(S, t), 'advertise'); count(seen, 'advert'); } }
         if (S.candidates.length) { const roles = {}; S.staff.forEach(s => { roles[s.role] = (roles[s.role] || 0) + 1; }); let bi = -1, bv = -1; S.candidates.forEach((a, i) => { const v = a.care + a.sci + a.exp + a.charm - (roles[a.role] || 0) * 30; if (v > bv) { bv = v; bi = i; } }); must(Z.hireCandidate(S, bi), 'hire'); }
       }
       // habitats: one per unlocked biome, then second ones
       let habs = S.items.filter(i => i.k === 'hab');
-      for (const b of D.BIOME_ORDER) { if (!S.regions[b]) continue; const n = habs.filter(h => h.t === b).length; const c = Z.habBuildCost(S, b); const want = n === 0 || (n < 2 && S.rows >= 10 && S.money > c * 6); if (want && S.money > c * 1.2) { const p = place('hab', b); if (p) must(Z.build(S, 'hab', b, p[0], p[1], p[2]), 'build hab'); } }
+      for (const b of D.BIOME_ORDER) { if (!S.regions[b]) continue; const n = habs.filter(h => h.t === b).length; const c = Z.habBuildCost(S, b); const want = n === 0 || (n < 2 && S.rows >= 10 && S.money > c * 6); if (want && S.money > c * 1.2) { const p = place('hab', b); if (p) { const r = must(Z.build(S, 'hab', b, p[0], p[1], p[2]), 'build hab'); if (r.movable.length) must(Z.moveIn(S, r.id, r.movable), 'move in'); } } }
       habs = S.items.filter(i => i.k === 'hab');
       // facilities near habitats
       const facs = S.items.filter(i => i.k === 'fac');
       if (facs.length < habs.length * 3 + 2) { const known = D.FAC_ORDER.filter(f => S.research['fac:' + f] && !(D.FAC[f].limit && facs.some(x => x.t === f))); const f = known[Math.floor(Math.random() * known.length)]; if (S.money > Z.facCost(S, f) * 1.8) { const h = habs[Math.floor(Math.random() * habs.length)]; const p = placeNear('fac', f, h); if (p) must(Z.build(S, 'fac', f, p[0], p[1], 0), 'build fac'); } }
       // upgrades
-      habs.forEach(h => { if (h.lvl < Z.habLevelCap(S) && S.money > Z.habUpgradeCost(h, S) * 1.6) must(Z.upgrade(S, h.id), 'upgrade'); });
+      habs.forEach(h => { if (h.lvl < Z.habLevelCap(S) && S.money > Z.habUpgradeCost(h, S) * 1.6) { const r = must(Z.upgrade(S, h.id), 'upgrade'); if (r.movable.length) must(Z.moveIn(S, h.id, r.movable), 'move in'); } });
       // market
       (S.offers ? S.offers.list : []).slice().forEach((o) => { const i = S.offers.list.indexOf(o); const sp = Z.sp(o.a); const room = habs.some(h => h.t === sp.biome && Z.inHab(S, h.id).length < Z.habCap(h)); const own = S.animals.filter(a => a.sp === sp.id); if (room && S.money > o.price * 1.5 && own.length < 2) must(Z.buyAnimal(S, i), 'buy'); });
-      // mystery crate
-      const crate = Z.crateInfo(S); if (!OFF.crate && crate && crate.cost <= S.money * 0.25 && Z.holding(S).length < Z.holdCap(S)) { must(Z.openCrate(S), 'crate'); count(seen, 'crate'); }
+      // rarity crates: up to two a week while they are cheap next to the bank
+      for (let k = 0; k < 2 && !OFF.crate; k++) { const crate = Z.crateInfo(S); if (!crate || crate.cost > S.money * 0.25) break; must(Z.openCrate(S), 'crate'); count(seen, 'crate'); count(seen, 'crate' + crate.rarity); }
+      // arrivals (expedition finds, crate animals): keep where it fits best, keep a couple in the pen, sell the rest
+      S.arrivals.slice().forEach(e => {
+        const ch = Z.arrivalChoices(S, e.a.id), best = ch.find(c => c.best), cmp = Z.compareOwned(S, e.a.id);
+        if (best && best.hab != null) { must(Z.keepArrival(S, e.a.id, best.hab), 'keep'); count(seen, 'keep'); }
+        else if (Z.holding(S).length < 2 && cmp.better !== 'no') { must(Z.keepArrival(S, e.a.id, null), 'keep pen'); count(seen, 'keepPen'); }
+        else { must(Z.sellArrival(S, e.a.id), 'sell arrival'); count(seen, 'sellArrival'); }
+      });
       // rehouse holding in one step / sell worst if full
       must(Z.autoHouseAll(S), 'autoHouseAll');
       habs.forEach(h => { const an = Z.inHab(S, h.id); if (an.length >= Z.habCap(h)) { const busy = Z.busyAnimals(S); const cand = an.filter(a => !busy[a.id]).sort((a, b) => Z.animalDraw(S, a) - Z.animalDraw(S, b)); if (cand.length) must(Z.sellAnimal(S, cand[0].id), 'sell'); } });
@@ -99,6 +107,7 @@ function run(skill, verbose, opts) {
       count(seen, 'report:' + r.type);
       if (r.type === 'choice') choices.asked++;
       if (r.type === 'happening') count(haps, r.key);
+      if (r.type === 'applicants' && (!r.candidates.length || r.n !== S.candidates.length)) throw new Error('bot: applicants report does not match S.candidates');
       if (r.type === 'review') { const y = Z.year(S); (reviews[y] = reviews[y] || []).push(r.total); }
       if (r.type === 'yearend') {
         const h = r.stats, rv = reviews[h.year] || [], avgRev = rv.length ? (rv.reduce((a, b) => a + b, 0) / rv.length).toFixed(1) : '-';
@@ -114,7 +123,8 @@ function run(skill, verbose, opts) {
     const kb = Math.round(Z.serialize(S).length / 1024); S.elog = [];
     console.log('score', JSON.stringify(S.score));
     console.log('regions', Object.keys(S.regions).join(','), '| frag', S.fragments, '| combos', Object.keys(S.combos).join(','), '| vips', Object.keys(S.vips).join(','), '| variants', Z.variantCount(S), '| hall of fame', S.life.hof);
-    console.log('happenings', hapN, '(one per', (D.WPY * D.RUN_YEARS / hapN).toFixed(1), 'weeks)', JSON.stringify(haps));
+    const badN = Object.keys(haps).reduce((t, k) => t + (D.HAPPENINGS[k].bad ? haps[k] : 0), 0);
+    console.log('happenings', hapN, '(one per', (D.WPY * D.RUN_YEARS / hapN).toFixed(1), 'weeks,', Math.round(100 * badN / hapN) + '% setbacks)', JSON.stringify(haps));
     console.log('choices asked', choices.asked, 'answered', choices.answered, '| seen', JSON.stringify(seen));
     console.log('reputation by source', JSON.stringify(S.life.repBy));
     console.log('optional spending over the run $' + Math.round(S.life.spent).toLocaleString('en-US'), '| saveKB with log', kb, 'without', Math.round(Z.serialize(S).length / 1024));

@@ -71,7 +71,7 @@
 .mo-title { font-size: 21px; line-height: 1.15; }
 .mo-line { font-size: 14px; color: var(--ink2); line-height: 1.3; }
 .mo-line.hi { color: var(--ink); font-size: 16px; }
-.mo-big { font-size: 42px; line-height: 1; text-shadow: 2px 2px 0 var(--cream2); }
+.mo-big { font-size: 42px; line-height: 1; }
 .mo-big small { font-size: 20px; color: var(--ink2); }
 .mo-good .mo-big, .mo-good.mo-big { color: var(--good); } .mo-bad .mo-big, .mo-bad.mo-big { color: var(--bad); } .mo-gold .mo-big, .mo-gold.mo-big { color: var(--gold-d); }
 .mo-hint { margin-top: 4px; font-size: 13px; color: var(--ink2); animation: blink 1.1s steps(2) infinite; }
@@ -91,14 +91,14 @@
 .mo-stars .star { width: 20px; height: 20px; }
 .mo-stars .stars { gap: 4px; }
 .mo-rar { font-size: 15px; letter-spacing: .04em; text-transform: uppercase; }
-.mo-tag { display: inline-block; padding: 2px 8px; font-size: 12px; color: #fff; background: var(--blue); box-shadow: 0 0 0 2px var(--bd); text-shadow: 1px 1px 0 rgba(0,0,0,.35); }
+.mo-tag { display: inline-block; padding: 2px 8px; font-size: 12px; color: #fff; background: var(--blue); box-shadow: 0 0 0 2px var(--bd); }
 .mo-tag.gold { background: var(--gold-d); } .mo-tag.green { background: var(--green-d); } .mo-tag.red { background: var(--red); }
 .mo-stats { display: flex; gap: 8px; width: 100%; justify-content: center; }
 .mo-stat { text-align: center; flex: 1; max-width: 108px; background: var(--paper); box-shadow: 0 0 0 2px var(--bd); display: flex; flex-direction: column; align-items: stretch; }
-.mo-stat i { font-style: normal; font-size: 11px; padding: 3px 0; color: #fff; text-shadow: 1px 1px 0 rgba(0,0,0,.4); }
+.mo-stat i { font-style: normal; font-size: 11px; padding: 3px 0; color: #fff; }
 .mo-stat.charm i { background: var(--charm); } .mo-stat.vigor i { background: var(--vigor); } .mo-stat.wit i { background: var(--wit); }
 .mo-snum { font-size: 28px; padding: 5px 0 6px; line-height: 1; }
-.mo-grade { position: absolute; top: 0; right: 0; min-width: 30px; padding: 3px 7px; font-size: 16px; background: var(--ink); color: var(--gold); box-shadow: 0 0 0 2px #000; }
+.mo-grade { display: inline-block; vertical-align: middle; min-width: 30px; padding: 3px 7px; font-size: 16px; background: var(--ink); color: var(--gold); box-shadow: 0 0 0 2px #000; }
 .mo-rare { background: #fff3b8; box-shadow: 0 -3px 0 0 var(--gold-d), 0 3px 0 0 var(--gold-d), -3px 0 0 0 var(--gold-d), 3px 0 0 0 var(--gold-d), inset 0 0 0 4px var(--gold); padding: 10px 6px 6px; margin: 3px 0; }
 .mo-sym { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; } .mo-symg { height: 20px; width: auto; image-rendering: pixelated; } .mo-symt { font-size: 12px; }
 .mo-stat i .mo-symg, .mo-roll .nm .mo-symg { height: 22px; } .mo-m b .mo-symg { height: 14px; } .mo-line .mo-symg { height: 22px; }
@@ -109,6 +109,15 @@
 .mo-optbody img, .mo-optbody .costline img, .mo-optbody .odds img { height: 20px; width: auto; max-width: none; image-rendering: pixelated; }
 .mo-optbody .odds { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 150px; } .mo-optbody .odds .bar { min-width: 60px; height: 12px; } .mo-optbody .odds b { font-size: 13px; min-width: 36px; }
 .mo-optpic > img { height: 52px; width: auto; max-width: 64px; }
+.mo-mini { gap: 6px; } .mo-m { display: inline-flex; align-items: center; gap: 1px; } .mo-m i { font-style: normal; font-size: 14px; } .mo-m .mo-symg { height: 15px; }
+.mo-cmp { display: inline-flex; align-items: center; gap: 1px; font-size: 13px; } .mo-cmp.mx { color: var(--orange-d); } .mo-cmp.up { color: var(--good); } .mo-cmp.dn { color: var(--bad); } .mo-cmp .mo-symg { height: 15px; }
+.mo-row.compact { min-height: 48px; padding: 3px 6px 3px 3px; gap: 6px; } .mo-row.compact .mo-pic { height: 42px; width: 44px; } .mo-row.compact .mo-pic img { max-height: 38px; max-width: 40px; }
+.mo-row.compact .mid { gap: 1px; } .mo-row.compact .t { display: flex; align-items: center; gap: 3px; font-size: 14px; white-space: nowrap; } .mo-row.compact .t .t { display: inline; overflow: hidden; text-overflow: ellipsis; }
+.mo-row.compact .s { display: flex; align-items: center; gap: 4px; white-space: nowrap; } .mo-row.compact .stars .star { width: 9px; height: 9px; }
+.mo-row.compact .btn { min-height: 44px; min-width: 76px; font-size: 14px; }
+.mo-arrows { display: flex; gap: 12px; } .mo-arrows .up { color: var(--good); } .mo-arrows .dn { color: var(--bad); }
+.mo-fee { display: inline-flex; align-items: center; gap: 2px; font-size: 14px; color: var(--ink2); margin-right: 8px; } .mo-fee .mo-symg { height: 16px; }
+.mo-room { display: inline-flex; align-items: center; gap: 4px; font-size: 18px; min-width: 56px; justify-content: flex-end; } .mo-row.off { opacity: .45; } .mo-row.sel { background: #fff3b8; }
 .mo-det {display: flex; align-items: center; gap: 4px; font-size: 15px; } .mo-det .mo-symg { height: 20px; }
 .mo-optbody .lbl { font-size: 17px; } .mo-optbody .meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .mo-optbody .sub { font-size: 13px; color: var(--ink2); }
 .mo-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
@@ -125,7 +134,7 @@
 .mo-crit.s-hi b { color: var(--good); } .mo-crit.s-mid b { color: var(--ink); } .mo-crit.s-lo b { color: var(--bad); }
 .mo-crit.on { animation: mo-pop .3s steps(5) both; }
 .mo-roll { display: flex; align-items: center; gap: 6px; width: 100%; background: var(--paper); box-shadow: 0 0 0 2px var(--bd); padding: 4px 8px; min-height: 40px; font-size: 14px; }
-.mo-roll .nm { width: 52px; text-align: left; font-size: 13px; color: #fff; padding: 2px 4px; text-shadow: 1px 1px 0 rgba(0,0,0,.4); }
+.mo-roll .nm { width: 52px; text-align: left; font-size: 13px; color: #fff; padding: 2px 4px; }
 .mo-roll .nm.charm { background: var(--charm); } .mo-roll .nm.vigor { background: var(--vigor); } .mo-roll .nm.wit { background: var(--wit); } .mo-roll .nm.var { background: var(--purple, #8a5cd0); width: 52px; }
 .mo-roll .par { color: var(--ink2); font-size: 12px; min-width: 62px; text-align: left; }
 .mo-roll .val { font-size: 24px; min-width: 40px; text-align: right; }
@@ -141,7 +150,7 @@
 .mo-dots i { font-style: normal; display: inline-block; animation: mo-dot .6s steps(2) infinite; } .mo-dots i:nth-child(2) { animation-delay: .15s; } .mo-dots i:nth-child(3) { animation-delay: .3s; }
 @keyframes mo-dot { 50% { transform: translateY(-8px); opacity: .4; } }
 .mo-crate { width: 110px; height: 90px; background: #b9803f; position: relative; box-shadow: 0 0 0 3px var(--bd), inset 0 -8px 0 rgba(0,0,0,.2), inset 0 6px 0 rgba(255,255,255,.2); margin-top: 16px; }
-.mo-crate::before { content: "?"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 56px; color: var(--gold); text-shadow: 3px 3px 0 var(--bd); }
+.mo-crate::before { content: "?"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 56px; color: var(--gold); text-shadow: 1px 1px 0 var(--bd); }
 .mo-crate::after { content: ""; position: absolute; left: -3px; right: -3px; top: 20px; height: 8px; background: #7a5226; box-shadow: 0 0 0 2px var(--bd); }
 .mo-row { display: flex; align-items: center; gap: 8px; width: 100%; background: var(--paper); box-shadow: 0 0 0 2px var(--line); padding: 5px 8px 5px 5px; min-height: 56px; text-align: left; }
 .mo-row .mo-pic { height: 50px; width: 54px; flex: none; background: #bfe0a0; box-shadow: 0 0 0 2px var(--bd); align-items: center; }
@@ -158,7 +167,7 @@
 .mo-rows { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .mo-tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .mo-tbl td { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--line); } .mo-tbl td.n { text-align: right; width: 56px; } .mo-tbl td.p { width: 28px; color: var(--ink2); }
-.mo-tbl tr.me td { background: #fff3b8; font-weight: 800; }
+.mo-tbl tr.me td { background: #fff3b8; font-weight: 700; }
 .mo-tbl tr.gap td { text-align: center; color: var(--ink2); font-size: 12px; padding: 0; border: 0; }
 .mo-awards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
 .mo-award { background: var(--paper); box-shadow: 0 0 0 2px var(--bd); padding: 8px 6px; min-height: 76px; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
@@ -172,8 +181,9 @@
 .mo-pips { display: flex; gap: 6px; justify-content: center; } .mo-pips i { width: 18px; height: 18px; background: #6b5a3c; box-shadow: 0 0 0 2px var(--bd); } .mo-pips i.on { background: var(--gold); }
 .mo-thumbs { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
 .mo-thumbs .mo-pic { height: 44px; width: 52px; background: #bfe0a0; box-shadow: 0 0 0 2px var(--bd); align-items: center; } .mo-thumbs img { max-height: 40px; max-width: 48px; }
-.mo-bad .ptitle, .mo.bad .ptitle { background: var(--red); text-shadow: 2px 2px 0 var(--red-d), 0 0 1px var(--bd); }
-.mo-medal { display: inline-block; padding: 6px 16px; font-size: 26px; color: #fff; box-shadow: 0 0 0 3px var(--bd); text-shadow: 2px 2px 0 rgba(0,0,0,.35); }
+.mo.calm .ptitle { background: #7a8fb0; } .mo-calm .mo-big { color: #55688a; }
+.mo-bad .ptitle, .mo.bad .ptitle { background: var(--red); }
+.mo-medal { display: inline-block; padding: 6px 16px; font-size: 26px; color: #fff; box-shadow: 0 0 0 3px var(--bd); }
 .mo-medal.gold { background: var(--gold-d); } .mo-medal.silver { background: #8c97a3; } .mo-medal.bronze { background: #a8693a; } .mo-medal.none { background: #9a8a70; }
 .mo-odds { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; width: 100%; } .mo-odds span { font-size: 12px; background: var(--paper); box-shadow: 0 0 0 2px var(--line); padding: 3px 6px; }
 .mo-sec { width: 100%; }
@@ -207,7 +217,7 @@
     M.head = (...n) => part('head', n); M.foot = (...n) => part('foot', n);
     M.clearParts = () => { try { const panel = M.api && M.api.el && M.api.el.querySelector('.panel'); if (panel) [].forEach.call(panel.querySelectorAll(':scope > .mo-top, :scope > .mo-foot'), x => x.remove()); } catch (e) { /* none */ } };
     M.rerender = () => { try { if (M.api && !M.ended) M.api.rerender(); } catch (e) { rec(e, id + ' rerender'); } };
-    M.tone = t => { try { const p = M.api && M.api.el && M.api.el.querySelector('.panel'); if (p) p.classList.toggle('bad', t === 'bad'); } catch (e) { /* none */ } };
+    M.tone = t => { try { const p = M.api && M.api.el && M.api.el.querySelector('.panel'); if (p) { p.classList.toggle('bad', t === 'bad'); p.classList.toggle('calm', t === 'calm'); } } catch (e) { /* none */ } };
     let api = null;
     try {
       api = Z.push({
@@ -253,7 +263,8 @@
     function show(instant) {
       M.clear(); card.textContent = ''; card.className = 'mo-card' + (instant ? ' mo-fast' : '');
       const step = steps[i]; M.i = i;
-      const st = mkState(M, instant, card); M.st = st;
+      M.clearParts && M.clearParts();
+      const st = mkState(M, instant, card); M.st = st; st.M = M; st.next = next; st.isLast = isFinal();
       try { if (window.ZMoments) window.ZMoments.cur = { id: M.id, i: i, n: steps.length, final: isFinal(), at: Date.now() }; } catch (e) { /* none */ }
       try { step.render(card, st, i); } catch (e) { rec(e, 'step'); }
       st.endAt = Date.now() + (instant ? 0 : (step.anim != null ? step.anim : Math.round((step.ms || 1500) * 0.9)));
@@ -264,6 +275,7 @@
     function next() { if (M.ended) return; if (i < steps.length - 1) { i++; show(false); } else M.end(); }
     M.tap = () => {
       const st = M.st, step = steps[i];
+      if (step.noAdvance) { if (st && !st.finished && Date.now() < st.endAt) st.finish(); return; }   // a decision: only buttons move on
       if (step.skipToFinal && !isFinal()) { i = steps.length - 1; show(false); return; }   // one tap skips straight to the last card
       if (st && !st.finished && Date.now() < st.endAt) { st.finish(); return; }   // first tap completes the beat and holds
       if (isFinal()) { if (!step.noEnd) M.end(); return; }
@@ -275,11 +287,61 @@
   function card0(card, tone) { if (tone) card.classList.add('mo-' + tone); }
 
   // ------------------------------------------------------------------ animal reveal (expedition find, crate, trader, reusable)
+  function gradeBadge(avg) {
+    const g = E.grade(avg);
+    if (ui.grade) { try { return ui.grade(String(g).toLowerCase()); } catch (e) { /* fall through */ } }
+    return el('span', { cls: 'mo-grade' }, g);
+  }
+  // Sell or keep, then where. Needs the engine's arrivals (ZE.arrival, arrivalChoices, keepArrival, sellArrival).
+  const hasArrivals = () => !!(E.arrival && E.arrivalChoices && E.keepArrival && E.sellArrival);
+  // The "where" list: habitats that fit first (best ticked), the holding pen last with its weekly cost.
+  function whereList(card, st, f, afterDecision) {
+    const M = st.M, id = f.id;
+    M.clearParts(); M.clear(); card.textContent = ''; card.className = 'mo-card mo-fast';
+    card.appendChild(el('div', { cls: 'mo-head', style: { padding: '0 4px' } }, el('div', { cls: 'mo-pic tiny', style: { height: '56px' } }, pic(aUrl(f.sp, { variant: !!f.variant }, 3))), el('div', { cls: 'mo-who' }, animalName(f))));
+    const entry = E.arrival(S(), id);
+    let fee = null; try { if (E.holdFee && entry) fee = Math.round(E.holdFee(S(), entry.a)); } catch (e) { /* none */ }
+    const rows = el('div', { cls: 'mo-rows' });
+    (E.arrivalChoices(S(), id) || []).forEach(c => {
+      const it = c.hab != null ? E.item(S(), c.hab) : null;
+      const label = c.hab == null ? 'Pen' : (it ? E.habName(S(), it) : 'Habitat');
+      const left = c.hab == null ? el('div', { cls: 'mo-pic' }, pic(iUrl('pen', 4))) : el('div', { cls: 'mo-pic' }, pic(tUrl('hab:' + (it ? it.t : spOf(f.sp).biome), 2)));
+      const right = [];
+      if (c.hab == null && fee != null) right.push(el('span', { cls: 'mo-fee' }, sym('coin', '$', 'upkeep'), el('b', String(fee)), sym('time', '', 'per week', 2)));
+      right.push(el('span', { cls: 'mo-room' }, sym(c.hab == null ? 'pen' : 'habitat', '', 'room', 3), el('b', String(Math.max(0, c.room)))));
+      const row = el('div', { cls: 'mo-row compact tap' + (c.fit ? '' : ' off') + (c.best ? ' sel' : '') }, left,
+        el('div', { cls: 'mid' }, el('span', { cls: 't' }, label, ' ', c.best ? sym('ok', 'o', 'best place') : null)), right);
+      if (c.fit) row.addEventListener('click', () => { const r = Z.act('keepArrival', id, c.hab); if (r && r.ok) { ui.toast(animalName(f) + (c.hab == null ? ' is in the pen' : ' joins ' + label), 'good'); afterDecision(); } });
+      rows.appendChild(row);
+    });
+    card.appendChild(rows);
+  }
+  // Only "where" (the player already chose to buy it): used after a purchase.
+  function placeMoment(animalId, done) {
+    if (!hasArrivals() || !E.arrival(S(), animalId)) { once(done)(); return null; }
+    const a = E.arrival(S(), animalId).a;
+    const f = { id: a.id, sp: a.sp, sex: a.sex, variant: a.variant, name: a.name };
+    return open('mo-place', (body, M) => sequence(M, body, [{ noAdvance: true, anim: 0, render(card, st) { if (!E.arrival(S(), animalId)) { M.later(() => M.end(), 0); return; } whereList(card, st, f, () => M.end()); } }]), done);
+  }
+  function decisionFlow(card, st, f, o, T) {
+    const M = st.M, id = f.id;
+    if (!E.arrival(S(), id)) { M.later(() => st.next(), 0); return; }   // already decided elsewhere
+    const entry = E.arrival(S(), id), price = Math.round(E.animalValue(entry.a));
+    const afterDecision = () => { if (st.isLast) M.end(); else st.next(); };
+    const showButtons = () => {
+      M.clearParts();
+      const sell = ui.btn(fmt.money(price), () => { const r = Z.act('sellArrival', id); if (r && r.ok) { ui.toast('Sold ' + fmt.money(r.price != null ? r.price : price), 'good'); afterDecision(); } }, { cls: 'warn', icon: iUrl('coin', 3) });
+      const keep = ui.btn('Keep', () => showWhere(), { cls: 'primary', icon: iUrl('ok', 3) });
+      M.foot(el('div', { cls: 'btnrow' }, sell, keep));
+    };
+    const showWhere = () => whereList(card, st, f, afterDecision);
+    st.at(T(1500), showButtons);
+  }
   function animalStep(f, o) {
     o = o || {};
     const s = spOf(f.sp), r = f.rarity || s.rarity || 1, scale = o.f || 1;
     return {
-      ms: o.ms, anim: o.ms ? Math.round(o.ms * 0.92) : 1700,
+      ms: o.ms, noAdvance: !!o.decide, anim: o.ms ? Math.round(o.ms * 0.92) : 1700,
       render(card, st) {
         const T = ms => ms * scale;
         st.t = T;
@@ -293,24 +355,27 @@
         const p = pic(aUrl(f.sp, { variant: !!f.variant, juv: !!f.juv }, 5), 'mo-unveil'); p.style.setProperty('--dur', (T(1000) / 1000) + 's');
         const pw = el('div', { cls: 'mo-pic' }, p);
         const avg = (f.charm + f.vigor + f.wit) / 3;
-        if (isFinite(avg)) { const g = el('span', { cls: 'mo-grade' }, E.grade(avg)); st.anim(g, T(1000)); pw.appendChild(g); }
+        const gr = isFinite(avg) ? gradeBadge(avg) : null;
         card.appendChild(pw);
-        const nm = el('div', { cls: 'mo-title' }, animalName(f)); st.anim(nm, T(700)); card.appendChild(nm);
+        const nm = el('div', { cls: 'mo-title' }, animalName(f), gr ? ' ' : null, gr); st.anim(nm, T(700)); card.appendChild(nm);
         const tags = el('div', { cls: 'mo-chips' });
         if (f.isNew || o.isNew) tags.appendChild(st.anim(el('span', { cls: 'mo-tag gold' }, 'New species!'), T(800)));
         if (f.variant) tags.appendChild(st.anim(el('span', { cls: 'mo-tag' }, 'Rare variant'), T(850)));
+        if (o.decide || o.cmp) tags.appendChild(st.anim(cmpBadge(f), T(900)));
         if (tags.children.length) card.appendChild(tags);
         card.appendChild(stats3(f, st));
         if (o.hab !== undefined) { const hl = el('div', { cls: 'mo-line' }, o.hab == null ? 'Goes to the holding pen' : 'Lives in ' + habLine(o.hab)); st.anim(hl, T(1500)); card.appendChild(hl); }
-        if (!o.ms) card.appendChild(hint());
+        if (o.decide) decisionFlow(card, st, f, o, T);
+        else if (!o.ms) card.appendChild(hint());
       }
     };
   }
   function revealAnimal(a, opts, done) {
     opts = opts || {};
     if (!a || a.sp == null) { once(done)(); return null; }
-    const f = { sp: a.sp, variant: a.variant, charm: a.charm, vigor: a.vigor, wit: a.wit, rarity: opts.rarity || spOf(a.sp).rarity, isNew: opts.isNew, juv: opts.juv };
-    return open('mo-animal', (body, M) => sequence(M, body, [animalStep(f, { kicker: opts.kicker, hab: opts.hab, isNew: opts.isNew })]), done);
+    const f = { id: a.id, sp: a.sp, sex: a.sex, variant: a.variant, charm: a.charm, vigor: a.vigor, wit: a.wit, rarity: opts.rarity || spOf(a.sp).rarity, isNew: opts.isNew, juv: opts.juv };
+    const dec = !!(opts.decide && hasArrivals() && a.id != null && E.arrival(S(), a.id));
+    return open('mo-animal', (body, M) => sequence(M, body, [animalStep(f, { kicker: opts.kicker, hab: dec ? undefined : opts.hab, isNew: opts.isNew, decide: dec, cmp: opts.cmp })]), done);
   }
   function crateStep() {
     return { ms: 1100, anim: 1000, render(card, st) {
@@ -321,8 +386,15 @@
   }
   function revealCrate(res, done) {
     if (!res || !res.animal) { once(done)(); return null; }
-    const a = res.animal;
-    return open('mo-crate', (body, M) => sequence(M, body, [crateStep(), animalStep({ sp: a.sp, variant: a.variant, charm: a.charm, vigor: a.vigor, wit: a.wit, rarity: res.rarity || spOf(a.sp).rarity, isNew: res.isNew }, { kicker: 'Mystery crate', hab: res.hab, isNew: res.isNew })]), done);
+    const a = res.animal, dec = !!(res.pending && hasArrivals());
+    const f = { id: a.id, sp: a.sp, sex: a.sex, variant: a.variant, charm: a.charm, vigor: a.vigor, wit: a.wit, rarity: res.rarity || spOf(a.sp).rarity, isNew: res.isNew };
+    return open('mo-crate', (body, M) => sequence(M, body, [crateStep(), animalStep(f, { kicker: 'Crate', hab: dec ? undefined : res.hab, isNew: res.isNew, decide: dec, cmp: true })]), done);
+  }
+  // Reopen a waiting arrival (sell or keep, then where), for example from Animals or Projects.
+  function showArrival(animalId, done) {
+    if (!hasArrivals() || !E.arrival(S(), animalId)) { once(done)(); return null; }
+    const a = E.arrival(S(), animalId).a;
+    return revealAnimal(a, { kicker: 'Arrived', decide: true, cmp: true, isNew: false }, done);
   }
 
   // ------------------------------------------------------------------ simple card (also reusable by Menus)
@@ -360,10 +432,16 @@
     }
     if (op.skill) {
       const sf = op.staff != null ? E.staffer(st, op.staff) : null;
-      const det = el('span', { cls: 'mo-det' }, skillSym(op.skill), (sf && sf[op.skill] != null ? ' ' + sf[op.skill] : ''), op.gain != null ? '  \u2192 +' + op.gain : '');
+      const det = el('span', { cls: 'mo-det' }, skillSym(op.skill), ' ' + SKILL(op.skill).name + (sf && sf[op.skill] != null ? ' ' + sf[op.skill] : ''), op.gain != null ? '  \u2192 +' + op.gain : '');
       return { det: det, keepNote: op.gain == null, img: sf ? pUrl(sf.role, 4) : null };
     }
     return null;
+  }
+  // "+1.5 to 2.5 points, flop -1" becomes an up arrow with the range and a down arrow with the flop.
+  function noteNode(note) {
+    const m = /^\+([\d.]+) to ([\d.]+) points, flop (-?[\d.]+)$/.exec(note || '');
+    if (!m) return el('span', { cls: 'sub' }, note);
+    return el('span', { cls: 'sub mo-arrows' }, el('b', { cls: 'up' }, '\u25B2 ' + m[1] + '-' + m[2]), el('b', { cls: 'dn' }, '\u25BC ' + Math.abs(+m[3])));
   }
   function optionButtons(options, onPick) {
     const wrap = el('div', { cls: 'choices n' + (options || []).length });
@@ -374,7 +452,7 @@
       b.textContent = '';
       const body = el('div', { cls: 'mo-optbody' }, el('span', { cls: 'lbl' }, op.label));
       if (d && d.det) body.appendChild(d.det);
-      if ((!d || d.keepNote) && op.note) body.appendChild(el('span', { cls: 'sub' }, op.note));
+      if ((!d || d.keepNote) && op.note) body.appendChild(noteNode(op.note));
       const meta = [];
       if (op.cost || op.costRp) meta.push(ui.cost ? ui.cost(Object.assign({}, op.cost ? { money: op.cost } : {}, op.costRp ? { rp: op.costRp } : {})) : el('span', { cls: 'cost' }, op.cost ? fmt.money(op.cost) : op.costRp + ' RP'));
       if (op.odds != null) meta.push(typeof op.odds === 'number' ? el('span', { cls: 'odds' }, sym('odds', '', 'odds'), ui.bar(op.odds, { cls: 'gold' }), el('b', Math.round(op.odds * 100) + '%')) : el('span', { cls: 'odds txt' }, String(op.odds)));
@@ -385,7 +463,7 @@
     });
     return wrap;
   }
-  const HAP_ICON = { heat: 'flame', storm: 'busy', powercut: 'rp', spring: 'heart', coins: 'coin', donor: 'coin', sale: 'coin', feature: 'rep', school: 'heart', tv: 'star', viral: 'star' };
+  const HAP_ICON = { fence: 'busy', pipe: 'busy', rival: 'visitors', heat: 'flame', storm: 'busy', powercut: 'rp', spring: 'heart', coins: 'coin', donor: 'coin', sale: 'coin', feature: 'rep', school: 'heart', tv: 'star', viral: 'star' };
   function headerFor(spec) {
     const h = el('div', { cls: 'mo-head' });
     let any = false;
@@ -403,14 +481,14 @@
     return open(spec.id, (body, M, api) => {
       if (M.result) {
         const r = M.result, odds = M.optOdds != null, tone = r.good ? 'good' : 'bad';
-        M.tone(r.good ? 'good' : 'bad'); api.setTitle(r.good ? (odds ? 'It worked!' : 'Good call') : (odds ? 'No luck' : 'Setback'));
+        M.tone(r.good ? 'good' : (spec.bad ? 'calm' : 'bad')); api.setTitle(r.good ? (odds ? 'It worked!' : 'Good call') : (odds ? 'No luck' : 'Setback'));
         const steps = [];
         if (odds) steps.push({ ms: 750, anim: 650, render(card, st) { card.appendChild(el('div', { cls: 'mo-line hi' }, M.optLabel || '')); card.appendChild(el('div', { cls: 'mo-dots' }, el('i', '.'), el('i', '.'), el('i', '.'))); } });
         steps.push(cardStep({ tone: tone, img: iUrl(r.good ? 'star' : 'sick', 8), imgCls: 'small', lines: [r.text || ''], anim: 400 }));
         sequence(M, body, steps); return;
       }
       if (spec.valid && !spec.valid()) { M.end(); return; }
-      M.tone(spec.bad ? 'bad' : '');
+      M.tone(spec.bad ? 'calm' : '');
       body.appendChild(headerFor(spec));
       if (spec.pre) spec.pre(body);
       body.appendChild(optionButtons(spec.options || [], i => {
@@ -441,9 +519,9 @@
   function happeningMoment(rep, done) {
     if (!rep.options || !rep.options.length) {
       return open('mo-happening', (body, M) => {
-        M.tone(rep.bad ? 'bad' : 'good');
+        M.tone(rep.bad ? 'calm' : 'good');
         sequence(M, body, [{ anim: 500, render(card, st) {
-          card.classList.add(rep.bad ? 'mo-bad' : 'mo-good');
+          card.classList.add(rep.bad ? 'mo-calm' : 'mo-good');
           const hs = el('div', { cls: 'mo-pics', style: { display: 'flex', gap: '4px', justifyContent: 'center' } });
           const wu = rep.who ? pUrl(rep.who, 5) : null; if (wu) hs.appendChild(el('div', { cls: 'mo-pic' }, pic(wu)));
           const sa = rep.animal != null ? E.animal(S(), rep.animal) : null; const au = sa ? aUrl(sa.sp, { variant: !!sa.variant }, 4) : null; if (au) hs.appendChild(el('div', { cls: 'mo-pic' }, pic(au)));
@@ -460,16 +538,18 @@
     spec.resolve = i => Z.act('resolveHappening', i);
     // the stray: show its numbers so the choice is informed
     if (rep.newAnimal) spec.pre = body => { const a = rep.newAnimal; body.appendChild(el('div', { cls: 'mo-line center', style: { textAlign: 'center' } }, animalName(a))); body.appendChild(stats3(a)); };
-    return choiceScreen(spec, done);
+    const after = () => { const id = rep.newAnimal && rep.newAnimal.id; if (id != null && hasArrivals() && E.arrival(S(), id)) showArrival(id, done); else once(done)(); };
+    return choiceScreen(spec, after);
   }
 
   // ------------------------------------------------------------------ birth
   function birthKidStep(r, k, n, ms) {
     const f = n > 1 ? Math.min(1, (3300 / n) / 2500) : 1;
+    const kid0 = r.kids[k] || {}, decide = !!(hasArrivals() && kid0.pending && kid0.id != null && E.arrival(S(), kid0.id));
     return {
-      ms: ms, anim: ms ? Math.round(ms * 0.92) : Math.round(2300 * f),
+      ms: decide ? 0 : ms, noAdvance: decide, anim: decide ? 2300 : (ms ? Math.round(ms * 0.92) : Math.round(2300 * f)),
       render(card, st) {
-        st.t = x => x * f;
+        st.t = decide ? (x => x) : (x => x * f);
         const kicker = n > 1 ? 'Twins! Baby ' + (k + 1) + ' of ' + n : 'New arrival';
         card.appendChild(el('div', { cls: 'mo-kicker' }, kicker));
         const kid = r.kids[k] || {}; const T = st.t;
@@ -498,9 +578,10 @@
           rolls.appendChild(row);
         }
         card.appendChild(rolls);
-        const hl = el('div', { cls: 'mo-line' }, kid.hab == null ? 'Goes to the holding pen' : 'Lives in ' + habLine(kid.hab)); st.anim(hl, T(2000)); card.appendChild(hl);
+        if (!decide) { const hl = el('div', { cls: 'mo-line' }, kid.hab == null ? 'Goes to the holding pen' : 'Lives in ' + habLine(kid.hab)); st.anim(hl, T(2000)); card.appendChild(hl); }
         if (k === r.kids.length - 1 && r.firstBred) card.appendChild(st.anim(el('span', { cls: 'mo-tag green' }, 'First of its kind born here!'), T(2100)));
-        if (!ms) card.appendChild(hint());
+        if (decide) decisionFlow(card, st, { id: kid0.id, sp: kid0.sp || r.sp, variant: kid0.variant, name: kid0.name, sex: kid0.sex }, {}, T);
+        else if (!ms) card.appendChild(hint());
       }
     };
   }
@@ -509,6 +590,9 @@
       const a = E.animal(S(), r.a), s = spOf(r.sp);
       return simpleCard('mo-birth', { tone: 'bad', kicker: 'Breeding', img: aUrl(r.sp, {}, 4), imgCls: 'small', title: 'No baby this time', lines: [(a ? a.name : 'The pair') + ' need a rest. ' + (r.chance != null ? 'Chance was ' + Math.round(r.chance * 100) + '%.' : '')] }, done);
     }
+    const kids = r.kids.filter(x => !(hasArrivals() && x.pending && x.id != null && !E.arrival(S(), x.id)));   // decided before a reload: skip
+    if (!kids.length) { once(done)(); return null; }
+    r = Object.assign({}, r, { kids: kids });
     const n = r.kids.length, ms = n > 1 ? Math.floor(3300 / n) : 0;
     const steps = r.kids.map((_, k) => birthKidStep(r, k, n, k < n - 1 ? ms : 0));
     return open('mo-birth', (body, M) => sequence(M, body, steps), done);
@@ -569,10 +653,11 @@
 
   // ------------------------------------------------------------------ expedition
   function expeditionMoment(r, done) {
-    const found = r.found || [], n = found.length;
+    const all = r.found || [], arr = hasArrivals();
+    const found = all.filter(x => !(arr && x.pending && !E.arrival(S(), x.id))), n = found.length;
     const ms = n ? Math.max(850, Math.min(1800, Math.floor(3400 / n))) : 0, f = ms ? Math.min(1, ms / 1800) : 1;
     const region = D.BIOMES[r.region] ? D.BIOMES[r.region].region : 'the wild';
-    const steps = found.map((x, k) => animalStep(x, { kicker: 'Found ' + (k + 1) + ' of ' + n, ms: ms, f: f, hab: x.hab, isNew: x.isNew }));
+    const steps = found.map((x, k) => { const dec = arr && x.pending; return animalStep(x, dec ? { kicker: 'Found ' + (k + 1) + ' of ' + n, decide: true, isNew: x.isNew } : { kicker: 'Found ' + (k + 1) + ' of ' + n, ms: ms, f: f, hab: x.hab, isNew: x.isNew }); });
     steps.push({ anim: 500, render(card, st) {
       card.appendChild(el('div', { cls: 'mo-kicker' }, 'Expedition back'));
       card.appendChild(el('div', { cls: 'mo-title' }, region));
@@ -638,29 +723,50 @@
   }
 
   // ------------------------------------------------------------------ callers (trader, director, headhunter)
-  function mini(a) {   // three stat numbers on one line
-    return el('span', { cls: 'mo-mini' }, [['charm', a.charm], ['vigor', a.vigor], ['wit', a.wit]].map(k => ui.astat ? ui.astat(k[0], k[1]) : el('span', { cls: 'mo-m ' + k[0] }, el('b', astatSym(k[0])), String(k[1]))));
+  function mini(a) {   // three stat numbers on one line, no boxes
+    return el('span', { cls: 'mo-mini' }, [['charm', a.charm], ['vigor', a.vigor], ['wit', a.wit]].map(k => el('span', { cls: 'mo-m ' + k[0] }, astatSym(k[0]), el('i', String(k[1])))));
+  }
+  // Compare an animal on offer with the zoo: do we own this species and sex, and is it better than our best of that sex?
+  function compareAnimal(a) {
+    try { if (E.compareOwned) { const r = E.compareOwned(S(), a); if (r) return r; } } catch (e) { /* use the local rule */ }
+    const mineSp = S().animals.filter(x => x.sp === a.sp), mine = mineSp.filter(x => x.sex === a.sex);
+    if (!mine.length) return { haveSpecies: mineSp.length > 0, haveSameSex: false, sex: a.sex, better: null };
+    const best = Math.max.apply(null, mine.map(x => E.avg(x)));
+    return { haveSpecies: true, haveSameSex: true, sex: a.sex, better: E.avg(a) > best + 0.5 ? 'yes' : 'no' };
+  }
+  // at a glance, no words: new species = "new" mark; species but not this sex = the sex mark; better = up arrow; worse = down arrow
+  function cmpBadge(a) {
+    const c = compareAnimal(a);
+    if (!c.haveSpecies) return el('span', { cls: 'mo-cmp new' }, sym('new', '*', 'you have none of this kind'));
+    if (!c.haveSameSex) return el('span', { cls: 'mo-cmp' }, sym(c.sex === 'M' ? 'sex-m' : 'sex-f', c.sex, 'you have none of this sex'), sym('new', '*', 'new sex'));
+    const b = c.better;
+    return el('span', { cls: 'mo-cmp ' + (b === 'yes' ? 'up' : b === 'mixed' ? 'mx' : 'dn') }, sym('ok', 'o', 'you have one'), b === 'yes' ? '\u25B2' : b === 'mixed' ? '\u00B1' : '\u25BC');
+  }
+  function animalLine(a) {
+    const s = spOf(a.sp);
+    return [animalName(a), ' ', sym(a.sex === 'M' ? 'sex-m' : 'sex-f', a.sex === 'M' ? 'M' : 'F', a.sex === 'M' ? 'male' : 'female'), E.isJuv && E.isJuv(S(), a) ? sym('juv', 'j', 'young') : null];
   }
   function offerRow(o, i, M) {
     const a = o.a, s = spOf(a.sp), poor = S().money < o.price;
-    const isNew = !S().book[a.sp];
     const btn = ui.btn(fmt.money(o.price), () => {
       const r = Z.act('buyAnimal', i);
-      if (r && r.ok) { ui.toast(animalName(a) + (r.housed ? ' joins ' + habLine(r.hab) : ' is in the pen'), 'good'); M.rerender(); }
+      if (r && r.ok && r.pending && hasArrivals() && r.animal) { placeMoment(r.animal.id, () => M.rerender()); }
+      else if (r && r.ok) { ui.toast(animalName(a) + (r.housed ? ' joins ' + habLine(r.hab) : ' is in the pen'), 'good'); M.rerender(); }
     }, { cls: 'primary', disabled: poor });
-    return el('div', { cls: 'mo-row' }, el('div', { cls: 'mo-pic' }, pic(aUrl(a.sp, { variant: !!a.variant }, 3))),
-      el('div', { cls: 'mid' }, el('span', { cls: 't' }, animalName(a), ' ', sym(a.sex === 'M' ? 'sex-m' : 'sex-f', a.sex === 'M' ? 'M' : 'F', a.sex === 'M' ? 'male' : 'female'), E.isJuv && E.isJuv(S(), a) ? sym('juv', 'j', 'young') : null),
-        el('span', { cls: 's' }, ui.stars(s.rarity, s.rarity), isNew ? el('span', { cls: 'mo-tag gold', style: { marginLeft: '6px' } }, 'New') : null),
-        mini(a)), btn);
+    return el('div', { cls: 'mo-row compact' }, el('div', { cls: 'mo-pic' }, pic(aUrl(a.sp, { variant: !!a.variant }, 3))),
+      el('div', { cls: 'mid' }, el('span', { cls: 't' }, animalLine(a), ' ', cmpBadge(a)), el('span', { cls: 's' }, ui.stars(s.rarity, s.rarity), ' ', mini(a))), btn);
   }
   function crateBlock(M) {
     const info = E.crateInfo(S()); if (!info) return null;
-    const odds = info.odds.map(o => o.rarity + '★ ' + Math.round(o.p * 100) + '%').join('  ');
+    const rar = info.rarity != null;
     const open = ui.btn('Open', () => {
       const r = Z.act('openCrate'); if (r && r.ok) revealCrate(r, () => M.rerender());
     }, { cls: 'blue', sub: fmt.money(info.cost), disabled: S().money < info.cost });
-    return el('div', { cls: 'mo-row' }, el('div', { cls: 'mo-pic' }, el('div', { cls: 'mo-crate mini' })),
-      el('div', { cls: 'mid' }, el('span', { cls: 't' }, 'Mystery crate' + (info.left > 1 ? ' x' + info.left : '')), el('span', { cls: 's' }, sym('odds', '', 'odds'), ' ' + odds)), open);
+    const odds = !rar ? info.odds.map(o => o.rarity + '\u2605 ' + Math.round(o.p * 100) + '%').join('  ') : null;
+    const mid = rar
+      ? el('div', { cls: 'mid' }, el('span', { cls: 't' }, rarityName(info.rarity), ' ', '\u00D7' + (info.left != null ? info.left : '?')), el('span', { cls: 's' }, ui.stars(info.rarity, info.rarity)))
+      : el('div', { cls: 'mid' }, el('span', { cls: 't' }, 'Mystery crate' + (info.left > 1 ? ' x' + info.left : '')), el('span', { cls: 's' }, sym('odds', '', 'odds'), ' ' + odds));
+    return el('div', { cls: 'mo-row compact' }, el('div', { cls: 'mo-pic' }, el('div', { cls: 'mo-crate mini' })), mid, open);
   }
   function callerMoment(kind, done, quiet) {
     const s = S();
@@ -688,7 +794,7 @@
       }
       const O = st.offers; if (!O) { M.foot(ui.btn('Close', () => M.end(), { cls: 'big' })); return; }
       const dir = O.kind === 'director';
-      body.appendChild(el('div', { cls: 'mo-head' }, el('div', { cls: 'mo-pic small' }, pic(pUrl(dir ? 'director' : 'trader', 5))), el('div', { cls: 'mo-who' }, dir ? 'Visiting director' : 'Trader')));
+      body.appendChild(el('div', { cls: 'mo-head', style: { padding: '0 4px' } }, el('div', { cls: 'mo-pic tiny', style: { height: '56px' } }, pic(pUrl(dir ? 'director' : 'trader', 4))), el('div', { cls: 'mo-who' }, dir ? 'Visiting director' : 'Trader')));
       const rows = el('div', { cls: 'mo-rows' });
       (O.list || []).forEach((o, i) => rows.appendChild(offerRow(o, i, M)));
       if (!(O.list || []).length) rows.appendChild(el('div', { cls: 'mo-line center' }, 'Nothing for sale right now'));
@@ -951,6 +1057,14 @@
     reg('showresult', (r, d) => showResultMoment(r, d));
     reg('yearend', (r, d) => yearEndMoment(r, d));
     reg('final', (r, d) => finalMoment(r, d));
+    reg('applicants', (r, d) => {
+      const list = (r.candidates && r.candidates.length ? r.candidates : S().candidates) || [];
+      if (!list.length) { d(); return; }
+      revealHire(list, () => {
+        try { const sc = window.ZMenus && ZMenus.screens; const fn = sc && (sc.candidates || sc.whoTurnedUp); if (fn) fn(); } catch (e) { rec(e, 'who turned up'); }
+        d();
+      });
+    });
   }
 
   window.ZMoments = {
@@ -958,7 +1072,7 @@
     revealAnimal: revealAnimal, revealCrate: revealCrate, revealHire: revealHire, revealTrain: revealTrain, result: result,
     showCaller: (kind, done) => callerMoment(kind, done, false),
     showChoice: (pid, done) => choiceMoment(pid, done),
-    showShow: done => showPicker(done),
+    showShow: done => showPicker(done), showArrival: showArrival, pendingArrivals: () => ((S() && S().arrivals) || []).map(x => x.a.id),
     showHappening: done => {
       const h = S().happening;
       if (!h) { ui.toast('Nothing is waiting'); once(done)(); return null; }

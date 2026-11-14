@@ -33,6 +33,19 @@ Tests: `node test/moments-shot.js [chromium] [webkit] [--quick] [--only=late,car
 * Sex uses `sex-m` / `sex-f` (and `juv` for youngsters) on trader and director rows. Wages use the coin plus the clock (`time`). Medals are `medal-*` icons, the Show shows the judged stat as an icon, review lines use `flame`, `ok` / `no`, `new`.
 * `ZMoments.revealHire` needs ONE tap to skip the flips (they also flip by themselves in about 2 s) and one tap on the last card to leave. It never needs a tap per applicant.
 
+## Round 5: arrivals, crates, comparison, applicants
+
+* **Sell or keep, then where (needs the engine's arrivals API, feature-detected).** Expedition finds and crate animals wait in `S.arrivals`. In the expedition reveal each pending find is opened (stars, picture, name, grade beside the name, comparison mark, numbers), then two pinned buttons: **[coin price] Sell** and **Keep**. Keep swaps the card for a list of places from `ZE.arrivalChoices` (best fit first, ticked; full ones greyed; the pen is the last row; a room number beside each). One tap picks; that is 2 taps per animal (1 if sold) and the next find opens by itself. Only buttons move on; a tap on the card never skips a decision. `done()` is called once after the last decision. After a reload the report is still pending and only the finds that are still waiting are offered again. Without the arrivals API the old behaviour (auto-housed, "Lives in ...") is used.
+* `ZMoments.revealCrate(result, done)` runs the whole flow (crate shake, reveal, Sell or Keep, where) before `done`.
+* `ZMoments.showArrival(animalId, done)` reopens one waiting arrival (Animals or Projects rows). `ZMoments.pendingArrivals()` lists the waiting animal ids. `ZMoments.revealAnimal(animal, {decide:true, cmp:true}, done)` does the same for any arrival.
+* **Rarity crates:** the trader row shows the crate rarity name, stars and `x left` with an Open button (cost); one compact row.
+* **Comparison mark** (trader, director, finds, crates): from `ZE.compareOwned`: no species = the `new` symbol; species but not this sex = the sex symbol with `new`; same sex and better = tick with up arrow (green); worse = tick with down arrow (red); mixed = tick with a plus-minus sign.
+* **Compact trader:** rows are portrait, name, sex, stars, three stat numbers on one line, price. Four animals plus the crate row fit with no scrolling at 390x844 and 393x852 (tested).
+* **Applicants report** (timed hiring): plays `revealHire` (one tap to skip, one to leave), then opens the "Who turned up" list through `ZMenus.screens.candidates` (or `whoTurnedUp`) if Menus exposes one.
+* **Choices:** a staff skill shows its icon, its word and the person's value; "+1.5 to 2.5 points, flop -1" is an up arrow with the range and a down arrow with the flop.
+* **Setbacks (bad happenings):** a calm blue-grey title bar and card, never the red used for real failures; every option still resolves. Good happenings are unchanged.
+* The grade badge never sits on top of an animal picture: it is beside the name.
+
 ## Report handlers (registered by `ZMoments.init`)
 
 | Report | What the player sees |

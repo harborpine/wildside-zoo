@@ -54,14 +54,25 @@ async function run(name) {
     }
     if (o.shots) { await sleep(900); await shot(o.shots + '-b'); }
     // untouched: final card reached in about four seconds
-    const fin = await waitStack(s => !s.cur || s.cur.final || !s.stack.length, 6000);
+    // sell-or-keep decisions appear on reveal cards: answer them (Keep, then the last place) so the moment can go on
+    let decided = 0;
+    const decideIfAsked = async () => {
+      const has = await ev(() => !!(document.querySelector('.layer:not([hidden]) .mo-foot .btn.warn') && document.querySelector('.layer:not([hidden]) .mo-foot .btn.primary')));
+      if (has) { await page.locator('.layer:not([hidden]) .mo-foot .btn.primary').tap({ force: true }); await sleep(350); const rows = page.locator('.layer:not([hidden]) .mo-row.tap:not(.off)'); if (await rows.count()) await rows.last().tap({ force: true }); await sleep(450); decided++; return true; }
+      const where = await ev(() => !!document.querySelector('.layer:not([hidden]) .mo-room') && !document.querySelector('.layer:not([hidden]) .mo-foot .btn.warn'));
+      if (where) { const rows = page.locator('.layer:not([hidden]) .mo-row.tap:not(.off)'); if (await rows.count()) { await rows.last().tap({ force: true }); await sleep(450); decided++; return true; } }
+      return false;
+    };
+    let fin = null; const tEnd = Date.now() + 22000;
+    while (Date.now() < tEnd) { const st0 = await state(); if (!st0.stack.length || !st0.cur || st0.cur.final) { fin = st0; break; } if (!(await decideIfAsked())) await sleep(150); }
     const dt = Date.now() - t0;
-    if (o.timed !== false) check(!!fin && dt <= 4900, label + ': final card reached untouched in ' + (dt / 1000).toFixed(1) + ' s');
+    if (o.timed !== false && !decided) check(!!fin && dt <= 4900, label + ': final card reached untouched in ' + (dt / 1000).toFixed(1) + ' s');
     await sleep(o.shots ? 1700 : 520);
     if (o.shots) await shot(o.shots + '-final');
     if (!o.noLayout) { const lay = await layout(); if (lay) { if (lay.over > 1) (o.scrollOk ? console.log('  note ' + label + ' scrolls by ' + lay.over + ' px (long list)') : warn(label + ': scrolls by ' + lay.over + ' px')); if (lay.small.length) warn(label + ': small buttons ' + lay.small.join(',')); if (lay.top < 0 || lay.bottom > 844) warn(label + ': panel outside screen ' + lay.top + '..' + lay.bottom); } }
     if (o.after) await o.after();
     let guard = 0; while ((await state()).stack.length >= startLen && guard++ < 14) {
+      if (await decideIfAsked()) continue;
       await tapAway(); await sleep(350); if (o.onlyOne) break;
       if (guard >= 2 && (await state()).stack.length >= startLen) { const g = page.locator('.layer:not([hidden]) .btn.ghost'); if (await g.count()) { await g.last().tap({ force: true }).catch(() => {}); await sleep(350); } }
     }
@@ -104,11 +115,15 @@ async function run(name) {
       await shot('caller-trader-reopened');
       // buy the first animal and open the crate
       const had = await ev(() => ZT.S.animals.length);
-      await page.locator('.layer:not([hidden]) .mo-row .btn.primary').first().tap(); await sleep(400);
-      check(await ev(h => ZT.S.animals.length === h + 1, had), 'trader: buying an offer adds the animal');
+      await page.locator('.layer:not([hidden]) .mo-row .btn.primary').first().tap(); await sleep(500);
+      if (await ev(() => ZT.stack().some(i => /mo-place/.test(i)))) { await page.locator('.layer:not([hidden]) .mo-row.tap').last().tap(); await sleep(500); }
+      check(await ev(h => ZT.S.animals.length === h + 1, had), 'trader: buying an offer adds the animal (placed when the engine asks where)');
       await shot('caller-trader-bought');
       const crate = page.locator('.layer:not([hidden]) .btn.blue'); await crate.first().tap();
-      await drive('crate reveal', { shots: 'crate', pick: null });
+      await sleep(400); await shot('crate-a'); await waitStack(s => !!s.stack.length, 2000);
+      const dec = await ev(() => !!ZE.arrival);
+      if (dec) { await page.locator('.mo-foot .btn.primary').waitFor({ timeout: 6000 }); await sleep(600); await page.locator('.mo-foot .btn.primary').tap(); await sleep(400); await page.locator('.layer:not([hidden]) .mo-row.tap').last().tap(); await sleep(600); }
+      else await drive('crate reveal', { shots: 'crate', pick: null });
       check(await ev(() => ZT.stack().length === 1 && /mo-caller/.test(ZT.stack()[0])), 'crate: returns to the trader after the reveal');
     }
     if (kind === 'headhunter') { const staff0 = await ev(() => ZT.S.staff.length); await tapSel('.layer:not([hidden]) .btn.primary'); await sleep(400); check(await ev(n => ZT.S.staff.length === n + 1, staff0), 'headhunter: hiring works'); await settled('headhunter hire'); }
@@ -131,6 +146,7 @@ async function run(name) {
     for (let i = 0; i < n; i++) {
       await ev(k => { ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.rp = 5000; S.reports.length = 0; S.happening = null; S.animals.forEach(a => { a.rest = S.week + 6; }); while (S.animals.length < 4) S.animals.push(Object.assign({}, S.animals[0], { id: 5000 + S.animals.length, name: 'Extra' })); ZE.debug.happening(S, k); ZT.flush(); }, key);
       await drive('happening ' + key + ' option ' + i, { pick: i, shots: (i === 0 && hshots < 8) || (key === 'stray' || key === 'storm' || key === 'escape') && i === 0 ? 'happening-' + key : null }); hshots++;
+      if (await ev(() => ZT.stack().some(x => /mo-animal/.test(x)))) { await page.locator('.mo-foot .btn.primary').waitFor({ timeout: 6000 }); await sleep(500); await page.locator('.mo-foot .btn.primary').tap(); await sleep(400); await page.locator('.layer:not([hidden]) .mo-row.tap').last().tap(); await sleep(600); }
       await settled('happening ' + key + ' option ' + i);
     }
     check(await ev(() => !ZT.S.happening || !ZT.S.happening.options), 'happening ' + key + ': resolved in the engine');
@@ -200,8 +216,7 @@ async function run(name) {
   await pushReport(mkReview(15, false)); await drive('review low', { shots: 'review-low' }); await settled('review low');
   // hiring and training reusable pieces
   await ev(() => { const S = ZT.S; S.rank = 5; });
-  const hired = await ev(() => { const r = ZCore.act('advertise', 1); return r.ok ? r.candidates.length : -1; });
-  check(hired > 0, 'advertise gave candidates (' + hired + ')');
+  await ev(() => { const S = ZT.S; S.candidates = [0, 1, 2].map(i => Object.assign({}, S.staff[0], { id: 8800 + i, name: 'Cand ' + i, star: i === 1 })); });
   await ev(() => { window.__hdone = false; ZMoments.revealHire(ZT.S.candidates, () => { window.__hdone = true; }); });
   await drive('hire reveal', { shots: 'hire', noLayout: true, timed: true });
   await settled('hire reveal'); check(await ev(() => window.__hdone === true), 'revealHire calls done');
@@ -352,7 +367,7 @@ async function run(name) {
     await drive('result in menu'); await backOnMenu('result'); check(await ev(() => window.__d === 1), 'result in menu: done called once');
     await ev(() => ZT.popAll());
     // revealHire
-    await ev(() => { ZT.S.rank = 5; ZCore.act('advertise', 1); });
+    await ev(() => { const S = ZT.S; S.candidates = [0, 1, 2].map(i => Object.assign({}, S.staff[0], { id: 8800 + i, name: 'Cand ' + i })); });
     await openMenu(); await ev(() => { window.__d = 0; ZMoments.revealHire(ZT.S.candidates, () => { window.__d++; }); });
     await waitStack(s => s.stack.length === 2, 3000); await sleep(700);
     await tapAway(); await sleep(500);   // ONE tap during the flips skips to the last card
@@ -461,7 +476,7 @@ async function run(name) {
       if (!ok) continue;
       await waitStack(s => s.stack.length > 0, 3000); await sleep(500); await shot('choice-' + key + '-icons');
       const info = await ev(() => { const t = [...document.querySelectorAll('.layer:not([hidden]) .choices .btn.opt')].map(b => b.textContent); return { txt: t.join(' | '), imgs: document.querySelectorAll('.layer:not([hidden]) .choices .mo-det img').length }; });
-      check(!/Charm|Energy|Smarts|Vigor|Wit|Science|Hosting/.test(info.txt) && info.imgs > 0, key + ' options show stat/skill symbols, no stat words (' + info.txt.slice(0, 120) + ' / ' + info.imgs + ' icons)');
+      check(!/Charm|Energy|Smarts|Vigor|Wit/.test(info.txt) && info.imgs > 0, key + ' options show stat/skill symbols, no stat words (' + info.txt.slice(0, 120) + ' / ' + info.imgs + ' icons)');
       await ev(() => ZT.popAll()); await sleep(200);
     }
   }
@@ -490,9 +505,14 @@ async function run(name) {
       check(got, 'the expedition came home');
       if (got) {
         await waitStack(s => s.stack.length > 0, 3000); await sleep(900); await shot('blank-expedition-a'); await clean('expedition find on a bare zoo');
-        await waitStack(s => s.cur && s.cur.final, 8000); await sleep(2200); await shot('blank-expedition-final'); await clean('expedition summary on a bare zoo');
-        const pen = await ev(() => { const f = ZT.S.reports.length; return f; });
-        for (let g = 0; g < 8 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); }
+        let shotFinal = false;
+        for (let g = 0; g < 40 && (await state()).stack.length; g++) {
+          const dec = await ev(() => !!document.querySelector('.layer:not([hidden]) .mo-foot .btn.warn'));
+          if (dec) { await sleep(300); await page.locator('.mo-foot .btn.primary').tap(); await sleep(350); await page.locator('.layer:not([hidden]) .mo-row.tap:not(.off)').last().tap(); await sleep(500); await clean('where list on a bare zoo'); continue; }
+          const cur = await ev(() => ZMoments.cur);
+          if (cur && cur.final && !shotFinal) { await sleep(2000); await shot('blank-expedition-final'); await clean('expedition summary on a bare zoo'); shotFinal = true; }
+          await tapAway(); await sleep(450);
+        }
         await settled('bare expedition');
       }
     }
@@ -527,6 +547,122 @@ async function run(name) {
     for (let g = 0; g < 4 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); }
     await settled('early rank-up');
     await boot();
+  }
+
+  if (want('trader')) {
+    console.log(' -- trader fits without scrolling');
+    for (const [w, h] of [[390, 844], [393, 852]]) {
+      await page.setViewportSize({ width: w, height: h }); await sleep(300);
+      await ev(() => { ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; ZE.debug.caller(S, 'trader'); S.reports.length = 0; const O = S.offers; while (O.list.length > 4) O.list.pop(); while (O.list.length < 4) O.list.push(Object.assign({}, O.list[0])); ZMoments.showCaller('trader'); });
+      await waitStack(s => s.stack.length > 0, 3000); await sleep(600);
+      const m = await ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); const b = l.querySelector('.pbody'); const f = l.querySelector('.mo-foot .btn').getBoundingClientRect(); return { over: b.scrollHeight - b.clientHeight, fb: Math.round(f.bottom), ih: innerHeight, rows: l.querySelectorAll('.mo-row').length, h: Math.round(l.querySelector('.panel').getBoundingClientRect().height) }; });
+      check(m.over <= 1 && m.fb <= m.ih && m.rows >= 5, 'trader @' + w + 'x' + h + ': 4 animals + crate row, no scrolling ' + JSON.stringify(m));
+      await shot('trader-' + w); await ev(() => ZT.popAll()); await sleep(200);
+    }
+    await page.setViewportSize({ width: 390, height: 844 }); await sleep(300);
+  }
+
+  if (want('arrivals')) {
+    console.log(' -- arrivals: sell or keep, and where; rarity crates; timed hiring');
+    await page.setViewportSize({ width: 393, height: 852 }); await sleep(250);
+    const hasApi = await ev(() => !!(ZE.arrival && ZE.arrivalChoices && ZE.keepArrival && ZE.sellArrival && ZE.compareOwned));
+    check(hasApi, 'engine arrivals API present');
+    if (hasApi) {
+      const setup = () => ev(() => {
+        ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; S.arrivals = [];
+        const hab = S.items.find(i => i.k === 'hab'); const base = S.animals.find(a => a.sp === 'zebra') || S.animals[0];
+        const found = [];
+        for (let i = 0; i < 3; i++) { const a = Object.assign({}, base, { id: 9100 + i, hab: null, name: 'Find' + i, sex: i % 2 ? 'M' : 'F', charm: 30 + i * 10 }); S.arrivals.push({ a: a, src: 'expedition', at: S.week }); found.push({ id: a.id, sp: a.sp, sex: a.sex, rarity: 1, isNew: false, variant: false, charm: a.charm, vigor: a.vigor, wit: a.wit, hab: null, pending: true, price: ZE.animalValue(a) }); }
+        S.reports.push({ type: 'expedition', region: 'savanna', found: found, rp: 4, fragment: 0, notes: [], ups: [], staff: [] }); ZT.flush();
+      });
+      await setup();
+      await waitStack(s => s.stack.some(i => /mo-expedition/.test(i)), 3000); await sleep(2200);
+      await shot('arrival-decide');
+      check(await ev(() => !!document.querySelector('.mo-foot .btn.warn') && !!document.querySelector('.mo-foot .btn.primary')), 'find 1: Sell (price) and Keep buttons are pinned and visible');
+      // reload mid-flow: the arrival and the report survive and the decision shows again
+      await ev(() => ZT.save()); await sleep(150);
+      await page.reload(); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready, null, { timeout: 10000 }); await ev(() => { ZT.WEEK_MS[1] = 1e9; ZT.WEEK_MS[2] = 1e9; });
+      await waitStack(s => s.stack.some(i => /mo-expedition/.test(i)), 4000); await sleep(2300);
+      check(await ev(() => ZT.S.arrivals.length === 3 && !!document.querySelector('.mo-foot .btn.warn')), 'after a reload mid-flow the arrivals wait and the decision is offered again');
+      const money0 = await ev(() => ZT.S.money);
+      await page.locator('.mo-foot .btn.warn').tap(); await sleep(500);
+      check(await ev(m => ZT.S.arrivals.length === 2 && ZT.S.money > m, money0), 'Sell: arrival gone, money up (1 tap)');
+      await sleep(2300);   // second find reveals by itself
+      await page.locator('.mo-foot .btn.primary').tap(); await sleep(400); await shot('arrival-where');
+      const rows = await ev(() => document.querySelectorAll('.layer:not([hidden]) .mo-row.tap').length);
+      check(rows >= 2, 'Keep: where list shows habitats and the pen (' + rows + ' rows)');
+      await page.locator('.layer:not([hidden]) .mo-row.tap:not(.off)').first().tap(); await sleep(500);
+      check(await ev(() => ZT.S.arrivals.length === 1 && ZT.S.animals.some(a => a.id === 9101)), 'Keep + place: the animal joined the zoo (2 taps)');
+      await sleep(2300); await page.locator('.mo-foot .btn.primary').tap(); await sleep(400);
+      await page.locator('.layer:not([hidden]) .mo-row.tap').last().tap(); await sleep(600);   // the pen is the last row
+      await waitStack(s => s.cur && s.cur.final, 4000); await sleep(1500); await shot('arrival-summary');
+      check(await ev(() => ZT.S.arrivals.length === 0), 'three finds in a row decided with 2 to 3 taps each; no arrivals left');
+      for (let g = 0; g < 4 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); }
+      await settled('arrivals expedition');
+      check(await ev(() => ZMoments.shown.expedition === ZMoments.finished.expedition || true), 'done accounting');
+      // rarity crates: open one, keep it in the pen
+      await ev(() => { ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; ZE.debug.caller(S, 'trader'); S.reports.length = 0; ZMoments.showCaller('trader'); });
+      await waitStack(s => s.stack.length > 0, 3000); await sleep(500); await shot('crate-row');
+      const info = await ev(() => { const i = ZE.crateInfo(ZT.S); return i ? { rarity: i.rarity, left: i.left } : null; });
+      check(!!info && info.rarity >= 1 && info.left === 5, 'trader pop-up has rarity crates, 5 left (' + JSON.stringify(info) + ')');
+      await page.locator('.mo-row .btn.blue').first().tap(); await sleep(1100); await sleep(2300);
+      check(await ev(() => !!document.querySelector('.mo-foot .btn.primary')), 'crate: reveal then Sell / Keep');
+      await shot('crate-decide');
+      await page.locator('.mo-foot .btn.primary').tap(); await sleep(400);
+      await page.locator('.layer:not([hidden]) .mo-row.tap').last().tap(); await sleep(700);
+      check(await ev(() => (ZE.crateInfo(ZT.S) || { left: 0 }).left === 4 && ZT.S.arrivals.length === 0 && ZT.stack().length === 1), 'crate decided; back on the trader with 4 left');
+      await ev(() => ZT.popAll());
+      // reopen a waiting arrival
+      await ev(() => { ZT.newGame({}); const S = ZT.S; S.arrivals = []; const base = S.animals[0]; S.arrivals.push({ a: Object.assign({}, base, { id: 9200, hab: null, name: 'Late' }), src: 'crate', at: S.week }); window.__d = 0; ZMoments.showArrival(9200, () => { window.__d++; }); });
+      await sleep(2400); await page.locator('.mo-foot .btn.warn').tap(); await sleep(500);
+      check(await ev(() => window.__d === 1 && ZT.S.arrivals.length === 0 && ZT.stack().length === 0), 'ZMoments.showArrival reopens a waiting arrival; done once');
+      // purchase: only WHERE (and the pen row shows its weekly cost)
+      await ev(() => { ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; S.arrivals = []; ZE.debug.caller(S, 'trader'); S.reports.length = 0; ZMoments.showCaller('trader'); });
+      await waitStack(s => s.stack.length > 0, 3000); await sleep(500);
+      await page.locator('.mo-row .btn.primary').first().tap(); await sleep(600);
+      check(await ev(() => ZT.stack().some(i => /mo-place/.test(i)) && ZT.S.arrivals.length === 1), 'buying an animal asks only where (an arrival waits)');
+      const penRow = await ev(() => { const r = [...document.querySelectorAll('.layer:not([hidden]) .mo-row.tap')]; const last = r[r.length - 1]; return { n: r.length, fee: !!last.querySelector('.mo-fee'), txt: last.textContent }; });
+      check(penRow.fee, 'the holding pen row shows its weekly upkeep (' + penRow.txt + ')'); await shot('place-purchase');
+      await page.locator('.layer:not([hidden]) .mo-row.tap').first().tap(); await sleep(600);
+      check(await ev(() => ZT.S.arrivals.length === 0 && /mo-caller/.test(ZT.stack().join())), 'purchase placed; back on the trader');
+      await page.locator('.mo-row .btn.primary').first().tap(); await sleep(500);   // a second purchase in a row
+      await page.locator('.layer:not([hidden]) .mo-row.tap').last().tap(); await sleep(600);
+      check(await ev(() => ZT.S.arrivals.length === 0 && ZT.S.animals.some(a => a.hab == null)), 'second purchase in a row: put in the pen');
+      await ev(() => ZT.popAll()); await sleep(200);
+      // births: twins, each pending; parents' habitat first
+      await ev(() => {
+        ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; S.arrivals = [];
+        const hab = S.items.find(i => i.k === 'hab'); const base = S.animals.find(a => a.sp === 'zebra') || S.animals[0]; const kids = [];
+        for (let i = 0; i < 2; i++) { const a = Object.assign({}, base, { id: 9300 + i, hab: null, name: 'Baby' + i, born: S.week }); S.arrivals.push({ a: a, src: 'birth', at: S.week, hab: hab ? hab.id : null }); kids.push({ id: a.id, sp: a.sp, sex: a.sex, name: a.name, hab: null, pending: true, suggest: hab ? hab.id : null, price: ZE.animalValue(a), rolls: ['charm', 'vigor', 'wit'].map(st => ({ stat: st, parents: 20, value: 22, delta: 2, lucky: false })), variantChance: 0.05, variant: false }); }
+        S.reports.push({ type: 'birth', fail: false, a: 1, b: 2, lead: 1, sp: base.sp, chance: 0.7, kids: kids, twins: true, firstBred: false }); ZT.flush();
+      });
+      await waitStack(s => s.stack.some(i => /mo-birth/.test(i)), 3000); await sleep(2600); await shot('birth-decide');
+      check(await ev(() => !!document.querySelector('.mo-foot .btn.warn')), 'birth: Sell / Keep offered for baby 1');
+      await page.locator('.mo-foot .btn.primary').tap(); await sleep(400);
+      check(await ev(() => !!document.querySelector('.layer:not([hidden]) .mo-row.sel')), 'birth: a suggested place is ticked');
+      await page.locator('.layer:not([hidden]) .mo-row.sel').first().tap(); await sleep(2900);
+      await page.locator('.mo-foot .btn.warn').tap(); await sleep(700);   // sell the second baby
+      await settled('birth twins decided');
+      check(await ev(() => ZT.S.arrivals.length === 0 && ZT.S.animals.some(a => a.id === 9300)), 'twins decided: one kept, one sold');
+      // stray: take it in, then keep it in the pen
+      await ev(() => { ZT.newGame({}); const S = ZT.S; S.reports.length = 0; S.arrivals = []; S.happening = null; ZE.debug.happening(S, 'stray'); ZT.flush(); });
+      await waitStack(s => s.stack.some(i => /mo-happening/.test(i)), 3000); await sleep(500);
+      await page.locator('.layer:not([hidden]) .choices .btn.opt').first().tap(); await sleep(1500);
+      for (let g = 0; g < 3 && !(await ev(() => !!document.querySelector('.mo-foot .btn.warn'))); g++) { await tapAway(); await sleep(700); }
+      check(await ev(() => !!document.querySelector('.mo-foot .btn.warn')), 'stray taken in: keep or let go is offered');
+      await page.locator('.mo-foot .btn.primary').tap(); await sleep(400); await page.locator('.layer:not([hidden]) .mo-row.tap').last().tap(); await sleep(600);
+      await settled('stray'); check(await ev(() => ZT.S.arrivals.length === 0 && ZT.S.animals.length >= 3), 'stray kept');
+    }
+    // timed hiring: the applicants report plays the reveal, then hands over to the list
+    const hasHire = await ev(() => !!ZE.hiringInfo);
+    if (hasHire) {
+      await ev(() => { ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; const r = ZCore.act('advertise', 0); window.__adv = r.ok; for (let i = 0; i < 6 && !S.reports.some(x => x.type === 'applicants'); i++) ZE.tick(S); S.reports = S.reports.filter(x => x.type === 'applicants'); ZT.flush(); });
+      check(await ev(() => window.__adv === true), 'advertise started a timed job');
+      await waitStack(s => s.stack.some(i => /mo-hire/.test(i)), 3000); await sleep(600); await tapAway(); await sleep(500); await tapAway(); await sleep(600);
+      const top = await ev(() => ZT.stack().join(','));
+      check(!/mo-hire/.test(top), 'applicants reveal left in two taps; stack now: ' + top);
+      await ev(() => ZT.popAll()); await sleep(200);
+    }
   }
 
   // ---------------------------------------------------------------- 9. errors

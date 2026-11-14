@@ -26,6 +26,7 @@
     for (k in base) this.key(k, base[k]);
     for (k in pal) this.key(k, pal[k]);
     this.out = (pal && pal.O) || mix((pal && pal.A) || '#555555', '#1c1226', 0.8);
+    if (DENS === 2 && !NOHD && hdInit) hdInit(this);
   }
   var pp = Pt.prototype;
   pp.key = function (k, b) { if (this.ki[k] == null) this.ki[k] = this.cols.length; this.cols[this.ki[k]] = ramp(b).map(rgb); };
@@ -136,13 +137,15 @@
   function flipSprite(s) {
     var c = document.createElement('canvas'); c.width = s.w; c.height = s.h;
     var g = c.getContext('2d'); g.translate(s.w, 0); g.scale(-1, 1); g.drawImage(s.c, 0, 0);
-    var o = { c: c, w: s.w, h: s.h, ax: s.w - 1 - s.ax, ay: s.ay }; if (s.sortDy != null) o.sortDy = s.sortDy; return o;
+    var o = { c: c, w: s.w, h: s.h, ax: s.w - (s.d === 2 ? 2 : 1) - s.ax, ay: s.ay, d: s.d || 1 }; if (s.K) o.K = s.K; if (s.sortDy != null) o.sortDy = s.sortDy; return o;
   }
   var CACHE = {};
   function blank() { var P = new Pt({ A: '#d86cc0' }, 16, 16, 8, 12); P.rr(-3, -7, 7, 7, 'A'); P.set(-1, -5, 'K'); P.set(1, -5, 'K'); return P.bake([3, 1]); }
   function cached(key, fn) {
+    if (DENS === 2) key = 'D2|' + key;
     var s = CACHE[key];
     if (!s) { try { s = fn(); } catch (e) { if (root.console) root.console.warn('ZSprites: could not draw ' + key, e); s = null; } if (!s) s = blank(); CACHE[key] = s; }
+    if (s.d == null) s.d = DENS;
     return s;
   }
 
@@ -890,6 +893,7 @@
   var PANTSC = ['#3a4a7a', '#4a4a54', '#7a5a3c', '#c8b48a', '#2c6a5a', '#a03a3a', '#e8e4dc', '#5a7ab8'];
 
   function drawPerson(sp, fr) {
+    if (DENS === 2) onPersonD(sp, fr);
     var pal = { A: sp.skin || SKIN[1], H: sp.hair || HAIRC[1], S: sp.shirt || '#4a8ae0', P: sp.pants || '#3a4a7a', F: sp.shoe || '#3a2c2a', T: (sp.hat && sp.hat[1]) || '#888888', B: (sp.hat && sp.hat[2]) || '#444444',
       C: sp.coat || sp.shirt || '#ffffff', V: sp.vest || '#888888', X: sp.acc || '#e04a3c', I: sp.item || '#c8c8d0', J: sp.item2 || '#f4d040', Q: sp.beard || sp.hair || '#888888', O: INK };
     var P = new Pt(pal, 44, 52, 22, 40), ch = !!sp.child, sg = sgn(fr), old = !!sp.old;
@@ -921,7 +925,10 @@
       if (sp.apron) P.recolor(bk, 'X', function (px, py) { return px > bx && px < bx + bw - 1 && py >= by + 1; });
       if (sp.scarf) { P.rect(bx + 1, by, bw - 2, 1, 'X', 1); P.rect(bx + bw - 3, by + 1, 1, 2, 'X', 2); }
       if (sp.neck) P.rect(bx + 2, by, bw - 4, 1, 'J', 1);
+      if (sp.pockets) { P.set(bx + 1, by + 1, bk, 0); P.set(bx + 1, by + 2, bk, 2); P.set(bx + bw - 2, by + 1, bk, 0); P.set(bx + bw - 2, by + 2, bk, 2); }
+      if (sp.strap) for (var si = 0; si < bodyH; si++) P.set(bx + bw - 2 - si, by + si, 'X', si === 0 ? 0 : 1);
     }, true);
+    if (sp.strap) P.part(function () { P.rr(bx - 2, by + 2, 3, 3, 'X', null, 1); P.set(bx - 1, by + 3, 'J', 1); });
     // arms
     P.part(function () {
       var a1 = sg > 0 ? -1 : 0, a2 = sg < 0 ? -1 : 0, sl = sp.short ? 2 : bodyH - 2, up = sp.hold && (sp.hold[0] === 'flag' || sp.hold[0] === 'balloon' || sp.hold[0] === 'mic' || sp.hold[0] === 'cone') ? -1 : 0;
@@ -964,7 +971,7 @@
       else if (hat === 'top') { P.rect(hx0 + 2, top - 5, hw - 4, 6, 'T', 'a'); P.rect(hx0, top + 1, hw, 1, 'T', 2); P.rect(hx0 + 2, top - 1, hw - 4, 1, 'B', 1); }
       else if (hat === 'bowler') { P.ell(0, top - 1, hw / 2 - 1.5, 2.6, 'T'); P.rect(hx0, top + 1, hw, 1, 'T', 2); P.rect(hx0 + 1, top, hw - 2, 1, 'B', 1); }
       else if (hat === 'fedora') { P.rr(hx0 + 1, top - 3, hw - 2, 4, 'T', null, 1); P.sh(0, top - 3, 2); P.rect(hx0 - 2, top + 1, hw + 4, 1, 'T', 2); P.rect(hx0 + 1, top, hw - 2, 1, 'B', 1); }
-      else if (hat === 'sun') { P.ell(0, top + 1, hw / 2 + 2, 1.4, 'T', 2); P.rr(hx0 + 2, top - 2, hw - 4, 3, 'T', null, 1); P.rect(hx0 + 2, top, hw - 4, 1, 'B', 1); }
+      else if (hat === 'sun') { P.rect(hx0 - 1, top + 1, hw + 2, 1, 'T', 2); P.rr(hx0 + 1, top - 2, hw - 2, 4, 'T', null, 1); P.rect(hx0 + 1, top, hw - 2, 1, 'B', 1); } // plain straw sun hat, short brim
       else if (hat === 'beanie') { P.rr(hx0, top - 1, hw, 4, 'T', null, 2); P.rect(hx0, top + 2, hw, 1, 'B', 1); P.rect(0, top - 2, 2, 1, 'B', 0); }
       else if (hat === 'crown') { P.rect(hx0 + 2, top - 1, hw - 4, 2, 'T', 1); for (var cx = hx0 + 2; cx < hx0 + hw - 2; cx += 2) P.set(cx, top - 2, 'T', 0); P.set(0, top, 'B'); P.set(2, top, 'B'); }
       else if (hat === 'scrub') { P.rr(hx0, top - 1, hw, 3, 'T', null, 2); P.set(1, top, 'W'); P.set(0, top, 'W'); P.set(2, top, 'W'); P.set(1, top - 1, 'W'); P.set(1, top + 1, 'W'); }
@@ -990,6 +997,10 @@
       else if (t === 'cone') { P.set(hx + 1, handY - 2, 'J', 2); P.rect(hx, handY - 3, 3, 1, 'J', 1); P.rr(hx, handY - 6, 3, 3, 'X', null, 1); }
       else if (t === 'bag') { P.rect(hx, handY + 1, 3, 3, 'X', 'a'); P.set(hx + 1, handY, 'X', 2); }
       else if (t === 'sack') { P.set(hx, handY, 'I'); }
+      else if (t === 'carrier') { // small pet carrier: handle on top, dark grille door with two bright eyes peeking out
+        P.rect(hx, handY - 1, 4, 1, 'I', 2); P.set(hx, handY, 'I', 2); P.set(hx + 3, handY, 'I', 2);
+        P.rr(hx - 1, handY + 1, 6, 4, 'I', null, 1); P.rect(hx, handY + 2, 4, 2, 'K', 1); P.set(hx + 1, handY + 2, 'J', 1); P.set(hx + 3, handY + 2, 'J', 1);
+      }
     });
     return P.bake([ch ? 3 : 4, 1, null, 0.24, 0, 0]);
   }
@@ -1003,17 +1014,18 @@
     zoologist:  { skin: SKIN[4], hair: HAIRC[6], style: 0, shirt: '#3f7a54', pants: '#c8b48a', shoe: '#4a3020', hat: ['safari', '#d8c08a', '#3f7a54'], beard: HAIRC[6], hold: ['clipboard', 0], item: '#b8844a' },
     leader:     { skin: SKIN[2], hair: HAIRC[1], style: 0, shirt: '#8a5a34', pants: '#5a5244', shoe: '#3a2a1c', hat: ['fedora', '#6e4a2c', '#2c2228'], scarf: 1, acc: '#e04a3c', pack: 1 },
     showrunner: { skin: SKIN[0], hair: HAIRC[0], style: 0, shirt: '#8a4ad0', pants: '#5a2a9a', coat: '#8a4ad0', tie: 1, acc: '#f4c020', hat: ['top', '#3a2a5a', '#f4c020'], hold: ['mic', 0], item: '#d8d8e0' },
-    trader:     { skin: SKIN[3], hair: HAIRC[0], style: 0, shirt: '#3a9a7a', pants: '#7a5a3c', coat: '#3a9a7a', hat: ['sun', '#e8cf8a', '#c8503a'], stache: 1, hold: ['sack', 0], item: '#c8a878', neck: 1, item2: '#f4c020' },
+    // travelling animal dealer: teal work shirt with chest pockets, rust cap, satchel strap, a pet carrier with a critter peeking out
+    trader:     { skin: SKIN[2], hair: HAIRC[1], style: 0, shirt: '#2f9a94', pants: '#6e5238', shoe: '#4a3020', hat: ['cap', '#d8683a', '#fff2c8'], pockets: 1, strap: 1, acc: '#8a5a30', hold: ['carrier', 0], item: '#e8e2d2', item2: '#f8d040', smile: 1 },
     headhunter: { skin: SKIN[1], hair: HAIRC[0], style: 4, shirt: '#f4f1ea', pants: '#2c2c3a', coat: '#2c2c3a', open: 1, tie: 1, acc: '#d8404a', glasses: 'sun', hold: ['case', 0], item: '#6e4a2c', item2: '#f4c020' },
-    director:   { skin: SKIN[0], hair: HAIRC[7], style: 5, shirt: '#f4f1ea', pants: '#6a6a7a', coat: '#7a7a8c', open: 1, tie: 1, acc: '#3a6ad8', hat: ['bowler', '#3a3a48', '#7a7a8c'], stache: 1, beard: 0, hold: ['cane', 0], item: '#6e4a2c', old: 1 },
+    director:   { skin: SKIN[3], hair: HAIRC[7], style: 5, shirt: '#f4f1ea', pants: '#6a6a7a', coat: '#7a7a8c', open: 1, tie: 1, acc: '#3a6ad8', hat: ['bowler', '#3a3a48', '#7a7a8c'], stache: 1, beard: 0, hold: ['cane', 0], item: '#6e4a2c', old: 1 },
     vip:        { skin: SKIN[1], hair: HAIRC[4], style: 1, shirt: '#f4f1ea', pants: '#f4f1ea', coat: '#f8f4ff', cape: 1, acc: '#d8404a', hat: ['crown', '#f4c020', '#e04a8a'], neck: 1, item2: '#f4c020', blush: 1 },
     teacher:    { skin: SKIN[2], hair: HAIRC[2], style: 2, shirt: '#f4f1ea', pants: '#5a4a6a', coat: '#6aa86a', open: 1, glasses: 1, hold: ['book', 0], acc: '#d8404a', dress: 0 },
-    donor:      { skin: SKIN[0], hair: HAIRC[7], style: 8, shirt: '#34447a', pants: '#34447a', dress: 1, neck: 1, item2: '#f8f4ff', hold: ['gift', 0], acc: '#e8503a', old: 1, blush: 1 },
+    donor:      { skin: SKIN[4], hair: HAIRC[7], style: 8, shirt: '#34447a', pants: '#34447a', dress: 1, neck: 1, item2: '#f8f4ff', hold: ['gift', 0], acc: '#e8503a', old: 1, blush: 1 },
     reporter:   { skin: SKIN[3], hair: HAIRC[0], style: 3, shirt: '#f4f1ea', pants: '#4a4a5c', coat: '#c8a878', open: 1, tie: 1, acc: '#3a6ad8', hold: ['mic', 0], item: '#e04a3c' },
     photographer: { skin: SKIN[1], hair: HAIRC[3], style: 0, shirt: '#4a4a5c', pants: '#7a6a4c', vest: '#b8a070', hat: ['cap', '#4a4a5c', '#f4f1ea'], hold: ['camera', 0], item: '#3a3a48', item2: '#f8f4a0' },
     kid:        { child: 1, skin: SKIN[0], hair: HAIRC[3], style: 0, shirt: '#f4c838', pants: '#4a8ae0', short: 1, stripe: 1, acc: '#e8503a', hat: ['prop', '#e8503a', '#4a8ae0'], item2: '#f4c838', hold: ['balloon', 0], blush: 0 },
     professor:  { skin: SKIN[1], hair: HAIRC[7], style: 5, shirt: '#f4f1ea', pants: '#5a4a3c', coat: '#8a6a44', open: 1, tie: 1, acc: '#a03a3a', glasses: 1, beard: HAIRC[7], hold: ['book', 0], old: 1 },
-    builder:    { skin: SKIN[4], hair: HAIRC[0], style: 0, shirt: '#f08a2c', pants: '#3a4a7a', shoe: '#5a3d28', band: 1, item2: '#f8f4a0', hat: ['hard', '#f4c838'], hold: ['wrench', 0], item: '#a8a8b8', short: 1 },
+    builder:    { skin: SKIN[1], hair: HAIRC[0], style: 0, shirt: '#f08a2c', pants: '#3a4a7a', shoe: '#5a3d28', band: 1, item2: '#f8f4a0', hat: ['hard', '#f4c838'], hold: ['wrench', 0], item: '#a8a8b8', short: 1 },
     volunteer:  { skin: SKIN[2], hair: HAIRC[5], style: 7, shirt: '#8ad84a', pants: '#3a4a7a', short: 1, logo: 1, item2: '#ffffff', hat: ['cap', '#8ad84a', '#ffffff'], hold: ['broom', 0], item: '#b8844a' },
     elder:      { skin: SKIN[0], hair: HAIRC[7], style: 8, shirt: '#b8a0d8', pants: '#6a5a7a', dress: 1, scarf: 1, acc: '#f4f1ea', glasses: 1, hold: ['cane', 0], item: '#6e4a2c', old: 1 },
     person:     { skin: SKIN[1], hair: HAIRC[1], style: 0, shirt: '#6a9ad8', pants: '#4a4a5c' }
@@ -1119,13 +1131,13 @@
     else if (name === 'mountain') { for (n = 0; n < 3; n++) { p = rp(14); put(p[0], p[1], 'D'); put(p[0] + 1, p[1] + 1, 'D'); put(p[0] + 2, p[1] + 1, 'D'); put(p[0] + 3, p[1] + 2, 'D'); } p = rp(14); blot(p[0], p[1], 4, 2, 'G'); p = rp(14); blot(p[0], p[1], 2, 1, 'C'); }
     else if (name === 'paleo') { for (n = 0; n < 2; n++) { p = rp(14); blot(p[0], p[1], 4, 2, 'D'); } for (n = 0; n < 4; n++) { p = rp(); tuft(p[0], p[1], 'G'); put(p[0], p[1] - 2, 'G'); } }
     else if (name === 'mythic') { p = rp(14); blot(p[0], p[1], 5, 2, 'B'); for (n = 0; n < 5; n++) { p = rp(); put(p[0], p[1], n % 2 ? 'G' : 'F'); if (n < 2) { put(p[0] - 1, p[1], 'C'); put(p[0] + 1, p[1], 'C'); put(p[0], p[1] - 1, 'C'); put(p[0], p[1] + 1, 'C'); } } }
-    var s = P.bake(null, true); s.ay -= 1; return s; // anchor = hex centre
+    var s = P.bake(null, true); s.ay -= (s.K || 1); return s; // anchor = hex centre
   }
   function tile(kind, seed) {
     kind = String(kind || 'grass'); var name = kind.indexOf('hab:') === 0 ? kind.slice(4) : kind;
     if (!GROUND[name]) kind = 'grass';
     var v = (kind === 'grass' || kind === 'locked') ? GRASS_VARIANTS * 3 : 4, sd = (((seed | 0) % v) + v) % v;
-    return cached('t|' + kind + '|' + sd, function () { return drawTile(kind, sd); });
+    return cached('t|' + kind + '|' + sd, function () { return DENS === 2 ? dTileX(ZI, kind, sd) : drawTile(kind, sd); });
   }
 
   // =====================================================================================================================
@@ -1161,7 +1173,7 @@
       col(px, py, i);
       if (steep && (i < 2 || i >= n - 2)) col(px + (fx > 0 ? -1 : 1), py, i); // corner posts stay two pixels wide on the steep edges
     }
-    var s = P.bake(null, false); s.ay -= 1; s.sortDy = G.edgeMidY(e); s.edge = e; return s;
+    var s = P.bake(null, false); s.ay -= (s.K || 1); s.sortDy = G.edgeMidY(e) * KD; s.edge = e; return s;
   }
   function fence(biome, e) { e = ((e | 0) % 6 + 6) % 6; if (!FENCES[biome]) biome = 'savanna'; return cached('f|' + biome + '|' + e, function () { return drawFence(biome, e); }); }
 
@@ -1170,6 +1182,7 @@
   // =====================================================================================================================
   var DECOS = ['tree', 'bush', 'flowers', 'rock', 'lamp', 'crate'];
   function drawDeco(kind, seed) {
+    if (DENS === 2 && decoD) { var d0 = decoD(kind, seed, Pt, { rng: rng, mix: mix }); if (d0) return d0; }
     var P, r = rng(seed * 17 + kind.length), n, x, y;
     if (kind === 'tree') {
       var tv = seed % 4;
@@ -1235,16 +1248,22 @@
     if (k === 1) return s; var w = Math.max(1, Math.round(s.w * k)), h = Math.max(1, Math.round(s.h * k)), c = document.createElement('canvas'); c.width = w; c.height = h;
     var g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(s.c, 0, 0, w, h); return { c: c, w: w, h: h, ax: Math.round(s.ax * k), ay: Math.round(s.ay * k) };
   }
-  function fin(P, rx, ry, dx, dy) { var s = P.bake(rx ? [rx, ry, null, 0.2, dx || 0, (dy || 0) + 1] : null); s.ay -= 1; return scaleSprite(s, U); }
+  function fin(P, rx, ry, dx, dy) { if (DENS === 2 && BPOST[CUR.id] && !CUR.done) { CUR.done = 1; propKeys(P); BPOST[CUR.id](P, BOXES); } var s = P.bake(rx ? [rx, ry, null, 0.2, dx || 0, (dy || 0) + 1] : null); s.ay -= (s.K || 1); return scaleSprite(s, U); }
   // a box: half sizes a (along u) and b (along v) in pixels of x, height h. a and b must both be odd or both even.
   function box(P, cx, cy, a, b, h, kL, kR, kT, sL, sR) {
     var Lx = cx - a - b, Ly = cy + (b - a) / 2, Fx = cx + a - b, Rx = cx + a + b, Ry = cy + (a - b) / 2, Bx = cx - a + b, By = cy - (a + b) / 2, i, v;
     var o = { Lx: Lx, Ly: Ly, Fx: Fx, Fy: Ly + a - 1, Rx: Rx, Ry: Ry, Bx: Bx, By: By, a: a, b: b, h: h, cx: cx, cy: cy };
+    if (DENS === 2) BOXES.push(o);
     o.fl = function (u, vv, k, s) { P.set(Lx + u, Ly + (u >> 1) - vv, k, s == null ? 1 : s); };
     o.fr = function (u, vv, k, s) { var j = 2 * b - 1 - u; P.set(Fx + u, Ry + (j >> 1) - vv, k, s == null ? 2 : s); };
     o.rl = function (u0, v0, w, hh, k, s) { for (var u = u0; u < u0 + w; u++) for (var q = v0; q < v0 + hh; q++) o.fl(u, q, k, s); };
     o.rr = function (u0, v0, w, hh, k, s) { for (var u = u0; u < u0 + w; u++) for (var q = v0; q < v0 + hh; q++) o.fr(u, q, k, s); };
     o.tp = function (pu, pv, up) { return [Lx + pu + pv, Ly - h + pu / 2 - pv / 2 - (up || 0)]; };
+    if (DENS === 2) { // style D: windows, doors and signs painted on a wall get a bevelled frame, glass a glint, doors planks and a knob
+      var rl0 = o.rl, rr0 = o.rr;
+      o.rl = function (u0, v0, w, hh, k, s) { rl0(u0, v0, w, hh, k, s); if (k !== kL && w >= 2 && hh >= 2) bevelD(P, o, 0, u0, v0, w, hh, k); };
+      o.rr = function (u0, v0, w, hh, k, s) { rr0(u0, v0, w, hh, k, s); if (k !== kR && w >= 2 && hh >= 2) bevelD(P, o, 1, u0, v0, w, hh, k); };
+    }
     if (kT) P.poly([[Lx, Ly - h], [Bx, By - h], [Rx - 1, Ry - h], [Fx, Ly + a - 1 - h]], kT, 0);
     for (i = 0; i < 2 * a; i++) for (v = 0; v < h; v++) o.fl(i, v, kL, sL == null ? 1 : sL);
     for (i = 0; i < 2 * b; i++) for (v = 0; v < h; v++) o.fr(i, v, kR, sR == null ? 2 : sR);
@@ -1253,13 +1272,32 @@
   function hip(P, o, rh, kA, kB, ov) { // four-sided roof with its point over the middle
     ov = ov || 0; var h = o.h, A = [o.cx, o.cy - h - rh], L = [o.Lx - ov, o.Ly - h], F = [o.Fx, o.Fy - h + 1 + ov / 2], R = [o.Rx - 1 + ov, o.Ry - h], B = [o.Bx, o.By - h - ov / 2];
     P.poly([L, B, A], kA, 0); P.poly([B, R, A], kB || kA, 1); P.poly([L, F, A], kA, 1); P.poly([[F[0], F[1]], R, A], kB || kA, 2);
+    if (DENS === 2) roofD(P, [[L, F, A, A, kA, 1], [F, R, A, A, kB || kA, 2]]);
     o.apex = A; return A;
   }
   function gable(P, o, rh, kA, kWall, ov) { // ridge runs along u; the triangle end shows on the right face
     ov = ov || 0; var h = o.h, a = o.a, b = o.b, L = [o.Lx - ov, o.Ly - h + ov / 2], F = [o.Fx, o.Fy - h + 1 + ov], R = [o.Rx - 1, o.Ry - h], B = [o.Bx, o.By - h];
     var M1 = [o.Lx + b - ov, o.Ly - h - b / 2 - rh], M2 = [o.Fx + b, o.Fy - h + 1 - b / 2 - rh + ov / 2];
     P.poly([M1, M2, R, B], kA, 2); P.poly([F, R, M2], kWall, 2); P.poly([L, F, M2, M1], kA, 1);
+    if (DENS === 2) roofD(P, [[L, F, M1, M2, kA, 1], [B, R, M1, M2, kA, 2]]);
     P.line(M1[0], M1[1], M2[0], M2[1], kA, 0); o.M1 = M1; o.M2 = M2;
+  }
+  // style D roof tiles: darker courses parallel to the eaves on each visible roof face (facet = eave p0-p1 rising to a0-a1)
+  function roofD(P, facets) {
+    if (CUR.noSiding) return;
+    facets.forEach(function (f) {
+      var mid = [(f[0][0] + f[1][0]) / 2, (f[0][1] + f[1][1]) / 2], am = [(f[2][0] + f[3][0]) / 2, (f[2][1] + f[3][1]) / 2], n = Math.floor(Math.hypot(am[0] - mid[0], am[1] - mid[1]) / 1.7), sh = Math.min(3, f[5] + 1);
+      for (var i = 1; i < n; i++) { var t = i / n; P.lineF(f[0][0] + (f[2][0] - f[0][0]) * t + 0.3, f[0][1] + (f[2][1] - f[0][1]) * t - 0.2, f[1][0] + (f[3][0] - f[1][0]) * t - 0.3, f[1][1] + (f[3][1] - f[1][1]) * t - 0.2, f[4], sh); }
+    });
+  }
+  function bevelD(P, o, side, u0, v0, w, hh, k) {
+    function pt(u, v) { return side ? [o.Fx + u, o.Ry + ((2 * o.b - 1 - u) >> 1) - v] : [o.Lx + u, o.Ly + (u >> 1) - v]; }
+    var u, v, t, b;
+    for (u = u0; u < u0 + w; u++) { t = pt(u, v0 + hh - 1); b = pt(u, v0); P.setF(t[0] - 0.25, t[1] - 0.25, k, 0); P.setF(t[0] + 0.25, t[1] - 0.25, k, 0); P.setF(b[0] - 0.25, b[1] + 0.25, k, 2); P.setF(b[0] + 0.25, b[1] + 0.25, k, 2); }
+    for (v = v0; v < v0 + hh; v++) { t = pt(u0, v); b = pt(u0 + w - 1, v); P.setF(t[0] - 0.25, t[1] - 0.25, k, 0); P.setF(t[0] - 0.25, t[1] + 0.25, k, 0); P.setF(b[0] + 0.25, b[1] - 0.25, k, 2); P.setF(b[0] + 0.25, b[1] + 0.25, k, 2); }
+    var c = P.cols[P.ki[k]] && P.cols[P.ki[k]][1]; if (!c) return;
+    if (c[2] > c[0] + 25 && c[2] > 150) { t = pt(u0 + 1, v0 + hh - 1); P.setF(t[0] - 0.25, t[1] + 0.25, 'W', 1); P.setF(t[0] + 0.25, t[1] + 0.75, 'W', 1); if (w >= 4) { b = pt(u0 + (w >> 1), v0); for (v = v0; v < v0 + hh; v++) { t = pt(u0 + (w >> 1), v); P.setF(t[0] - 0.25, t[1], k, 2); } } }
+    else if (hh >= 3 && hh >= w * 1.4) { t = pt(u0 + w - 1, v0 + (hh >> 1)); P.setF(t[0] - 0.25, t[1] + 0.25, 'Y', 1); for (v = v0; v < v0 + hh - 1; v++) { t = pt(u0 + (w >> 1), v); P.setF(t[0] - 0.25, t[1], k, 3); } }
   }
   function stripes(P, k, k2, y0, y1, w) { P.recolor(k, k2, function (x, y) { return y >= y0 && y <= y1 && (((x + 96) % (w * 2)) < w); }); }
   function cyl(P, cx, cy, rx, ry, h, kSide, kTop) { for (var v = 0; v <= h; v++) P.ell(cx, cy - v, rx, ry, kSide, v === 0 ? 2 : 1); P.ell(cx, cy - h, rx, ry, kTop, 0); }
@@ -1432,7 +1470,7 @@
   function building(id, opt) {
     if (!BUILD[id]) id = '?';
     var fr = id === 'fountain' ? ((opt && opt.frame) | 0) & 1 : 0;
-    return cached('b|' + id + '|' + fr, function () { return BUILD[id](fr); });
+    return cached('b|' + id + '|' + fr, function () { return DENS === 2 ? BUILDX[id](fr) : BUILD[id](fr); });
   }
   var BUILDING_FRAMES = { fountain: 2 };
   // the zoo entrance: two pillars and an arch across one hex. sortDy puts it in front of whoever walks through.
@@ -1448,7 +1486,7 @@
         P.rr(-4, -33, 9, 9, 'L', null, 3); P.rr(-2, -28, 5, 3, 'M', 1, 1); P.set(-2, -30, 'M'); P.set(0, -31, 'M'); P.set(2, -30, 'M');
         P.set(-14, -28, 'Y'); P.set(-11, -29, 'L'); P.set(-17, -26, 'L'); P.set(14, -28, 'Y'); P.set(11, -29, 'L'); P.set(17, -26, 'L');
       });
-      var s = fin(P, 24, 5, 0, 5); s.sortDy = HH; return s;
+      var s = fin(P, 24, 5, 0, 5); s.sortDy = HH * KD; return s;
     });
   }
 
@@ -1480,7 +1518,7 @@
   };
   // ---- symbols that replace words in the menus: animal stats, staff skills, and small markers ----
   (function () {
-    var more = { p: '#fbb4d2', b: '#a8d0fa', U: '#27a898', u: '#8fe0d2', I: '#cfd4de', i: '#f4f6fa', J: '#8f96a8', Z: '#cf8a4c', z: '#f0b880', X: '#7a5230', F: '#fff2c8', v: '#c0a4f4', g: '#3f8f45', H: '#f0a020', A: '#f08a2c', a: '#f8b860', e: '#9aa0b0', m: '#e8894a', n: '#fcc49a', o: '#b85c2a' }, k;
+    var more = { p: '#fbb4d2', b: '#a8d0fa', U: '#27a898', u: '#8fe0d2', I: '#cfd4de', i: '#f4f6fa', J: '#8f96a8', Z: '#cf8a4c', z: '#f0b880', X: '#7a5230', F: '#fff2c8', v: '#c0a4f4', g: '#3f8f45', H: '#f0a020', A: '#f08a2c', a: '#f8b860', e: '#9aa0b0', y: '#5a3a9a', m: '#e8894a', n: '#fcc49a', o: '#b85c2a' }, k;
     for (k in more) IC[k] = more[k];
     function sub(rows, map) { return rows.map(function (r) { return r.replace(/[adh]/g, function (c) { return map[c]; }); }); }
     var MEDAL = ['..RRWBB..', '..RRWBB..', '..RRWBB..', '..aaaaa..', '.aahhaaa.', 'aahaaaaad', 'aahaaaaad', 'aaaaaaadd', '.aaaaadd.', '..adddd..'];
@@ -1499,7 +1537,8 @@
       'skill-care': { rows: ['..GG.GG..', '..GG.GG..', 'GG.....GG', 'GG.GGG.GG', '..GGGGG..', '.GGGGGGG.', '.GGGGGGG.', '..GG.GG..'] },
       'skill-sci':  { rows: ['.CC..CC..CC.', '.CC..CC..CC.', '.CC..CC..CC.', 'TTTTTTTTTTTT', '.UU..CC..UU.', '.UU..uu..UU.', '.UU..uu..UU.', '.UU..uu..UU.', 'TTTTTTTTTTTT', 'X..........X'], flat: true },
       'skill-exp':  { rows: ['...DDDDD...', '..DFFFFFD..', '.DFFFFRFFD.', 'DFFFFRRFFFD', 'DFFFRRFFFFD', 'DFFFFKFFFFD', 'DFFFFBBFFFD', 'DFFFBBFFFFD', '.DFFBFFFFD.', '..DFFFFFD..', '...DDDDD...'], flat: true },
-      'skill-charm': { rows: ['.....VVVV..', '....VvVvVV.', '...VvVvVVVV', '...VVvVVVVV', '...VVVVVVVV', '....VVVVVV.', '...JJVVVV..', '..JJJ......', '.JJJ.......', 'JJJ........'], flat: true },
+      // Hosting: a hand-held stage microphone, tilted like the usual mic symbol. Round mesh head with a shine, silver band, straight handle.
+      'skill-charm': { rows: ['.......VVVV..', '......WWvVvV.', '.....WWVVVVVy', '.....VvVvVvVy', '.....VVVVVVVy', '....iVvVvVvVy', '...iJiVVVVVy.', '...JiJiyyyy..', '..VyJJ.......', '.Vyy.........', 'Vyy..........', 'yy...........'] },
       'sex-m': { rows: ['.....BBBB', '.......BB', '......B.B', '.BBBBB..B', 'BB...BB..', 'B.....B..', 'B.....B..', 'BB...BB..', '.BBBBB...'], flat: true },
       'sex-f': { rows: ['.PPPPP.', 'PP...PP', 'P.....P', 'P.....P', 'PP...PP', '.PPPPP.', '...P...', '.PPPPP.', '...P...', '...P...'], flat: true },
       'juv':   { rows: ['...FFF...', '..FFFFF..', '.FFiFFFF.', '.FFFFFFF.', 'FFFFFFFFF', 'FaFFFaFFF', 'aFaFaFaFa', 'FFFaFFFaF', '.FFFFFFF.', '..FFFFF..'] },
@@ -1535,7 +1574,7 @@
     for (y = -h; y < 0; y++) for (x = -8; x <= 8; x++) if (!d.flat && P.has(x, y) && !P.has(x, y + 1) && P.kat(x, y) !== 'W' && P.kat(x, y) !== 'K') P.sh(x, y, 2);
     return P.bake(null);
   }
-  function icon(name) { return cached('i|' + name, function () { return drawIcon(name); }); }
+  function icon(name) { return cached('i|' + name, function () { return DENS === 2 ? iconD(ZI, name) : drawIcon(name); }); }
 
   // named colours the page can reuse for menus, so the interface matches the floor
   var PALETTE = {
@@ -1548,6 +1587,917 @@
     rarity: ['#a8acb8', '#a8acb8', '#5cb85a', '#4a8ae0', '#8a5ad8', '#f08a2c', '#e8503a']
   };
 
+
+  // =====================================================================================================================
+  // STYLE D (density 2): the approved finer art. OFF by default: nothing below runs unless setDensity(2) is called.
+  // The painter above switches to a fine grid with twice the pixels per art pixel (hdInit), every shape is redrawn on it,
+  // detail passes and per-species redraws add the extra detail, and outer outlines are 2 fine pixels (as bold as today).
+  // Sprites at density 2 are exactly twice as many pixels with anchors doubled and carry d: 2.
+  // =====================================================================================================================
+  var DENS = 1, KD = 1, NOHD = false, SPX = null, BUILDX = null, ZI = null, hdInit = null, decoD = null;
+  function halfGeo(Z0) { // ZGeo given in fine pixels (doubled) -> the same shapes in art pixels
+    var A = [Z0.A[0] / 2, Z0.A[1] / 2], B = [Z0.B[0] / 2, Z0.B[1] / 2], g = { A: A, B: B }, DET = A[0] * B[1] - B[0] * A[1];
+    var third = function (i, j) { return [(i * A[0] + j * B[0]) / 3, (i * A[1] + j * B[1]) / 3]; };
+    g.CORNERS = [third(1, -2), third(2, -1), third(1, 1), third(-1, 2), third(-2, 1), third(-1, -1)]; g.EDGES = Z0.EDGES;
+    g.W = Z0.W / 2; g.H = Z0.H / 2; g.HW = Z0.HW / 2; g.HH = Z0.HH / 2;
+    g.toScreen = function (q, r) { return { x: A[0] * q + B[0] * r, y: A[1] * q + B[1] * r }; };
+    g.toAxial = function (x, y) {
+      var qf = (x * B[1] - y * B[0]) / DET, rf = (y * A[0] - x * A[1]) / DET, rx = Math.round(qf), rz = Math.round(rf), ry = Math.round(-qf - rf);
+      var dx = Math.abs(rx - qf), dz = Math.abs(rz - rf), dy = Math.abs(ry + qf + rf);
+      if (dx > dy && dx > dz) rx = -ry - rz; else if (dy <= dz) rz = -rx - ry;
+      return { q: rx, r: rz };
+    };
+    g.edgeMidY = function (e) { return (g.CORNERS[g.EDGES[e][1]][1] + g.CORNERS[g.EDGES[e][2]][1]) / 2; };
+    g.depth = function (q, r, dy) { return A[1] * q + B[1] * r + (dy || 0); };
+    return g;
+  }
+  function applyGeo() { // style D is drawn in art pixels of the original hex; a doubled ZGeo (fine pixels) is halved back
+    var Z0 = root.ZGeo; G = (DENS === 2 && Z0.W >= 80) ? halfGeo(Z0) : Z0; W = G.W; H = G.H; HH = G.HH; HW = G.HW;
+  }
+  function setDensity(n) { DENS = n === 2 ? 2 : 1; KD = DENS; applyGeo(); if (DENS === 2) dReady(); return DENS; }
+  function tileD1(kind, seed) { // today's tile (art pixels), the base that style-D ground is built on
+    var was = NOHD; NOHD = true;
+    try { kind = String(kind || 'grass'); var nm = kind.indexOf('hab:') === 0 ? kind.slice(4) : kind; if (!GROUND[nm]) kind = 'grass';
+      var v = (kind === 'grass' || kind === 'locked') ? GRASS_VARIANTS * 3 : 4; return drawTile(kind, (((seed | 0) % v) + v) % v); } finally { NOHD = was; }
+  }
+  function ctxD(o) { // what kind of sprite is being drawn, so the detail passes know what to add
+    BOXES = [];
+    CUR = { type: o.t === 'entrance' ? 'building' : o.t, id: o.id };
+    if (o.id === 'panda') CUR.pupil = 1;
+    if (o.t === 'animal') { var tx = TEX[o.id] || ['fur']; CUR.tex = tx[0]; if (tx[1]) CUR.texKeys = tx[1]; if (tx[2]) CUR.sparkle = 1; if (tx[0] !== 'fur') CUR.fur = tx[0] === 'wet' ? 0 : 0.02; }
+    if (o.t === 'building' && o.id === 'snack') CUR.noSiding = 1;
+  }
+  function withD(o, fn) { if (DENS !== 2) return fn(); var prev = CUR; ctxD(o); try { return fn(); } finally { CUR = prev; } }
+  function dReady() {
+    if (ZI) return;
+    var k; SPX = {}; for (k in SP) SPX[k] = { pal: SP[k].pal, vpal: SP[k].vpal, draw: SP[k].draw, opt: SP[k].opt };
+    BUILDX = {}; for (k in BUILD) BUILDX[k] = BUILD[k];
+    ZI = { _in: { Pt: Pt, SP: SPX, quad: quad, trunked: trunked, spots: spots, h2: h2, rng: rng, GROUND: GROUND, BUILD: BUILDX, box: box, hip: hip, stripes: stripes, Bp: Bp, fin: fin, IC: IC, ICON_DEFS: ICON_DEFS, birdFn: bird }, _mix: mix };
+    hdInit = makeHD(2, ZI, { bold: true, outline2: true });
+    installOverrides(ZI); installRev3(ZI);
+    // the owner's choices (revision 2): polar bear design 1, chestnut-red rare gorilla
+    SPX.polarbear.draw = SPX.polarbear_1.draw; SPX.gorilla.vpal = GORILLA_RARE.chestnut;
+    for (k in SPX) if (!SP[k]) delete SPX[k];
+  }
+
+  function frac(v) { return v - Math.floor(v); }
+
+  // ---------------------------------------------------------------------------------------------------------------------
+  // The hi-res painter: same calls as sprites.js's painter (art-pixel coordinates), drawn on a K-times finer grid.
+  // ---------------------------------------------------------------------------------------------------------------------
+  var HDM = {};
+  HDM.X = function (i) { return Math.round((i + this.ox) * this.K); };
+  HDM.Y = function (j) { return Math.round((j + this.oy) * this.K); };
+  HDM.code = function (k, s) { var c = this.ki[k]; if (c == null) c = this.ki.A || 0; return c * 4 + (s == null ? 1 : s) + 1; };
+  HDM.cs = function (c, r, v) { if (c >= 0 && r >= 0 && c < this.W && r < this.H) this.d[r * this.W + c] = v; };
+  HDM.cg = function (c, r) { return (c >= 0 && r >= 0 && c < this.W && r < this.H) ? this.d[r * this.W + c] : 0; };
+  HDM.blk = function (x, y, fn) { x = Math.round(x); y = Math.round(y); for (var r = this.Y(y); r < this.Y(y + 1); r++) for (var c = this.X(x); c < this.X(x + 1); c++) if (c >= 0 && r >= 0 && c < this.W && r < this.H) { if (fn(r * this.W + c) === false) return; } };
+  HDM.set = function (x, y, k, s) { var v = this.code(k, s), me = this; this.blk(x, y, function (i) { me.d[i] = v; }); };
+  HDM.has = function (x, y) { var f = false, d = this.d; this.blk(x, y, function (i) { if (d[i] !== 0) { f = true; return false; } }); return f; };
+  HDM.kat = function (x, y) { var v = 0, d = this.d; this.blk(x, y, function (i) { if (d[i] > 0) { v = d[i]; return false; } }); if (!v) return ''; var c = (v - 1) >> 2; for (var k in this.ki) if (this.ki[k] === c) return k; return ''; };
+  HDM.sh = function (x, y, s) { var d = this.d; this.blk(x, y, function (i) { if (d[i] > 0) d[i] = (((d[i] - 1) >> 2) * 4) + s + 1; }); };
+  HDM.re = function (x, y, k, s) { var c = this.ki[k], d = this.d; if (c == null) return; this.blk(x, y, function (i) { if (d[i] > 0) d[i] = c * 4 + (s == null ? ((d[i] - 1) & 3) : s) + 1; }); };
+  HDM.clr = function (x, y) { var d = this.d; this.blk(x, y, function (i) { d[i] = 0; }); };
+  HDM.rect = function (x, y, w, h, k, s) {
+    x = Math.round(x); y = Math.round(y); var wi = Math.ceil(w), hi = Math.ceil(h); if (wi <= 0 || hi <= 0) return;
+    var c0 = this.X(x), c1 = this.X(x + wi), r0 = this.Y(y), r1 = this.Y(y + hi), n = r1 - r0;
+    for (var r = r0; r < r1; r++) { var v = this.code(k, s === 'a' ? (hi < 3 ? 1 : ash((r - r0 + 0.5) / n)) : s); for (var c = c0; c < c1; c++) this.cs(c, r, v); }
+  };
+  HDM.rr = function (x, y, w, h, k, s, rad) {
+    x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h); if (rad == null) rad = Math.min(2, Math.floor(Math.min(w, h) / 3));
+    if (w <= 0 || h <= 0) return;
+    var c0 = this.X(x), c1 = this.X(x + w), r0 = this.Y(y), r1 = this.Y(y + h), Wc = c1 - c0, Hc = r1 - r0, rc = Math.round(rad * this.K);
+    for (var j = 0; j < Hc; j++) {
+      var ins = j < rc ? rc - j : (j >= Hc - rc ? rc - (Hc - 1 - j) : 0); if (ins * 2 >= Wc) ins = Math.max(0, Math.floor((Wc - 1) / 2));
+      var v = this.code(k, s == null ? (h < 3 ? 1 : ash((j + 0.5) / Hc)) : s);
+      for (var i = ins; i < Wc - ins; i++) this.cs(c0 + i, r0 + j, v);
+    }
+  };
+  HDM.ell = function (cx, cy, rx, ry, k, s) {
+    var K = this.K, e = 0.5 - 0.5 / K, Rx = rx + 0.25 + e, Ry = ry + 0.25 + e, list = [], top = null, bot = 0;
+    var c0 = this.X(Math.floor(cx - Rx) - 1), c1 = this.X(Math.ceil(cx + Rx) + 2), r0 = this.Y(Math.floor(cy - Ry) - 1), r1 = this.Y(Math.ceil(cy + Ry) + 2);
+    for (var r = r0; r < r1; r++) for (var c = c0; c < c1; c++) {
+      var dx = ((c + 0.5) / K - this.ox - 0.5 - cx) / Rx, dy = ((r + 0.5) / K - this.oy - 0.5 - cy) / Ry;
+      if (dx * dx + dy * dy <= 1) { list.push(c, r); if (top == null) top = r; bot = r; }
+    }
+    var n = top == null ? 0 : bot - top + 1, nArt = n / K;
+    for (var i = 0; i < list.length; i += 2) this.cs(list[i], list[i + 1], this.code(k, s == null ? (nArt < 3 ? 1 : ash((list[i + 1] - top + 0.5) / n)) : s));
+  };
+  HDM.line = function (x0, y0, x1, y1, k, s, t) {
+    x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1); t = t || 1;
+    var K = this.K, o = Math.floor((t - 1) / 2), B = Math.max(1, Math.round(t * K - 0.01)), me = this, v = this.code(k, s);
+    function tl(x, off) { return Math.round((x - o + t / 2 + off) * K - B / 2); }
+    var a = tl(x0, this.ox), b = tl(y0, this.oy), a1 = tl(x1, this.ox), b1 = tl(y1, this.oy);
+    var dx = Math.abs(a1 - a), dy = Math.abs(b1 - b), sx = a < a1 ? 1 : -1, sy = b < b1 ? 1 : -1, er = dx - dy;
+    for (;;) {
+      for (var j = 0; j < B; j++) for (var i = 0; i < B; i++) me.cs(a + i, b + j, v);
+      if (a === a1 && b === b1) break;
+      var e2 = 2 * er; if (e2 > -dy) { er -= dy; a += sx; } if (e2 < dx) { er += dx; b += sy; }
+    }
+  };
+  HDM.path = function (pts, k, s, t) { for (var i = 0; i < pts.length - 1; i++) this.line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], k, s, t); };
+  HDM.poly = function (pts, k, s) {
+    var K = this.K, miny = 1e9, maxy = -1e9, n = pts.length, i;
+    for (i = 0; i < n; i++) { miny = Math.min(miny, pts[i][1]); maxy = Math.max(maxy, pts[i][1]); }
+    miny = Math.round(miny); maxy = Math.round(maxy); var hh = maxy - miny + 1;
+    function sf(y) { return s === 'a' ? (hh < 3 ? 1 : ash(Math.min(0.999, Math.max(0, (y - miny + 0.5) / hh)))) : s; }
+    var r0 = this.Y(miny), r1 = this.Y(maxy + 1);
+    for (var r = r0; r < r1; r++) {
+      var ya = (r + 0.5) / K - this.oy - 0.5, yy = Math.min(maxy, Math.max(miny, ya)) + 0.01, xs = [];
+      for (i = 0; i < n; i++) { var p = pts[i], q = pts[(i + 1) % n]; if ((p[1] <= yy && q[1] > yy) || (q[1] <= yy && p[1] > yy)) xs.push(p[0] + (yy - p[1]) * (q[0] - p[0]) / (q[1] - p[1])); }
+      xs.sort(function (u, w) { return u - w; });
+      var v = this.code(k, sf(ya));
+      for (i = 0; i + 1 < xs.length; i += 2) for (var c = this.X(Math.floor(xs[i]) - 1); c < this.X(Math.ceil(xs[i + 1]) + 2); c++) {
+        var xa = (c + 0.5) / K - this.ox - 0.5; if (xa >= xs[i] - 0.25 && xa <= xs[i + 1] + 0.25) this.cs(c, r, v);
+      }
+    }
+    for (i = 0; i < n; i++) { // edges, so thin shapes never break up
+      var a = pts[i], b = pts[(i + 1) % n], st = Math.ceil(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])) * K * 1.5) + 1;
+      for (var u = 0; u <= st; u++) { var lx = a[0] + (b[0] - a[0]) * u / st, ly = a[1] + (b[1] - a[1]) * u / st; this.cs(Math.floor((lx + 0.5 + this.ox) * K), Math.floor((ly + 0.5 + this.oy) * K), this.code(k, sf(ly))); }
+    }
+  };
+  HDM.stamp = function (x, y, rows, map) {
+    for (var j = 0; j < rows.length; j++) for (var i = 0; i < rows[j].length; i++) { var c = rows[j].charAt(i); if (c === '.' || c === ' ') continue; var m = map && map[c]; if (m) this.set(x + i, y + j, m[0], m[1]); else this.set(x + i, y + j, c, 1); }
+  };
+  HDM.part = function (fn, nosep) {
+    var old = this.d, w = this.W, t = this.d = new Int16Array(this.W * this.H), i;
+    try { fn.call(this, this); } finally { this.d = old; }
+    for (i = 0; i < t.length; i++) if (t[i]) old[i] = t[i];
+    if (!nosep) for (i = 0; i < t.length; i++) if (!t[i] && old[i] > 0) { var x = i % w; if ((x > 0 && t[i - 1]) || (x < w - 1 && t[i + 1]) || (i >= w && t[i - w]) || (i < t.length - w && t[i + w])) old[i] = (((old[i] - 1) >> 2) * 4) + 3 + 1; }
+  };
+  HDM.recolor = function (from, to, pred, s) {
+    var c = this.ki[to]; if (c == null) return; var fs = {}, i;
+    for (i = 0; i < from.length; i++) if (this.ki[from.charAt(i)] != null) fs[this.ki[from.charAt(i)]] = 1;
+    for (var r = 0; r < this.H; r++) for (var x = 0; x < this.W; x++) { var v = this.d[r * this.W + x]; if (v > 0 && fs[(v - 1) >> 2] && (!pred || pred(this.CA[x], this.RA[r], (v - 1) & 3))) this.d[r * this.W + x] = c * 4 + (s == null ? ((v - 1) & 3) : s) + 1; }
+  };
+  // hi-res extras: fractional art coordinates (index space: a whole number is the middle of an art pixel)
+  HDM.fx = function (c) { return (c + 0.5) / this.K - this.ox - 0.5; };
+  HDM.fy = function (r) { return (r + 0.5) / this.K - this.oy - 0.5; };
+  HDM.recolorF = function (from, to, pred, s) {
+    var c = this.ki[to]; if (c == null) return; var fs = {}, i;
+    for (i = 0; i < from.length; i++) if (this.ki[from.charAt(i)] != null) fs[this.ki[from.charAt(i)]] = 1;
+    for (var r = 0; r < this.H; r++) for (var x = 0; x < this.W; x++) { var v = this.d[r * this.W + x]; if (v > 0 && fs[(v - 1) >> 2] && pred(this.fx(x), this.fy(r), (v - 1) & 3)) this.d[r * this.W + x] = c * 4 + (s == null ? ((v - 1) & 3) : s) + 1; }
+  };
+  HDM.shadeF = function (from, fn) { // fn returns a new shade (0..3) or null
+    var fs = {}, i; for (i = 0; i < from.length; i++) if (this.ki[from.charAt(i)] != null) fs[this.ki[from.charAt(i)]] = 1;
+    for (var r = 0; r < this.H; r++) for (var x = 0; x < this.W; x++) { var j = r * this.W + x, v = this.d[j]; if (v > 0 && fs[(v - 1) >> 2]) { var n = fn(this.fx(x), this.fy(r), (v - 1) & 3, x, r); if (n != null) this.d[j] = v - ((v - 1) & 3) + n; } }
+  };
+  HDM.setF = function (xa, ya, k, s) { this.cs(Math.floor((xa + 0.5 + this.ox) * this.K), Math.floor((ya + 0.5 + this.oy) * this.K), this.code(k, s)); };
+  HDM.lineF = function (x0, y0, x1, y1, k, s) { var st = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * this.K * 1.5) + 1; for (var u = 0; u <= st; u++) this.setF(x0 + (x1 - x0) * u / st, y0 + (y1 - y0) * u / st, k, s); };
+  HDM.outline = function () {
+    var w = this.W, d = this.d, n = [], i;
+    for (i = 0; i < d.length; i++) if (!d[i]) { var x = i % w; if ((x > 0 && d[i - 1] > 0) || (x < w - 1 && d[i + 1] > 0) || (i >= w && d[i - w] > 0) || (i < d.length - w && d[i + w] > 0)) n.push(i); }
+    for (i = 0; i < n.length; i++) d[n[i]] = -1;
+  };
+  HDM.bake = function (shadow, noOutline) {
+    if (this.post) this.post(this);
+    if (!noOutline) { this.outline(); if (this.opts.outline2) { // D: a second outline ring on the outer silhouette only (inner lines stay 1 px)
+      var w2 = this.W, d2 = this.d, ring = [], ii; for (ii = 0; ii < d2.length; ii++) if (!d2[ii]) { var xx = ii % w2; if ((xx > 0 && d2[ii - 1] < 0) || (xx < w2 - 1 && d2[ii + 1] < 0) || (ii >= w2 && d2[ii - w2] < 0) || (ii < d2.length - w2 && d2[ii + w2] < 0)) ring.push(ii); }
+      for (ii = 0; ii < ring.length; ii++) d2[ring[ii]] = -1; } }
+    var W = this.W, H = this.H, d = this.d, K = this.K, sd = null, a0 = 0, sc = [24, 44, 24], x, y;
+    if (shadow) {
+      sd = new Uint8Array(W * H); a0 = Math.round((shadow[3] || 0.24) * 255); if (shadow[2]) sc = shadow[2];
+      var e = 0.5 - 0.5 / K, Rx = shadow[0] + 0.4 + e, Ry = shadow[1] + 0.4 + e, cx = (shadow[4] || 0), cy = -1 + (shadow[5] || 0);
+      for (y = 0; y < H; y++) for (x = 0; x < W; x++) { var ex = (this.fx(x) - cx) / Rx, ey = (this.fy(y) - cy) / Ry; if (ex * ex + ey * ey <= 1) sd[y * W + x] = 1; }
+    }
+    var x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (d[y * W + x] || (sd && sd[y * W + x])) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) { x0 = y0 = 0; x1 = y1 = 0; }
+    var cw = x1 - x0 + 1, ch = y1 - y0 + 1, cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+    var g = cv.getContext('2d'), im = g.createImageData(cw, ch), q = im.data, o = hexRgb(this.out);
+    for (y = 0; y < ch; y++) for (x = 0; x < cw; x++) {
+      var v = d[(y + y0) * W + x + x0], j = (y * cw + x) * 4, col = null;
+      if (v > 0) col = this.cols[(v - 1) >> 2][(v - 1) & 3]; else if (v < 0) col = o;
+      if (col) { q[j] = col[0]; q[j + 1] = col[1]; q[j + 2] = col[2]; q[j + 3] = 255; }
+      else if (sd && sd[(y + y0) * W + x + x0]) { q[j] = sc[0]; q[j + 1] = sc[1]; q[j + 2] = sc[2]; q[j + 3] = a0; }
+    }
+    g.putImageData(im, 0, 0);
+    return { c: cv, w: cw, h: ch, ax: this.X(0) - x0, ay: this.Y(1) - y0, K: K };
+  };
+  function hexRgb(c) { if (c.charAt(0) === '#') c = c.slice(1); var n = parseInt(c, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+
+  function makeHD(K, Z, opts) {
+    var post = makePost(Z);
+    return function (p) {
+      p.K = K; p.opts = opts || {}; p.W = Math.ceil(p.w * K) + 2; p.H = Math.ceil(p.h * K) + 2; p.d = new Int16Array(p.W * p.H);
+      for (var m in HDM) p[m] = HDM[m];
+      p.CA = new Int16Array(p.W); p.RA = new Int16Array(p.H);
+      for (var n = 0, c = 0; c < p.W; n++) for (; c < Math.round((n + 1) * K) && c < p.W; c++) p.CA[c] = n - p.ox;
+      for (n = 0, c = 0; c < p.H; n++) for (; c < Math.round((n + 1) * K) && c < p.H; c++) p.RA[c] = n - p.oy;
+      p.post = post;
+    };
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------------
+  // Generic detail passes, run on the fine grid just before the outline: eye shine, fur strokes, hair strands, rim light.
+  // ---------------------------------------------------------------------------------------------------------------------
+  var CUR = {};
+  function makePost(Z) {
+    var h2 = Z._in.h2;
+    return function (p) {
+      var t = CUR.type; if (!t) return; var bold = !!(p.opts && p.opts.bold);
+      var K = p.K, W = p.W, H = p.H, d = p.d, r, c, i, v, keyAt = [];
+      for (var kk in p.ki) keyAt[p.ki[kk]] = kk;
+      function key(v) { return v > 0 ? keyAt[(v - 1) >> 2] : ''; }
+      function sh(v) { return (v - 1) & 3; }
+      function setSh(i, s) { var v = d[i]; d[i] = v - ((v - 1) & 3) + s; }
+      var NOFX = { K: 1, W: 1, N: 1, T: 1 };
+      if (t === 'animal' || t === 'person') { // eye shine: the top front cell of each small dark eye becomes white
+        var seen = new Uint8Array(W * H), kc = p.ki.K, wv = p.code('W', 1); var blobs = [];
+        for (i = 0; i < d.length; i++) if (!seen[i] && d[i] > 0 && ((d[i] - 1) >> 2) === kc) {
+          var st = [i], blob = []; seen[i] = 1;
+          while (st.length) { var j = st.pop(); blob.push(j); [j - 1, j + 1, j - W, j + W].forEach(function (n) { if (n >= 0 && n < d.length && !seen[n] && d[n] > 0 && ((d[n] - 1) >> 2) === kc) { seen[n] = 1; st.push(n); } }); }
+          if (blob.length >= (K >= 2 ? 4 : 3) && blob.length <= 12) blobs.push(blob);
+        }
+        var minTop = 1e9; blobs.forEach(function (b) { b.forEach(function (j) { minTop = Math.min(minTop, Math.floor(j / W)); }); });
+        blobs.forEach(function (blob) { var bt = 1e9; blob.forEach(function (j) { bt = Math.min(bt, Math.floor(j / W)); }); if (bt > minTop + K) return;
+          { var best = blob[0]; blob.forEach(function (j) { var br = Math.floor(best / W), jr = Math.floor(j / W); if (jr < br || (jr === br && j > best)) best = j; }); d[best] = wv; }
+        });
+      }
+      if (t === 'animal') { // fur: short dark strokes falling downward and a few light flecks on the mid tone
+        var dens = (CUR.fur == null ? (K >= 2 ? 0.045 : 0.035) : CUR.fur) * (bold ? 0.45 : 1);
+        for (r = 0; r < H; r++) for (c = 0; c < W; c++) { i = r * W + c; v = d[i]; if (v <= 0 || NOFX[key(v)] || sh(v) !== 1) continue;
+          var hs = h2(c, r, 77);
+          if (hs < dens && r > 0 && d[i - W] > 0 && key(d[i - W]) === key(v)) { setSh(i, 2); if (K >= 2 && r + 1 < H && d[i + W] > 0 && key(d[i + W]) === key(v) && sh(d[i + W]) === 1) setSh(i + W, 2); }
+        }
+      }
+      if (t === 'person') { // hair strands and cloth folds
+        for (r = 0; r < H; r++) for (c = 0; c < W; c++) { i = r * W + c; v = d[i]; if (v <= 0) continue; var k = key(v);
+          if (k === 'H' && sh(v) === 1 && ((c + (r >> 1)) % 3 === 0)) setSh(i, 2);
+          if (!bold && (k === 'S' || k === 'C' || k === 'P') && sh(v) === 1 && h2(c, r, 5) < 0.07) setSh(i, 2);
+          if ((k === 'S' || k === 'C') && r + 1 < H && key(d[i + W]) === 'P') setSh(i, 3);          // belt line
+          if ((k === 'S' || k === 'C') && r > 0 && key(d[i - W]) === 'A' && sh(v) <= 1) setSh(i, 0); // collar
+          if (k === 'F' && r > 0 && key(d[i - W]) !== 'F' && h2(c, r, 6) < 0.5) setSh(i, 0);           // shoe shine
+        }
+        if (bold) for (r = 1; r < H; r++) for (c = 0; c < W - 2; c++) { i = r * W + c; v = d[i]; var kq = key(v);
+          if ((kq === 'S' || kq === 'C' || kq === 'P' || kq === 'V') && sh(v) === 1 && (d[i + 1] <= 0 || d[i + 2] <= 0)) setSh(i, 2);
+          if (kq === 'H' && sh(v) !== 3 && d[i - W] > 0 && key(d[i - W]) === 'H' && r > 1 && d[i - 2 * W] <= 0 && (c & 1)) setSh(i, 0); }
+        // a small mouth under the eyes
+        var eyes = []; for (i = 0; i < d.length; i++) if (d[i] > 0 && key(d[i]) === 'K' && !(i >= W && key(d[i - W]) === 'K')) eyes.push(i);
+        if (!bold && eyes.length >= 2 && eyes.length <= 4) { var e0 = eyes[0], e1 = eyes[eyes.length - 1], er = Math.max(Math.floor(e0 / W), Math.floor(e1 / W)), ec = Math.round(((e0 % W) + (e1 % W)) / 2);
+          var mr = er + Math.round(3 * K); for (var mc = ec - Math.floor(K / 2); mc <= ec + Math.floor(K / 2); mc++) { var mi = mr * W + mc; if (d[mi] > 0 && key(d[mi]) === 'A') setSh(mi, 2); } }
+      }
+      if (bold) styleD(p, t, key, sh, setSh, h2);
+      if (t === 'animal' || t === 'person' || t === 'building' || t === 'fence') { // rim light from above, a soft dark underside
+        var snap = new Int16Array(d);
+        for (r = 0; r < H; r++) for (c = 0; c < W; c++) { i = r * W + c; v = snap[i]; if (v <= 0 || key(v) === 'K' || key(v) === 'W') continue;
+          var up = r > 0 ? snap[i - W] : 0, dn = r < H - 1 ? snap[i + W] : 0, lf = c > 0 ? snap[i - 1] : 0;
+          if (up <= 0 && sh(v) === 1) setSh(i, 0);
+          else if (lf <= 0 && sh(v) === 1 && t !== 'building' && (bold || h2(c, r, 9) < 0.6)) setSh(i, 0);
+          else if (dn <= 0 && sh(v) <= 1 && t !== 'building') setSh(i, 2);
+        }
+      }
+      if (t === 'fence') { // wood grain on rails and posts
+        for (r = 0; r < H; r++) for (c = 0; c < W; c++) { i = r * W + c; v = d[i]; if (v <= 0 || sh(v) !== 1) continue; if (bold ? (r % 3 === 0 && h2(Math.floor(c / 4), r, 31) < 0.45) : h2(Math.floor(c / 3), r, 31) < 0.3) setSh(i, 2); }
+      }
+    };
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------------
+  // Featured subjects re-drawn with the same templates, then hi-res detail written in art coordinates.
+  // ---------------------------------------------------------------------------------------------------------------------
+  function installOverrides(Z) {
+    var I = Z._in, SP = I.SP, quad = I.quad, trunked = I.trunked, spots = I.spots;
+    SP.lion.draw = function (P, o) {
+      var j = o.juv, cx, cy, m = quad(P, o, { len: 14, bh: 8, leg: 5, lw: 3, head: [8, 8], hd: [2, -1], snout: [3, 4, 2], snoutK: 'B', ear: ['round', 2, 'A'], tail: ['tuft', 6, 'M'],
+        pre: function (P, m) { if (!j) P.part(function () {
+          cx = m.hx - 1; cy = m.hy + 1;
+          P.ell(cx, cy, 6.4, 6.4, 'M');
+          for (var a = 0; a < 26; a++) { var t = a / 26 * 6.283, r0 = 5.6, r1 = 7.4 + ((a * 7) % 3) * 0.35; P.lineF(cx + Math.cos(t) * r0, cy + Math.sin(t) * r0, cx + Math.cos(t + 0.12) * r1, cy + Math.sin(t + 0.12) * r1, 'M', a % 2 ? 2 : 1); }
+          P.shadeF('M', function (x, y) { var dx = x - cx, dy = y - cy, a = Math.atan2(dy, dx), rr = Math.sqrt(dx * dx + dy * dy), ph = frac(a / 6.283 * 15 + rr * 0.22); return ph < 0.26 ? 2 : (ph > 0.72 && rr > 2.5 && dy < 2 ? 0 : 1); });
+        }); } });
+      if (j) spots(P, 'A', 'C', m.x0 + 1, m.yt + 1, m.x1 - 2, m.yb - 2, 0.14, 3);
+      // the near ear's seam line cut an arc across the face on the fine grid: smooth it back into the head
+      P.shadeF('A', function (x, y, s) { return s === 3 && Math.hypot(x - m.hx, y - m.hy) < 3.6 ? 1 : null; });
+      // muscle shading: lit shoulder, shaded haunch and belly line, light muzzle, dark tail tip strands
+      P.shadeF('A', function (x, y, s) { if (y > m.yb) return null; var u = (x - (m.x1 - 3)) / 3.2, w = (y - (m.yt + 2)) / 2.4; if (u * u + w * w < 1 && s === 1) return 0; var u2 = (x - (m.x0 + 3)) / 3, w2 = (y - (m.yt + 4)) / 2.6; if (u2 * u2 + w2 * w2 < 1 && u2 > 0.2 && s === 1) return 2; return null; });
+      P.shadeF('A', function (x, y, s) { return (Math.abs(y - (m.yb - 0.5)) < 0.3 && x > m.x0 + 2 && x < m.x1 - 2 && s === 1) ? 2 : null; });
+      CUR.fur = P.K >= 2 ? 0.035 : 0.025;
+    };
+    SP.zebra.draw = function (P, o) {
+      var m = quad(P, o, { len: 14, bh: 8, leg: 7, lw: 2, head: [7, 6], hd: [3, -4], nw: 4, snout: [4, 4, 1], snoutK: 'C', ear: ['point', 2], tail: ['tuft', 5, 'C'], foot: 'C', nose: 0,
+        pre: function (P, m) { P.line(m.x1 - 3, m.yt, m.hx - 3, m.hy - 2, 'C', 1, 2); for (var y = 0; y < 7; y++) P.setF(m.x1 - 3 + (m.hx - m.x1) * y / 7 - 0.6, m.yt - 0.6 + (m.hy - 2 - m.yt) * y / 7, 'A', 1); } });
+      P.recolorF('A', 'C', function (x, y) {
+        if (y > m.yb + 0.3) return frac((y + 0.2) / 1.35) < 0.45;
+        if (x >= m.hx - 2 && y <= m.hy + 3) return x < m.hx + 2 && frac((x + y) / 2.3) < 0.36 && Math.round(y) !== m.ey && Math.round(y) !== m.ey + 1;
+        var bend = x < m.x0 + 4 ? (m.x0 + 4 - x) * 0.55 : 0, u = (x - y * (0.45 + bend * 0.12) + Math.sin(y * 0.8) * 0.5) / 2.25;
+        return frac(u) < 0.4;
+      });
+      P.shadeF('A', function (x, y, s) { return (y > m.yb - 2.2 && y <= m.yb + 0.3 && s === 1) ? 2 : null; });
+      CUR.fur = 0.02;
+    };
+    SP.giraffe.draw = function (P, o) {
+      var m = quad(P, o, { len: 12, bh: 7, leg: 10, lw: 2, head: [6, 5], hd: [5, -13], nw: 3, snout: [4, 3, 1], ear: ['point', 1], tail: ['tuft', 6, 'T'], foot: 'T',
+        pre: function (P, m) { P.line(m.x1 - 2, m.yt - 1, m.hx - 3, m.hy, 'C', 1, 1); } });
+      P.rect(m.hx - 1, m.hy - 4, 1, 2, 'A', 1); P.set(m.hx - 1, m.hy - 5, 'T'); P.rect(m.hx + 1, m.hy - 4, 1, 2, 'A', 1); P.set(m.hx + 1, m.hy - 5, 'T');
+      var h2 = I.h2;
+      function vor(x, y) { // distance to the nearest patch border of a jittered grid of patch centres
+        var gx = Math.floor(x / 2.7), gy = Math.floor(y / 2.5), d1 = 9, d2 = 9;
+        for (var a = -1; a <= 1; a++) for (var b = -1; b <= 1; b++) { var px = (gx + a + 0.2 + h2(gx + a, gy + b, 3) * 0.6) * 2.7, py = (gy + b + 0.2 + h2(gx + a, gy + b, 4) * 0.6) * 2.5, dd = Math.hypot(x - px, (y - py) * 1.1); if (dd < d1) { d2 = d1; d1 = dd; } else if (dd < d2) d2 = dd; }
+        return d2 - d1;
+      }
+      P.recolorF('A', 'C', function (x, y) { if (y > -3.6 || (x > m.hx - 1 && y < m.hy + 3)) return false; return vor(x + 40, y + 40) > 0.42; });
+      P.shadeF('C', function (x, y, s) { if (y > -3.6 || s !== 1) return null; var v = vor(x + 40, y + 40); return v > 0.42 && v < 0.75 ? 2 : null; });
+      CUR.fur = 0.03;
+    };
+    SP.elephant.draw = function (P, o) {
+      var m = trunked(P, o, { len: 15, bh: 11, leg: 5, head: [10, 10], hd: [0, 1], earS: [3.4, 5],
+        tusk: function (P, m, x, y) { if (m.j) { P.set(x + 1, y + 1, 'T', 1); return; } P.path([[x, y], [x + 3, y + 2], [x + 5, y + 1]], 'T', 0, 1); P.path([[x, y + 1], [x + 3, y + 3]], 'T', 1, 1); } });
+      // skin: wrinkle rings on the legs and trunk, fold lines on the body, veins in the ear, toenails
+      P.shadeF('A', function (x, y, s) {
+        if (s !== 1) return null;
+        if (y > m.yb + 0.4) return frac((y + 0.3) / 1.3) < 0.28 ? 2 : null;
+        if (x > m.hx + 2) return frac(y / 1.15) < 0.3 ? 2 : null;
+        var f1 = Math.abs(x - (m.x0 + 3.5) - Math.sin(y * 0.9) * 0.5) < 0.3, f2 = Math.abs(x - (m.x1 - 3) - Math.sin(y * 0.8) * 0.6) < 0.3 && y > m.yt + 3;
+        return (f1 || f2) && y > m.yt + 2 ? 2 : null;
+      });
+      P.shadeF('E', function (x, y, s) { return frac((x * 0.6 + y * 0.4) / 1.7) < 0.22 ? 2 : (s === 1 && frac((x + y) / 3.1) > 0.85 ? 0 : null); });
+      [m.nbx, m.nfx].forEach(function (lx) { for (var n = 0; n < 2; n++) P.setF(lx + 0.6 + n * 1.6 + (m.sg ? 0 : 0), -1.25, 'T', 0); });
+      CUR.fur = 0.03;
+    };
+    // big cats: real open rosettes drawn on the fine grid (a broken dark ring round a warmer middle)
+    function rosetteF(P, x0, x1, y1) {
+      var h2 = I.h2;
+      function near(x, y) { var gx = Math.floor(x / 4.4), gy = Math.floor(y / 3.8), best = 9, bx = 0, by = 0;
+        for (var a = -1; a <= 1; a++) for (var b = -1; b <= 1; b++) { var px = (gx + a + 0.25 + h2(gx + a, gy + b, 5) * 0.5) * 4.4 + ((gy + b) & 1) * 2.2, py = (gy + b + 0.25 + h2(gx + a, gy + b, 6) * 0.5) * 3.8, dd = Math.hypot(x - px, y - py); if (dd < best) { best = dd; bx = x - px; by = y - py; } }
+        return [best, Math.atan2(by, bx)]; }
+      P.recolorF('C', 'A', function (x, y) { return x >= x0 && x <= x1 && y <= y1; });
+      P.recolorF('A', 'C', function (x, y) { if (x < x0 || x > x1 || y > y1) return false; var n = near(x + 40, y + 40); return n[0] > 0.95 && n[0] < 1.55 && Math.cos(n[1] - (x * 1.3 + y)) < 0.55; });
+      P.shadeF('A', function (x, y, s) { if (x < x0 || x > x1 || y > y1) return null; var n = near(x + 40, y + 40); return n[0] <= 0.95 && s === 1 ? 2 : null; });
+    }
+    SP.jaguar.draw = function (P, o) {
+      var m = quad(P, o, { len: 14, bh: 8, leg: 4, lw: 3, head: [9, 8], hd: [2, -1], snout: [3, 4, 2], snoutK: 'B', ear: ['round', 2, 'A', 'C'], tail: ['cat', 7, 'A', 2] });
+      rosetteF(P, -40, m.hx - 4, -1.5);
+      P.set(m.hx - 2, m.hy - 2, 'C'); P.set(m.hx - 3, m.hy, 'C'); P.set(m.hx - 1, m.hy + 2, 'C');
+    };
+    SP.snowleopard.draw = function (P, o) {
+      var m = quad(P, o, { len: 14, bh: 7, leg: 4, lw: 3, head: [8, 7], hd: [2, -1], snout: [3, 4, 2], snoutK: 'B', ear: ['round', 1], tail: ['cat', 9, 'A', 3], tailY: 1, br: 2 });
+      rosetteF(P, m.x0, m.hx - 3.5, -2.5);
+      P.recolor('A', 'C', function (x, y) { return x < m.x0 - 1 && (((x + y) % 3) + 3) % 3 === 0; });
+    };
+    // the snack stand, same build as sprites.js plus roof tiles, scalloped awning, plank door, cups on the counter, a shine on the sign
+    var B = I.BUILD, box = I.box, hip = I.hip, stripes = I.stripes, Bp = I.Bp, fin = I.fin;
+    B.snack = function () {
+      var P = Bp({ A: '#fbf0d0', R: '#e8503a', D: '#7a5430', G: '#4a3a44', C: '#f4c838', M: '#c89858', B: '#b8844a', L: '#6ab04a' }), o = box(P, 0, 1, 9, 9, 10, 'A', 'A', 'R');
+      function flF(u, v, k, s) { P.setF(o.Lx + u, o.Ly + u / 2 - v, k, s); }
+      function frF(u, v, k, s) { P.setF(o.Fx + u, o.Ry + (2 * o.b - 1 - u) / 2 - v, k, s); }
+      o.rl(3, 3, 12, 5, 'G', 1); o.rl(2, 2, 14, 1, 'M', 0); o.fl(6, 4, 'C', 1); o.fl(7, 4, 'C', 1); o.fl(10, 4, 'R', 1); o.fl(13, 5, 'L', 1);
+      // counter: cups with straws, a stack of buns, a lit menu strip
+      for (var q = 0; q < 3; q++) { var u0 = 3.8 + q * 1.2; flF(u0, 3.6, 'W', 1); flF(u0, 4.2, 'W', 1); flF(u0 + 0.3, 4.9, 'R', 1); }
+      flF(8.6, 3.5, 'C', 2); flF(9.2, 3.7, 'C', 0); flF(11.5, 3.4, 'L', 0); flF(12, 3.4, 'L', 1); flF(13.2, 6.6, 'C', 0); flF(14, 6.4, 'W', 1);
+      o.rr(6, 0, 6, 7, 'D', 2); o.fr(10, 3, 'C', 1);
+      P.shadeF('D', function (x, y, s, c) { return (c % Math.round(1.5 * P.K) === 0) ? 3 : null; });
+      for (var u = 0; u < 18; u++) { for (var v = 8; v < 11; v++) { o.fl(u, v, (u % 6) < 3 ? 'R' : 'W', 1); o.fr(u, v, (u % 6) < 3 ? 'W' : 'R', 2); } }
+      for (u = 0; u < 18; u += 0.5 / P.K * 2) { var w = u % 3, dep = Math.sqrt(Math.max(0, 1 - Math.pow((w - 1.5) / 1.5, 2))) * 1.1;
+        for (var dv = 0; dv < dep; dv += 0.5 / P.K) { flF(u, 7.9 - dv, (u % 6) < 3 ? 'R' : 'W', 2); frF(u, 7.9 - dv, (u % 6) < 3 ? 'W' : 'R', 2); } }
+      P.part(function () {
+        hip(P, o, 6, 'R', 'R', 2);
+        P.shadeF('RW', function (x, y, s, c, r) { var t = x < o.Fx ? y - 0.5 * (x - o.Fx) : y + 0.5 * (x - o.Fx); var f = frac(t / 2.6); return (f < 1 / (2.6 * P.K) && s < 2) ? s + 1 : null; });
+      }, true);
+      stripes(P, 'R', 'W', -40, o.Fy - o.h - 1, 3);
+      P.part(function () { P.rr(-4, o.apex[1] - 5, 9, 3, 'B', null, 1); P.rect(-4, o.apex[1] - 2, 9, 1, 'L', 1); P.rect(-4, o.apex[1] - 1, 9, 1, 'D', 1); P.rr(-4, o.apex[1], 9, 2, 'B', 2, 1); P.set(-1, o.apex[1] - 5, 'W'); P.set(2, o.apex[1] - 4, 'W');
+        P.setF(-2.7, o.apex[1] - 4.6, 'W', 1); P.setF(-2.2, o.apex[1] - 4.6, 'W', 1); for (var x = -3.6; x < 4.6; x += 0.9) P.setF(x, o.apex[1] - 1.3, 'L', 0); });
+      P.shadeF('A', function (x, y, s) { var vv = o.Ly + (x - o.Lx) / 2 - y; return (x < o.Fx && vv < 0.7 && vv > -0.2) ? 2 : null; });
+      return fin(P, 19, 8, 1, 3);
+    };
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------------
+  // Ground tiles on the fine grid: exact hex from ZGeo per fine pixel, 1-pixel edge lines, grass blades, paving stones.
+  // ---------------------------------------------------------------------------------------------------------------------
+  function dTile(Z, kind, seed) {
+    var src = tileD1(kind, seed), K = 2, h2 = Z._in.h2, GR = Z._in.GROUND, name = kind.indexOf('hab:') === 0 ? kind.slice(4) : kind, pal = GR[name];
+    var cv = document.createElement('canvas'); cv.width = src.w * K; cv.height = src.h * K; var g = cv.getContext('2d', { willReadFrequently: true }); g.imageSmoothingEnabled = false; g.drawImage(src.c, 0, 0, cv.width, cv.height);
+    var im = g.getImageData(0, 0, cv.width, cv.height), q = im.data, ax = src.ax * K, ay = (src.ay) * K, rd = Z._in.rng(seed * 17 + 3);
+    function IN(c, r) { var a = G.toAxial((c + 0.5) / K - ax / K + 0.013, (r + 0.5) / K - ay / K + 0.007); return a.q === 0 && a.r === 0; }
+    function put(c, r, col) { if (c < 2 || r < 2 || c >= cv.width - 2 || r >= cv.height - 2 || !IN(c, r) || !IN(c, r + 2) || !IN(c + 2, r) || !IN(c - 2, r)) return; var rgb = hexRgb(col), i = (r * cv.width + c) * 4; q[i] = rgb[0]; q[i + 1] = rgb[1]; q[i + 2] = rgb[2]; q[i + 3] = 255; }
+    function blade(c, r, hgt, lean, dk, md, tp) { for (var j = 0; j < hgt; j++) put(c + Math.round(lean * j / hgt), r - j, j === 0 ? dk : j === hgt - 1 ? tp : md); }
+    function tuft(c, r, dk, md, tp) { blade(c, r, 3, -1, dk, md, tp); blade(c + 2, r, 4, 0, dk, md, tp); blade(c + 4, r, 3, 1, dk, md, tp); }
+    function rp() { return [Math.round(ax + (rd() - 0.5) * (G.W - 16) * K), Math.round(ay + (rd() - 0.5) * (G.H - 12) * K)]; }
+    var n, p, mix = Z._mix;
+    if (name === 'grass') for (n = 0; n < 4; n++) { p = rp(); tuft(p[0], p[1], pal.D, mix(pal.B, pal.D, 0.4), pal.C); }
+    else if (name === 'savanna') for (n = 0; n < 5; n++) { p = rp(); tuft(p[0], p[1], pal.D, n % 2 ? pal.G : mix(pal.A, pal.D, 0.5), n % 2 ? mix(pal.G, '#ffffff', 0.3) : pal.C); }
+    else if (name === 'path') for (n = 0; n < 4; n++) { p = rp(); put(p[0], p[1], pal.D); put(p[0] + 1, p[1], pal.D); put(p[0], p[1] - 1, pal.C); put(p[0] + 1, p[1] - 1, pal.B); }
+    g.putImageData(im, 0, 0);
+    return { c: cv, w: cv.width, h: cv.height, ax: ax, ay: ay, K: K };
+  }
+
+
+  var onPersonD = function (sp, fr) { CUR.spec = sp; CUR.fr = fr; };
+  function fineCells(p, x0, y0, x1, y1, fn) {
+    var K = p.K, r0 = Math.round((y0 + p.oy) * K), r1 = Math.round((y1 + p.oy) * K), c0 = Math.round((x0 + p.ox) * K), c1 = Math.round((x1 + p.ox) * K);
+    for (var r = Math.max(0, r0); r < Math.min(p.H, r1); r++) for (var c = Math.max(0, c0); c < Math.min(p.W, c1); c++) fn(r * p.W + c, c, r);
+  }
+  function styleD(p, t, key, sh, setSh, h2) {
+    var d = p.d, W = p.W, H = p.H, K = p.K, r, c, i, v;
+    function paint(x0, y0, x1, y1, k, s, only) { if (p.ki[k] == null) return; var nv = p.code(k, s); fineCells(p, x0, y0, x1, y1, function (i) { if (!only || (d[i] > 0 && only.indexOf(key(d[i])) >= 0)) d[i] = nv; }); }
+    function shade(x0, y0, x1, y1, s, only) { fineCells(p, x0, y0, x1, y1, function (i) { if (d[i] > 0 && (!only || only.indexOf(key(d[i])) >= 0)) setSh(i, s); }); }
+    if (t === 'person' && CUR.spec) personD(p, CUR.spec, CUR.fr | 0, key, paint, shade);
+    if (t === 'animal') {
+      var tex = CUR.tex || 'fur', body = CUR.texKeys || 'AC';
+      for (r = 1; r < H - 1; r++) for (c = 1; c < W - 1; c++) {
+        i = r * W + c; v = d[i]; if (v <= 0) continue; var k = key(v), s = sh(v); if (body.indexOf(k) < 0 || s === 3) continue;
+        var same = d[i - W] > 0 && key(d[i - W]) === k && d[i + W] > 0 && key(d[i + W]) === k;
+        if (tex === 'feather') { var rr = r % 4, cc = (c + (Math.floor(r / 4) % 2) * 2) % 4; if (same && s === 1 && ((rr === 3 && (cc === 1 || cc === 2)) || (rr === 2 && (cc === 0 || cc === 3)))) setSh(i, 2); }
+        else if (tex === 'scale') { var row4 = Math.floor(r / 4), r4 = r % 4, c4 = (c + (row4 % 2) * 2) % 4; if (same && s === 1 && h2(Math.floor((c + (row4 % 2) * 2) / 4), row4, 23) < 0.55 && ((r4 === 3 && (c4 === 1 || c4 === 2)) || (r4 === 2 && c4 === 0))) setSh(i, 2); }
+        else if (tex === 'shaggy') { if (same && s <= 1 && h2(c, Math.floor(r / 3), 41) < 0.11 && (r % 3) !== 2) setSh(i, 2); }
+        else if (tex === 'skin') { if (same && s === 1 && r % 2 === 0 && c % 2 === 0 && h2(c >> 1, r >> 1, 29) < 0.07) setSh(i, 2); }
+        else if (tex === 'wet') { if (d[i - W] > 0 && r > 1 && d[i - 2 * W] <= 0 && s === 1) setSh(i, 0); }
+        else if (tex === 'leaf') { if (s === 1 && ((c + 2 * r) % 7 === 0 && r % 3 === 0)) setSh(i, 2); else if (s === 1 && ((c - r + 70) % 6 === 0 && r % 4 === 1)) setSh(i, 0); }
+      }
+      if (CUR.rosette && p.ki.C != null) { // big-cat spots become open rosettes: a broken dark ring round a warmer middle
+        var kC = p.ki.C, kA = p.ki.A, snap0 = new Int16Array(d), isC = function (j) { return snap0[j] > 0 && ((snap0[j] - 1) >> 2) === kC; }, isA = function (j) { return snap0[j] > 0 && ((snap0[j] - 1) >> 2) === kA; };
+        for (r = 2; r < H - 3; r++) for (c = 2; c < W - 3; c++) { i = r * W + c;
+          if (!(isC(i) && isC(i + 1) && isC(i + W) && isC(i + W + 1) && !isC(i - 1) && !isC(i - W) && !isC(i + 2) && !isC(i + 2 * W))) continue;
+          [i, i + 1, i + W, i + W + 1].forEach(function (j) { d[j] = p.code('A', 2); });
+          [[-1, 0], [-1, 1], [0, -1], [1, -1], [2, 1], [0, 2], [1, 2]].forEach(function (o2) { var j = i + o2[1] * W + o2[0]; if (isA(j)) d[j] = p.code('C', 1); });
+        } }
+      if (CUR.pupil && p.ki.W != null) { var kW = p.ki.W; for (i = W; i < d.length - W - 1; i++) { var isW = function (j) { return d[j] > 0 && ((d[j] - 1) >> 2) === kW; };
+        if (isW(i) && isW(i + 1) && isW(i + W) && isW(i + W + 1) && !isW(i - 1) && !isW(i - W)) { d[i] = d[i + W] = d[i + W + 1] = p.code('K', 1); } } }
+      if (CUR.sparkle && p.ki.W != null) { var n = 0, wv = p.code('W', 1); for (i = W * 2; i < d.length - W * 2 && n < 3; i += 7) if (d[i] > 0 && body.indexOf(key(d[i])) >= 0 && h2(i, 3, 17) < 0.012 && d[i - 1] > 0 && d[i + 1] > 0 && d[i - W] > 0 && d[i + W] > 0) { d[i] = wv; d[i - 1] = wv; d[i + 1] = wv; d[i - W] = wv; d[i + W] = wv; n++; } }
+      if (CUR.bark) for (r = 0; r < H; r++) for (c = 0; c < W; c++) { i = r * W + c; v = d[i]; if (v > 0 && key(v) === 'T' && sh(v) === 1 && c % 3 === 0 && (r % 5) !== 0) setSh(i, 2); }
+    }
+    if (t === 'building' && !CUR.noSiding) { // siding / brick courses on walls and roofs: a darker line every 2 art pixels, staggered joints
+      var snap = new Int16Array(d);
+      for (r = 1; r < H - 1; r++) for (c = 0; c < W; c++) { i = r * W + c; v = snap[i]; if (v <= 0) continue; var s2 = sh(v), k2 = key(v); if (s2 === 3 || k2 === 'W' || k2 === 'K' || k2 === 'Y') continue;
+        if (!(snap[i - W] > 0 && key(snap[i - W]) === k2 && snap[i + W] > 0 && key(snap[i + W]) === k2)) continue;
+        var wide = true; for (var dc = -4; dc <= 4 && wide; dc++) for (var dr = -3; dr <= 3; dr += 3) { var jj = i + dr * W + dc; if (!(snap[jj] > 0 && key(snap[jj]) === k2)) { wide = false; break; } }
+        if (wide && r % 6 === 0 && s2 < 2) setSh(i, s2 + 1);
+      }
+    }
+  }
+  function personD(p, sp, fr, key, paint, shade) {
+    var d = p.d, ch = !!sp.child, legH = ch ? 2 : 3, bodyH = ch ? 4 : 5, bw = ch ? 5 : 7, hw = ch ? 8 : 9, hh = ch ? 7 : 8;
+    var by = -legH - bodyH, bx = -Math.floor(bw / 2), top = by - hh, hx0 = -Math.floor(hw / 2), ey = top + (ch ? 3 : 4), bk = sp.coat ? 'C' : 'S', sg = fr === 1 ? 1 : fr === 3 ? -1 : 0;
+    if (p.ki.q == null) p.key('q', '#f2a0a0'); if (p.ki.g == null) p.key('g', '#f4c838'); if (p.ki.m == null) p.key('m', '#8a3a3a');
+    // face: rounder eyes with a shine, brows, nose, mouth, cheeks
+    if (!sp.glasses) [0, 3].forEach(function (ex) { paint(ex, ey, ex + 1, ey + 2, 'A', 1, 'K'); paint(ex, ey, ex + 1, ey + 1.5, 'K', 1, 'A'); paint(ex + 0.5, ey, ex + 1, ey + 0.5, 'W', 1, 'K'); paint(ex, ey - 1, ex + 1, ey - 0.5, 'H', 2, 'A'); });
+    paint(2, ey + 1.5, 2.5, ey + 2, 'A', 2, 'A');
+    if (!sp.stache && !sp.beard) { paint(1, ey + 2.5, 2.5, ey + 3, 'm', 1, 'A'); if (sp.smile) { paint(0.5, ey + 2, 1, ey + 2.5, 'm', 1, 'A'); paint(2.5, ey + 2, 3, ey + 2.5, 'm', 1, 'A'); } }
+    paint(-1.5, ey + 2, -0.5, ey + 2.5, 'q', 1, 'A'); paint(4, ey + 2, 5, ey + 2.5, 'q', 1, 'A');
+    shade(hx0, ey + 0.5, hx0 + 0.5, ey + 2, 2, 'A'); // ear shadow line
+    // hair: a soft highlight band and darker roots
+    shade(hx0 + 1.5, top + 0.5, hx0 + 4.5, top + 1, 0, 'H'); shade(hx0 + 1, top + 1, hx0 + 2, top + 1.5, 0, 'H');
+    shade(hx0, top + 2.5, hx0 + hw, top + 3, 2, 'H');
+    // clothes: neckline, folds under the arms, cuffs, belt and buckle, darker hem
+    if (!sp.tie && !sp.neck && !sp.scarf && !sp.open && !sp.dress) { paint(0, by, 2, by + 0.5, 'A', 1, 'SC'); paint(0.5, by + 0.5, 1.5, by + 1, 'A', 2, 'SC'); }
+    for (var tt = 0; tt < bodyH - 1.5; tt += 0.5) { shade(bx + 0.5 + tt * 0.35, by + 1.5 + tt, bx + 1 + tt * 0.35, by + 2 + tt, 2, bk + 'V'); shade(bx + bw - 1 - tt * 0.35, by + 1.5 + tt, bx + bw - 0.5 - tt * 0.35, by + 2 + tt, 2, bk + 'V'); }
+    var sl = sp.short ? 2 : bodyH - 2, a1 = sg > 0 ? -1 : 0, a2 = sg < 0 ? -1 : 0;
+    shade(bx - 1, by + 1 + a1 + sl - 0.5, bx, by + 1 + a1 + sl, 2, bk); shade(bx + bw, by + 1 + a2 + sl - 0.5, bx + bw + 1, by + 1 + a2 + sl, 2, bk);
+    if (!sp.dress && !sp.coat) { paint(0.5, by + bodyH - 0.5, 1.5, by + bodyH, 'g', 1, 'SXJ'); }
+    if (sp.coat && sp.open) { paint(-0.5, by + 1.5, 0, by + 2, 'g', 0, 'C'); paint(-0.5, by + 3, 0, by + 3.5, 'g', 0, 'C'); }
+    shade(-3, -legH + 0.5, 4, -legH + 1, 2, 'P'); // knee crease
+    shade(-3, -0.5, 4, 0, 3, 'F'); // shoe soles
+  }
+
+  // ---------- icons in style D: the drawn rows doubled with Scale2x (smooth diagonals, still crisp pixels), then lit ----------
+  function scale2x(rows) {
+    var h = rows.length, w = rows[0].length, out = [], y, x;
+    function at(x, y) { x = Math.max(0, Math.min(w - 1, x)); y = Math.max(0, Math.min(h - 1, y)); return rows[y].charAt(x); }
+    for (y = 0; y < h; y++) { var a = '', b = ''; for (x = 0; x < w; x++) {
+      var E = at(x, y), B = at(x, y - 1), D = at(x - 1, y), F = at(x + 1, y), Hh = at(x, y + 1);
+      var e0 = E, e1 = E, e2 = E, e3 = E;
+      if (B !== Hh && D !== F) { e0 = D === B ? D : E; e1 = B === F ? F : E; e2 = D === Hh ? D : E; e3 = Hh === F ? F : E; }
+      a += e0 + e1; b += e2 + e3; } out.push(a, b); }
+    return out;
+  }
+  function iconD(Z, name) {
+    var I = Z._in, def = I.ICON_DEFS[name]; if (!def) return drawIcon(name);
+    var P = new I.Pt(I.IC, 32, 32, 16, 24); P.out = '#2a1d33';
+    var rows = scale2x(def.rows), h = def.rows.length, w = def.rows[0].length, j, i;
+    function stampFine(x0, y0, rr) { for (j = 0; j < rr.length; j++) for (i = 0; i < rr[j].length; i++) { var ch = rr[j].charAt(i); if (ch === '.' || ch === ' ') continue; P.cs(P.X(x0) + i, P.Y(y0) + j, P.code(ch, 1)); } }
+    if (def.badge) { P.ell(0, -5, 4, 4, def.badge, 1); stampFine(-2, -7, rows); }
+    else stampFine(-Math.floor(w / 2), -h, rows);
+    // light from the top-left, shade along the bottom-right of each colour patch
+    var d = P.d, W = P.W, snap = new Int16Array(d);
+    for (i = W; i < d.length - W; i++) { var v = snap[i]; if (v <= 0) continue; var kk = (v - 1) >> 2; if (kk === P.ki.W || kk === P.ki.K) continue;
+      var up = snap[i - W] > 0 && ((snap[i - W] - 1) >> 2) === kk, lf = snap[i - 1] > 0 && ((snap[i - 1] - 1) >> 2) === kk, dn = snap[i + W] > 0 && ((snap[i + W] - 1) >> 2) === kk, rt = snap[i + 1] > 0 && ((snap[i + 1] - 1) >> 2) === kk;
+      if (!up || !lf) d[i] = kk * 4 + 0 + 1; else if (!dn || !rt) d[i] = kk * 4 + 2 + 1; }
+    CUR = {}; return P.bake(null);
+  }
+
+  // ---------- ground in style D: today's tile doubled plus fine detail per biome ----------
+  function dTileX(Z, kind, seed) {
+    if (kind === 'path') return dPath(Z, seed);
+    var base = dTile(Z, kind, seed), name = kind.indexOf('hab:') === 0 ? kind.slice(4) : kind;
+    if (['jungle', 'desert', 'arctic', 'mountain', 'ocean', 'water', 'paleo', 'mythic', 'locked'].indexOf(name) < 0) return base;
+    var g = base.c.getContext('2d', { willReadFrequently: true }), im = g.getImageData(0, 0, base.w, base.h), q = im.data, pal = Z._in.GROUND[name], mix = Z._mix, rd = Z._in.rng(seed * 29 + 11), K = 2;
+    function IN(c, r) { var a = G.toAxial((c + 0.5) / K - base.ax / K + 0.013, (r + 0.5) / K - base.ay / K + 0.007); return a.q === 0 && a.r === 0; }
+    function put(c, r, col) { if (c < 2 || r < 2 || c >= base.w - 2 || r >= base.h - 2 || !IN(c, r) || !IN(c, r + 2) || !IN(c + 2, r) || !IN(c - 2, r)) return; var rgb = hexRgb(col), i = (r * base.w + c) * 4; q[i] = rgb[0]; q[i + 1] = rgb[1]; q[i + 2] = rgb[2]; q[i + 3] = 255; }
+    function rp() { return [Math.round(base.ax + (rd() - 0.5) * (G.W - 16) * K), Math.round(base.ay + (rd() - 0.5) * (G.H - 12) * K)]; }
+    var n, p, j;
+    for (n = 0; n < 6; n++) { p = rp();
+      if (name === 'jungle') { put(p[0], p[1], pal.D); put(p[0] + 1, p[1], pal.D); put(p[0] + 1, p[1] - 1, pal.G); put(p[0] + 2, p[1] - 1, pal.G); put(p[0], p[1] + 1, mix(pal.D, '#000000', 0.2)); }
+      else if (name === 'desert' || name === 'mountain') { put(p[0], p[1], pal.D); put(p[0] + 1, p[1], pal.B); put(p[0], p[1] - 1, pal.C); if (name === 'mountain' && n < 3) for (j = 0; j < 4; j++) put(p[0] + 3 + j, p[1] + 2 + (j >> 1), pal.L); }
+      else if (name === 'arctic') { put(p[0], p[1], '#ffffff'); if (n < 3) { put(p[0] - 1, p[1], '#ffffff'); put(p[0] + 1, p[1], '#ffffff'); put(p[0], p[1] - 1, '#ffffff'); put(p[0], p[1] + 1, '#ffffff'); } else for (j = 0; j < 5; j++) put(p[0] + j, p[1] + (j >> 1), pal.D); }
+      else if (name === 'ocean' || name === 'water') { for (j = 0; j < 4; j++) put(p[0] + j, p[1] - (j === 1 || j === 2 ? 1 : 0), pal.C); }
+      else if (name === 'paleo') { put(p[0], p[1], pal.G); put(p[0] - 1, p[1] - 1, pal.G); put(p[0] + 1, p[1] - 1, pal.G); put(p[0], p[1] - 2, mix(pal.G, '#ffffff', 0.3)); }
+      else if (name === 'mythic') { var sc = n % 2 ? pal.G : '#ffffff'; put(p[0], p[1], sc); if (n < 2) { put(p[0] - 1, p[1], sc); put(p[0] + 1, p[1], sc); put(p[0], p[1] - 1, sc); put(p[0], p[1] + 1, sc); } }
+      else if (name === 'locked') { put(p[0], p[1], pal.D); put(p[0] + 2, p[1] - 1, pal.D); put(p[0] + 4, p[1], pal.D); }
+    }
+    g.putImageData(im, 0, 0); return base;
+  }
+
+  // ---------- one entry point for any style-D sprite, with each species' fur / feather / scale treatment ----------
+  var TEX = {
+    seal: ['wet'], koala: ['shaggy'],
+    lion: ['fur'], zebra: ['fur'], giraffe: ['fur'], elephant: ['fur'], ostrich: ['feather', 'AF'], gorilla: ['shaggy'], toucan: ['feather', 'A'], jaguar: ['fur'], sloth: ['shaggy'],
+    camel: ['fur'], kangaroo: ['fur'], komodo: ['scale'], penguin: ['feather', 'A'], polarbear: ['fur'], walrus: ['wet'], reindeer: ['fur'], panda: ['fur'], snowleopard: ['fur'],
+    eagle: ['feather', 'AC'], yak: ['shaggy'], dolphin: ['wet'], turtle: ['scale', 'C'], octopus: ['wet'], clownfish: ['wet'], trex: ['skin'], triceratops: ['skin'], raptor: ['skin'], mammoth: ['shaggy'],
+    unicorn: ['fur', 'A', 1], dragon: ['scale', 'A', 1], phoenix: ['feather', 'AC', 1]
+  };
+
+  // =====================================================================================================================
+  // REVISION 1 (owner's notes on the showcase): polar bear, gorilla, toucan and eagle beaks, T. rex, dolphin, path, trees.
+  // These species are drawn from scratch on the fine grid (art coordinates, fractions allowed), same colours and size as today.
+  // =====================================================================================================================
+  function baseHex(P, k) { var c = P.cols[P.ki[k]][1]; return '#' + ((1 << 24) | (c[0] << 16) | (c[1] << 8) | c[2]).toString(16).slice(1); }
+  function scalePts(pts, k, cy) { cy = cy || 0; return pts.map(function (q) { return [q[0] * k, cy + (q[1] - cy) * k]; }); }
+  function quadPts(a, b, c, n) { var out = []; for (var i = 0; i <= n; i++) { var t = i / n, u = 1 - t; out.push([u * u * a[0] + 2 * u * t * b[0] + t * t * c[0], u * u * a[1] + 2 * u * t * b[1] + t * t * c[1]]); } return out; }
+  function ellPts(cx, cy, rx, ry, ang, n) { var out = []; for (var i = 0; i < n; i++) { var t = i / n * 6.2832, x = Math.cos(t) * rx, y = Math.sin(t) * ry; out.push([cx + x * Math.cos(ang) - y * Math.sin(ang), cy + x * Math.sin(ang) + y * Math.cos(ang)]); } return out; }
+  function installRev1(Z) {
+    var I = Z._in, SP = I.SP, mix = Z._mix;
+    function sgn(f) { return f === 1 ? 1 : f === 3 ? -1 : 0; }
+    // ---------- polar bear: long low heavy body, long neck, small head with a long muzzle, cream with blue-grey shading ----------
+    SP.polarbear.draw = function (P, o) {
+      var k = o.juv ? 0.72 : 1, sg = sgn(o.fr), A = baseHex(P, 'A'), s = function (p) { return scalePts(p, k); };
+      P.key('S', mix(A, '#8a9ac0', 0.26)); P.key('D', mix(A, '#3e4a6a', 0.62));
+      function leg(x, d, k2, sh) { P.poly(s([[x + d, -7.4], [x + 3.6 + d, -7.4], [x + 3.4 + d * 1.3, -2.2], [x + 3.9 + d * 1.3, -1], [x - 0.3 + d * 1.3, -1], [x + 0.1 + d * 1.3, -2.2]]), k2, sh); }
+      P.part(function () { leg(-9.6, -sg * 0.7, 'S', 2); leg(2.6, sg * 0.7, 'S', 2); }, true);
+      P.part(function () { leg(-10.8, sg * 0.7, 'A', 1); leg(1.2, -sg * 0.7, 'A', 1); P.recolorF('A', 'S', function (x, y) { return y > -2.2 * k; }); }, true);
+      P.part(function () {
+        P.ell(-3.6 * k, -8.6 * k, 8.4 * k, 4.2 * k, 'A'); P.ell(-8 * k, -9.3 * k, 4.4 * k, 4.4 * k, 'A'); P.ell(-12.3 * k, -10.2 * k, 1.1 * k, 1 * k, 'A');
+        P.poly(s([[0.5, -12.4], [5, -11.9], [9.4, -10.2], [10.2, -7], [5, -5.6], [0.5, -5.8]]), 'A', 'a');
+        P.recolorF('A', 'S', function (x, y) { return y > -5.9 * k + Math.max(0, x) * 0.1 * k; });
+      });
+      P.part(function () { P.ell(9.8 * k, -11.3 * k, 1.1 * k, 1.1 * k, 'A'); P.setF(9.8 * k, -11.2 * k, 'S', 2); });
+      P.part(function () {
+        P.ell(11.3 * k, -9 * k, 3.2 * k, 2.8 * k, 'A');
+        P.poly(s([[12, -10.2], [15.6, -9.5], [16.6, -8.5], [16.3, -7.4], [12.2, -6.6]]), 'A', 1);
+        P.recolorF('A', 'S', function (x, y) { return y > -7.6 * k && x > 11 * k; });
+      });
+      for (var dx = 0; dx < 2; dx++) for (var dy = 0; dy < 2; dy++) P.setF((15.9 + dx * 0.5) * k, (-9 + dy * 0.5) * k, 'N', 1);
+      P.setF(12.4 * k, -9.9 * k, 'K', 1); P.setF(12.9 * k, -9.9 * k, 'K', 1); P.setF(12.4 * k, -9.4 * k, 'K', 1); P.setF(12.9 * k, -9.4 * k, 'K', 1);
+      P.lineF(13.4 * k, -7.5 * k, 16 * k, -7.8 * k, 'D', 1);
+      [[-10.6, -1.25], [-9.6, -1.25], [-8.6, -1.25], [1.4, -1.25], [2.4, -1.25], [3.4, -1.25]].forEach(function (q, i) { P.setF((q[0] + (i < 3 ? sg : -sg) * 0.9) * k, q[1] * k, 'D', 1); });
+    };
+    // gorilla: the owner chose the first (showcase) design; only its rare colour changes (see GORILLA_RARE below)
+    // ---------- toucan: clean curved banana beak, orange-yellow with a red tip and a black cutting edge ----------
+    function beakTo(P, bx, by, L) {
+      var top = quadPts([bx - 0.4, by - 2.3], [bx + 4.2 * L, by - 3.7 * L], [bx + 8.7 * L, by + 0.5], 10), bot = quadPts([bx + 8.7 * L, by + 0.5], [bx + 5 * L, by + 1.8], [bx - 0.4, by + 1.9], 10);
+      function yAt(arr, x) { for (var i = 0; i < arr.length - 1; i++) { var a = arr[i], b = arr[i + 1]; if ((x - a[0]) * (x - b[0]) <= 0 && a[0] !== b[0]) return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); } return null; }
+      P.part(function () {
+        P.poly(top.concat(bot.slice(1)), 'Y', 1);
+        P.recolorF('Y', 'J', function (x, y) { var t = yAt(top, x), b = yAt(bot, x); return t != null && b != null && y < (t + b) / 2 - 0.2; });
+        P.recolorF('YJ', 'R', function (x) { return x > bx + 7.1 * L; });
+        P.recolorF('YJR', 'K', function (x, y) { var b = yAt(bot, x); return x < bx + 0.5 || (b != null && y > b - 0.45 && x < bx + 7.6 * L); });
+        P.shadeF('JR', function (x, y) { var t = yAt(top, x); return t != null && y < t + 0.6 ? 0 : null; });
+      });
+    }
+    SP.toucan.draw = function (P, o) {
+      P.key('J', o.variant ? '#fbe27a' : '#f8c838');
+      var m = Z._in.birdFn(P, o, { bw: 9, bh: 9, leg: 2, head: [7, 7], hd: [1, -3], wing: [5, 5, -1, 1, 'A'], tail: [5, 3, 5, 'A'],
+        body: function (P, m) { P.recolor('A', 'B', function (x, y) { return x > 0 && y < m.cy + 1; }); },
+        face: function (P, m) { P.recolor('A', 'B', function (x, y) { return x >= m.hx && y >= m.hy + 1; }); } });
+      beakTo(P, m.hx + Math.floor((m.hw - 1) / 2) + 0.4, m.hy + 1, o.juv ? 0.72 : 1);
+      P.set(m.ex - 1, m.ey, 'E'); P.set(m.ex, m.ey - 1, 'E'); P.set(m.ex + 1, m.ey, 'E');
+    };
+    // ---------- eagle: hooked yellow raptor beak with a gape line, pale head on a dark body, fierce brow ----------
+    SP.eagle.draw = function (P, o) {
+      P.key('H', o.variant ? '#ffffff' : mix(baseHex(P, 'G'), '#fff2d8', 0.55));
+      var m = Z._in.birdFn(P, o, { bw: 9, bh: 11, leg: 2, head: [7, 6], hd: [0, -3], headK: 'H', wing: [6, 9, -1, 0, 'C'], tail: [4, 4, 6, 'C'] });
+      var bx = m.hx + Math.floor((m.hw - 1) / 2) + 0.3, by = m.hy + 1, L = o.juv ? 0.8 : 1;
+      P.part(function () {
+        P.poly(scalePts(quadPts([0, -1.9], [2.8, -2.6], [3.5, 0.2], 6).concat([[3.4, 1.0], [3.0, 1.7], [2.7, 1.0], [2.2, 0.5], [1.6, 0.8], [0.2, 1.1]]), L * 1.1).map(function (q) { return [bx + q[0], by + q[1]]; }), 'Y', 1);
+        P.shadeF('Y', function (x, y) { return y < by - 1.3 ? 0 : (x > bx + 2.6 * L && y > by + 0.2 ? 2 : null); });
+        P.lineF(bx - 0.2, by + 0.2, bx + 2.3 * L, by + 0.45, 'C', 3); P.setF(bx + 0.6, by - 0.9, 'C', 3);
+      });
+      P.lineF(m.ex - 1.4, m.ey - 1.3, m.ex + 1.1, m.ey - 0.7, 'C', 3); P.lineF(m.ex - 1.4, m.ey - 0.9, m.ex + 0.6, m.ey - 0.4, 'H', 2);
+      P.set(m.ex, m.ey, 'K'); P.setF(m.ex + 0.25, m.ey - 0.25, 'Y', 1);
+    };
+    // ---------- T. rex: big long-jawed head with teeth, tiny arms, heavy legs, long tail, leaning forward ----------
+    SP.trex.draw = function (P, o) {
+      var k = o.juv ? 0.68 : 1, sg = sgn(o.fr), s = function (p) { return scalePts(p, k); };
+      P.part(function () { P.poly(s([[-2, -15.4], [-9, -14.4], [-15, -12.4], [-19.5, -10.6], [-15, -10.2], [-8, -10.2], [-2, -9.6]]), 'A', 'a'); }, true);
+      P.part(function () { var d = -sg * 0.9; P.ell((-1.6 + d) * k, -9.6 * k, 2.9 * k, 3.5 * k, 'A', 2); P.poly(s([[-2.8 + d, -7.4], [0.4 + d, -7.4], [0 + d, -2], [-2.6 + d, -2]]), 'A', 2); P.poly(s([[-3.2 + d, -2.2], [1.8 + d, -2.2], [2.3 + d, -1], [-3.2 + d, -1]]), 'C', 2); }, true);
+      P.part(function () {
+        P.poly(ellPts(0.6 * k, -13.4 * k, 6.9 * k, 4.4 * k, -0.36, 24), 'A', 'a');
+        P.recolorF('A', 'B', function (x, y) { return y > -13.4 * k - (x - 0.6 * k) * 0.37 + 2.2 * k && x > -3 * k && x < 5.5 * k; });
+        P.recolorF('A', 'C', function (x, y) { return x < 5 * k && y < -14.6 * k - x * 0.35 && frac((x - y * 0.45) / (2.7 * k)) < 0.26; });
+      }, true);
+      P.part(function () { P.poly(s([[3.6, -16.8], [7, -20], [9.8, -17.2], [7, -12.6]]), 'A', 'a'); }, true);
+      P.part(function () {
+        P.poly(s([[6.4, -21.6], [9, -23.8], [14.6, -23.2], [16.8, -21.2], [17, -19.2], [9, -18.4], [6.6, -19.2]]), 'A', 'a');
+        P.poly(s([[8.4, -18.6], [16.2, -19.1], [15.8, -17.5], [13, -16.3], [9.4, -16]]), 'B', 1);
+        P.lineF(9 * k, -18.55 * k, 16.6 * k, -19.1 * k, 'C', 3);
+        for (var x = 10; x <= 16; x += 1.05) { P.setF(x * k, (-18.3 - (x - 9) * 0.07) * k, 'T', 1); if (!o.juv) P.setF(x * k, (-17.85 - (x - 9) * 0.07) * k, 'T', 1); }
+        for (x = 10.5; x <= 15.5; x += 1.05) P.setF(x * k, (-18.95 - (x - 9) * 0.07) * k, 'T', 1);
+        P.setF(11.1 * k, -21.3 * k, 'K', 1); P.setF(11.6 * k, -21.3 * k, 'W', 1); P.setF(11.1 * k, -20.8 * k, 'K', 1); P.setF(11.6 * k, -20.8 * k, 'K', 1);
+        P.lineF(10.2 * k, -22.4 * k, 12.8 * k, -22 * k, 'C', 2); P.setF(16 * k, -21.6 * k, 'K', 1);
+      });
+      P.part(function () { P.lineF(6.6 * k, -13.6 * k, 8.2 * k, -12.4 * k, 'A', 1); P.lineF(6.9 * k, -13.9 * k, 8.5 * k, -12.7 * k, 'A', 1); P.setF(8.8 * k, -12.9 * k, 'T', 1); P.setF(8.7 * k, -12.3 * k, 'T', 1); });
+      P.part(function () { var d = sg * 0.9; P.ell((0.2 + d) * k, -10.4 * k, 3.6 * k, 4.2 * k, 'A'); P.poly(s([[-1.2 + d, -8], [2.4 + d, -8], [1.8 + d, -2], [-1.6 + d, -2]]), 'A', 1); P.poly(s([[-2 + d, -2.3], [3.6 + d, -2.3], [4.3 + d, -1], [-2 + d, -1]]), 'C', 1); P.setF((4 + d) * k, -1.3 * k, 'T', 1); P.setF((2.9 + d) * k, -1.3 * k, 'T', 1); });
+    };
+    // ---------- dolphin: real beak (rostrum), melon forehead, gentle smile, eye above the mouth, smooth three-tone shading ----------
+    SP.dolphin.draw = function (P, o) {
+      var k = o.juv ? 0.72 : 1, w = sgn(o.fr) * 0.6, s = function (p) { return scalePts(p, k, -4); };
+      P.part(function () { P.poly(s([[-8, -8.8], [-11.2, -11 + w], [-12.6, -10.6 + w], [-10.2, -8], [-12.6, -5.6 + w], [-11.2, -5.2 + w], [-8, -7.4]]), 'C', 1); }, true);
+      P.part(function () { P.poly(s([[-1.4, -11.8], [1.2, -15.6], [2.4, -15.2], [3.6, -11.6]]), 'C', 1); }, true);
+      P.part(function () {
+        var body = quadPts([-8.4, -8.9], [-1, -13.4], [5.5, -11.9], 8).concat(quadPts([5.5, -11.9], [9.8, -12.1], [10.3, -9.2], 5).slice(1), [[10.6, -8.85], [13.6, -8.65], [14.2, -8.15], [13.5, -7.6], [10.4, -7.45]], quadPts([10.4, -7.45], [2, -3.4], [-8.4, -7.3], 8).slice(1));
+        P.poly(s(body), 'A', 1);
+        var Ys = function (v) { return -4 + (v + 4) * k; };
+        P.recolorF('A', 'C', function (x, y) { return y < Ys(-10.4) + Math.max(0, x - 6 * k) * 0.25; });
+        P.recolorF('A', 'B', function (x, y) { return (y > Ys(-7.5) + Math.abs(x - 1 * k) * 0.04 && x < 10.5 * k) || (x > 10.4 * k && y > Ys(-8.1)); });
+        P.shadeF('C', function (x, y) { return y < Ys(-11.6) ? 0 : null; });
+      });
+      P.part(function () { P.poly(s([[3.4, -6.4], [1.2, -3.6 - w], [2.6, -3.4 - w], [5.4, -6]]), 'C', 2); });
+      var sm = [[9.4, -8.7], [9.9, -8.25], [10.6, -8.05], [12, -8.1], [13.8, -8.2]]; for (var i = 0; i < sm.length - 1; i++) P.lineF(sm[i][0] * k, -4 + (sm[i][1] + 4) * k, sm[i + 1][0] * k, -4 + (sm[i + 1][1] + 4) * k, 'C', 3);
+      P.setF(8.4 * k, -4 + (-9.7 + 4) * k, 'K', 1); P.setF(8.9 * k, -4 + (-9.7 + 4) * k, 'K', 1); P.setF(8.4 * k, -4 + (-10.2 + 4) * k, 'K', 1); P.setF(8.9 * k, -4 + (-10.2 + 4) * k, 'W', 1);
+    };
+    // ---------- trees and bushes: solid clumpy canopies, light-green highlights (never white), no gaps ----------
+    function leaves(P, keys, h2f) {
+      P.shadeF(keys, function (x, y, sh, c, r) { var rr = r % 4, cc = (c + (Math.floor(r / 4) % 2) * 2) % 4; if (sh === 1 && ((rr === 3 && (cc === 1 || cc === 2)) || (rr === 2 && (cc === 0 || cc === 3))) && h2f(c >> 2, r >> 2) < 0.7) return 2; return null; });
+    }
+    decoD = function (kind, seed, Pt, U) {
+      if (kind !== 'tree' && kind !== 'bush') return null;
+      var P, tv = seed % 4;
+      if (kind === 'bush') {
+        var bc = '#4fa648';
+        P = new Pt({ A: bc, B: U.mix(bc, '#c8ee78', 0.42), D: U.mix(bc, '#1d4a2a', 0.38), F: seed % 2 ? '#f4d040' : '#f08aa8' }, 32, 28, 16, 20);
+        P.part(function () { P.ell(-3, -4, 4, 3.6, 'A'); }, true); P.part(function () { P.ell(3, -3.4, 4, 3.1, 'A'); }); P.part(function () { P.ell(0, -6, 4, 3.4, 'A'); });
+        P.recolorF('A', 'D', function (x, y) { return y > -2.4; }); leaves(P, 'AD', function (a, b) { return I.h2(a, b, 61); });
+        P.ell(-1.2, -7.6, 1.7, 1, 'B', 1); P.ell(-4.4, -5.6, 1.2, 0.8, 'B', 1); P.ell(3.4, -4.6, 1.2, 0.8, 'B', 1);
+        if (seed % 3 !== 0) [[2.2, -6.2], [-4.2, -3.2], [4.4, -2.4], [0.2, -4]].forEach(function (q) { P.setF(q[0], q[1], 'F', 1); P.setF(q[0] + 0.5, q[1], 'F', 1); P.setF(q[0], q[1] + 0.5, 'F', 2); P.setF(q[0] + 0.5, q[1] + 0.5, 'F', 1); });
+        return P.bake([7, 1]);
+      }
+      if (tv === 2) {
+        var pc = '#3f8f52';
+        P = new Pt({ A: pc, B: U.mix(pc, '#a8e070', 0.4), D: U.mix(pc, '#163a24', 0.4), T: '#8a5a34' }, 40, 56, 20, 46);
+        P.poly([[-1.6, -6], [1.6, -6], [1.8, -0.5], [-1.8, -0.5]], 'T', 1); P.recolorF('T', 'T', function (x) { return x > 0.6; }, 2);
+        [[-8.4, -5, -13.6], [-7.2, -10.4, -19.6], [-5.4, -16, -25.4]].forEach(function (t, n) {
+          P.part(function () { P.poly([[t[0], t[1]], [0, t[2]], [-t[0], t[1]], [-t[0] - 1.2, t[1] + 0.8], [t[0] + 1.2, t[1] + 0.8]], 'A', 1);
+            P.recolorF('A', 'D', function (x, y) { return y > t[1] - 1.4; }); P.shadeF('A', function (x, y, sh, c, r) { return sh === 1 && r % 3 === 0 && (c + r) % 4 === 0 ? 2 : null; }); P.recolorF('A', 'B', function (x, y) { return x < -0.4 && x > (t[0] * (y - t[2]) / (t[1] - t[2])) + 0.2 && x < (t[0] * (y - t[2]) / (t[1] - t[2])) + 1.4 && y < t[1] - 1.4; }); }, n === 0);
+        });
+        return P.bake([8, 2]);
+      }
+      var big = tv !== 1, col = tv === 3 ? '#4fa860' : '#5fb04a';
+      P = new Pt({ A: col, B: U.mix(col, '#c8ee78', 0.42), D: U.mix(col, '#1d4a2a', 0.36), T: '#8a5a34', F: '#e8503a' }, 44, 56, 22, 46);
+      P.poly([[-1.6, -11], [1.6, -11], [1.8, -1.4], [3, -0.5], [-3, -0.5], [-1.8, -1.4]], 'T', 1); P.recolorF('T', 'T', function (x) { return x > 0.7; }, 2); P.lineF(-0.6, -9, -0.4, -3, 'T', 2);
+      var clumps = big ? [[0, -11.8, 4.6, 3.2], [-4.6, -13, 4.6, 4], [4.8, -13, 4.6, 4], [0, -18.2, 6.4, 5.8]] : [[0, -10.4, 3.4, 2.4], [0, -13.4, 5.8, 5.6]];
+      clumps.forEach(function (c, n) { P.part(function () { P.ell(c[0], c[1], c[2], c[3], 'A'); P.recolorF('A', 'D', function (x, y) { return y > c[1] + c[3] * 0.35; }); leaves(P, 'AD', function (a, b) { return I.h2(a, b, 61 + n); }); P.ell(c[0] - c[2] * 0.3, c[1] - c[3] * 0.35, c[2] * 0.45, c[3] * 0.32, 'B', 1); }, n === 0); });
+      if (tv === 3) [[-3, -15], [3.4, -16.6], [-5.4, -11.6], [5.6, -12], [0.6, -20]].forEach(function (q) { P.setF(q[0], q[1], 'F', 1); P.setF(q[0] + 0.5, q[1], 'F', 0); P.setF(q[0], q[1] + 0.5, 'F', 2); P.setF(q[0] + 0.5, q[1] + 0.5, 'F', 1); });
+      return P.bake([big ? 9 : 6, 2]);
+    };
+  }
+  // ---------- path in style D: smooth packed sand with soft tone patches and a few pebbles, no paving grid; hex edges kept ----------
+  function dPath(Z, seed) {
+    var src = tileD1('path', seed), pal = Z._in.GROUND.path, mix = Z._mix, h2 = Z._in.h2, K = 2, LIP = 3, ox = src.ax, oy = src.ay, Wc = src.w * K, Hc = src.h * K; // same frame as today's tile, doubled
+    var cv = document.createElement('canvas'); cv.width = Wc; cv.height = Hc; var g = cv.getContext('2d', { willReadFrequently: true }), im = g.createImageData(Wc, Hc), q = im.data, ins = new Uint8Array(Wc * Hc), col = [], r, c, i;
+    for (r = 0; r < Hc; r++) for (c = 0; c < Wc; c++) { var a = G.toAxial((c + 0.5) / K - ox + 0.013, (r + 0.5) / K - oy + 0.007); ins[r * Wc + c] = a.q === 0 && a.r === 0 ? 1 : 0; }
+    function IN(c, r) { return c >= 0 && r >= 0 && c < Wc && r < Hc && ins[r * Wc + c] === 1; }
+    function noise(x, y) { var x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0, s = function (a, b) { return h2(a, b, seed * 7 + 3); };
+      var u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy); return (s(x0, y0) * (1 - u) + s(x0 + 1, y0) * u) * (1 - v) + (s(x0, y0 + 1) * (1 - u) + s(x0 + 1, y0 + 1) * u) * v; }
+    var light = mix(pal.A, pal.C, 0.45), dark = mix(pal.A, pal.B, 0.55), Zc = mix(pal.A, pal.D, 0.8), Hl = mix(pal.A, '#ffffff', 0.3);
+    for (r = 0; r < Hc; r++) for (c = 0; c < Wc; c++) { i = r * Wc + c;
+      if (ins[i]) { var n = noise(c / 9 + seed * 3.1, r / 7), v = h2(c, r, seed * 5 + 1); col[i] = n > 0.7 ? light : n < 0.3 ? dark : pal.A; if (v < 0.03) col[i] = pal.B; else if (v > 0.975) col[i] = pal.C; }
+      else for (var l = 1; l <= LIP * K; l++) if (IN(c, r - l)) { col[i] = l <= K ? pal.L : mix(pal.L, '#1c1226', 0.3); break; } }
+    var rd = Z._in.rng(seed * 13 + 7);
+    for (var p = 0; p < 7; p++) { var pc = Math.round(ox * K + (rd() - 0.5) * (G.W - 16) * K), pr = Math.round(oy * K + (rd() - 0.5) * (G.H - 12) * K), big2 = p % 3 === 0;
+      [[0, 0, '#c4b494'], [1, 0, '#a8987a'], [0, -1, '#e8dcc0'], [1, -1, '#c4b494']].concat(big2 ? [[2, 0, '#8a7a60'], [2, -1, '#a8987a']] : []).forEach(function (t) { if (IN(pc + t[0], pr + t[1]) && IN(pc + t[0], pr + t[1] + 3)) col[(pr + t[1]) * Wc + pc + t[0]] = t[2]; }); }
+    for (r = 0; r < Hc; r++) for (c = 0; c < Wc; c++) { i = r * Wc + c; if (!ins[i]) continue;
+      if (!IN(c, r + 1) || !IN(c + 1, r) || !IN(c, r + 2) || !IN(c + 2, r)) col[i] = Zc; else if (!IN(c, r - 1) || !IN(c - 1, r) || !IN(c, r - 2) || !IN(c - 2, r)) col[i] = Hl; }
+    for (i = 0; i < col.length; i++) if (col[i]) { var rgb = hexRgb(col[i]); q[i * 4] = rgb[0]; q[i * 4 + 1] = rgb[1]; q[i * 4 + 2] = rgb[2]; q[i * 4 + 3] = 255; }
+    g.putImageData(im, 0, 0);
+    return { c: cv, w: Wc, h: Hc, ax: ox * K, ay: oy * K, K: K };
+  }
+
+  var _installOverrides0 = installOverrides;
+  installOverrides = function (Z) { _installOverrides0(Z); installRev1(Z); };
+
+  // =====================================================================================================================
+  // REVISION 2: gorilla rare colour candidates and three new polar bear designs (the owner picks one of each).
+  // =====================================================================================================================
+  var GORILLA_RARE = { // candidates for the rare gorilla (replacing the white one). A fur, F face and hands, B chest
+    chestnut: { A: '#6e3423', F: '#2e2226', B: '#8c4a30' },
+    golden: { A: '#8e6226', F: '#3a2a24', B: '#b07a34' },
+    midnight: { A: '#2f3a5c', F: '#1a1e2c', B: '#45527a' }
+  };
+  function rrPts(x0, y0, x1, y1, r, n) { // rounded rectangle outline
+    var out = [], c = [[x1 - r, y0 + r, -0.5], [x1 - r, y1 - r, 0], [x0 + r, y1 - r, 0.5], [x0 + r, y0 + r, 1]];
+    c.forEach(function (q) { for (var i = 0; i <= n; i++) { var t = (q[2] + i / n * 0.5) * Math.PI; out.push([q[0] + Math.cos(t) * r, q[1] + Math.sin(t) * r]); } });
+    return out;
+  }
+  function installRev2(Z) {
+    var I = Z._in, SP = I.SP, mix = Z._mix;
+    Object.keys(GORILLA_RARE).forEach(function (n) { SP['gorilla_' + n] = { pal: GORILLA_RARE[n], vpal: null, draw: SP.gorilla.draw, opt: SP.gorilla.opt }; });
+    function sgn(f) { return f === 1 ? 1 : f === 3 ? -1 : 0; }
+    // one bear builder; c = design numbers. Same shading language everywhere: lit top, cream middle, blue-grey lower band.
+    function bear(c) {
+      return function (P, o) {
+        var k = o.juv ? c.juv : 1, sg = sgn(o.fr) * 0.7, A = baseHex(P, 'A'), s = function (p) { return scalePts(p, k); };
+        P.key('S', mix(A, '#8a9ac0', 0.28)); P.key('D', mix(A, '#3e4a6a', 0.6));
+        var bandY = c.y1 - c.band;
+        function leg(x, d, key, sh) {
+          var t = c.y1 - 1.2, w0 = c.legW, w1 = c.legW * 0.8;
+          P.poly(s([[x, t], [x + w0, t], [x + w0 - (w0 - w1) / 2 + d, -1.6], [x + (w0 - w1) / 2 + d, -1.6]]), key, sh);
+          P.ell((x + w0 / 2 + d) * k, -1.6 * k, (w1 / 2 + 0.45) * k, 0.75 * k, key, sh);
+        }
+        P.part(function () { leg(c.bx - 0.4, -sg, 'S', 2); leg(c.fx + 1, sg, 'S', 2); }, true);
+        P.part(function () {
+          P.poly(s(rrPts(c.x0, c.y0, c.x1, c.y1, c.r, 5)), 'A', 1);
+          P.ell(c.humpX * k, (c.y0 + 0.3) * k, c.humpR[0] * k, c.humpR[1] * k, 'A', 1);
+          P.ell((c.x0 + 0.4) * k, (c.y0 + 2.2) * k, 0.9 * k, 0.8 * k, 'A', 1);
+        }, true);
+        P.recolorF('A', 'S', function (x, y) { return y > bandY * k; });
+        P.part(function () { leg(c.bx, sg, 'A', 1); leg(c.fx, -sg, 'A', 1); P.recolorF('A', 'S', function (x, y) { return y > -3.1 * k; }); }, true);
+        P.part(function () { // short neck into a head held at shoulder height
+          P.poly(s([[c.x1 - 2.5, c.y0 + 1], [c.hx - 0.5, c.hy - 2], [c.hx, c.hy + 2.2], [c.x1 - 1.5, c.y1 - 2.2]]), 'A', 1);
+        }, true);
+        P.part(function () { P.ell((c.hx - 1.8) * k, (c.hy - c.hr[1] - 0.9) * k, 1.15 * k, 1.15 * k, 'A', 1); P.ell((c.hx - 1.8) * k, (c.hy - c.hr[1] - 0.9) * k, 0.45 * k, 0.45 * k, 'S', 2); }, true);
+        P.part(function () {
+          P.ell(c.hx * k, c.hy * k, c.hr[0] * k, c.hr[1] * k, 'A', 1);
+          P.poly(s([[c.hx + 0.6, c.hy - 1.3], [c.hx + c.mL - 0.4, c.hy - 0.7], [c.hx + c.mL, c.hy + 0.2], [c.hx + c.mL - 0.3, c.hy + 1.1], [c.hx + 0.6, c.hy + 1.6]]), 'A', 1);
+          P.recolorF('A', 'S', function (x, y) { return y > (c.hy + 0.9) * k; });
+        });
+        P.part(function () { P.ell((c.hx + 0.3) * k, (c.hy - c.hr[1] - 0.8) * k, 1.15 * k, 1.15 * k, 'A', 1); P.ell((c.hx + 0.3) * k, (c.hy - c.hr[1] - 0.8) * k, 0.45 * k, 0.45 * k, 'S', 2); });
+        for (var dx = 0; dx < 2; dx++) for (var dy = 0; dy < 2; dy++) P.setF((c.hx + c.mL - 0.6 + dx * 0.5) * k, (c.hy - 0.6 + dy * 0.5) * k, 'N', 1);
+        P.setF((c.hx + 0.6) * k, (c.hy - 0.9) * k, 'K', 1); P.setF((c.hx + 1.1) * k, (c.hy - 0.9) * k, 'K', 1); P.setF((c.hx + 0.6) * k, (c.hy - 0.4) * k, 'K', 1); P.setF((c.hx + 1.1) * k, (c.hy - 0.4) * k, 'K', 1);
+        P.lineF((c.hx + 1.6) * k, (c.hy + 0.9) * k, (c.hx + c.mL - 0.5) * k, (c.hy + 0.7) * k, 'D', 1);
+        [c.bx, c.fx].forEach(function (x, i) { var d = i ? -sg : sg; for (var t = 0; t < 3; t++) P.setF((x + 0.6 + t * 1 + d) * k, -1.3 * k, 'D', 1); });
+      };
+    }
+    var D = {
+      1: { x0: -10, y0: -12.4, x1: 5.5, y1: -4.6, r: 3, band: 2.2, humpX: 2, humpR: [3.6, 1.7], bx: -9.2, fx: 1, legW: 3.8, hx: 8.4, hy: -9.4, hr: [2.9, 2.6], mL: 4.4, juv: 0.7 },
+      2: { x0: -9, y0: -13.2, x1: 5, y1: -4.8, r: 3.6, band: 2.4, humpX: 1.6, humpR: [3.4, 2], bx: -8.3, fx: 0.8, legW: 4.1, hx: 7.8, hy: -10, hr: [3.1, 2.8], mL: 4, juv: 0.72 },
+      3: { x0: -8, y0: -12.6, x1: 4.2, y1: -5.2, r: 3.6, band: 2.2, humpX: 1.2, humpR: [3, 1.8], bx: -7.4, fx: 0.4, legW: 4, hx: 7, hy: -9.8, hr: [3.4, 3], mL: 3.8, juv: 0.74 }
+    };
+    [1, 2, 3].forEach(function (n) { SP['polarbear_' + n] = { pal: SP.polarbear.pal, vpal: SP.polarbear.vpal, draw: bear(D[n]), opt: SP.polarbear.opt }; TEX['polarbear_' + n] = ['fur']; });
+  }
+  var _installOverrides1 = installOverrides;
+  installOverrides = function (Z) { _installOverrides1(Z); installRev2(Z); };
+
+
+
+  // ---------- style D hand redraws of the thinnest species (hare, seal, sea otter) ----------
+  function installRev3(Z) {
+    var SPX0 = Z._in.SP, mix0 = Z._mix;
+    function sg(f) { return f === 1 ? 1 : f === 3 ? -1 : 0; }
+    function S(p, k) { return p.map(function (q) { return [q[0] * k, q[1] * k]; }); }
+    SPX0.hare.draw = function (P, o) { // crouched hare: round haunch, long ears with pink inside, big eye, fluffy tail
+      var k = o.juv ? 0.75 : 1, u = sg(o.fr), A = baseHex(P, 'A');
+      P.key('S', mix0(A, '#7a8ab0', 0.3)); P.key('E', '#f0a8b8');
+      P.part(function () { P.poly(S([[4.2, -14], [3.4, -20.5], [4.6, -21], [6.4, -14.5]], k), 'S', 1); }, true);          // far ear
+      P.part(function () { P.ell(-6.4 * k, -5.6 * k, 1.6 * k, 1.5 * k, 'A'); }, true);                                    // tail
+      P.part(function () {
+        P.ell(-1.6 * k, -5 * k, 5 * k, 4.4 * k, 'A'); P.ell(-2.8 * k, -4.2 * k, 3.4 * k, 3.6 * k, 'A');                  // body and haunch
+        P.ell(3.2 * k, -6.6 * k, 3 * k, 3.2 * k, 'A');                                                                     // chest
+        P.recolorF('A', 'S', function (x, y) { return y > -2.2 * k; });
+        P.lineF(-5.6 * k, -6.4 * k, -2.6 * k, -2.4 * k, 'S', 1);                                                          // haunch line
+      }, true);
+      P.part(function () { P.poly(S([[-5.8 + u * 0.6, -1.6], [-1.2 + u * 0.6, -1.6], [-1, -0.4], [-6 + u * 0.6, -0.4]], k), 'A', 1); P.poly(S([[3 - u * 0.6, -3.4], [4.6 - u * 0.6, -3.4], [5.2 - u * 0.6, -0.4], [2.8 - u * 0.6, -0.4]], k), 'A', 1); }, true);
+      P.part(function () { P.ell(6.2 * k, -10 * k, 3.2 * k, 2.8 * k, 'A'); P.ell(7.8 * k, -9.2 * k, 1.5 * k, 1.4 * k, 'A', 1); P.recolorF('A', 'S', function (x, y) { return y > -8 * k && x > 5 * k; }); });
+      P.part(function () { P.poly(S([[4.6, -12], [3.2, -20.4], [5, -21.2], [7, -12.6]], k), 'A', 1); P.poly(S([[4.9, -13], [4, -19.4], [5, -19.8], [6.1, -13.4]], k), 'E', 1); P.poly(S([[3.2, -20.4], [5, -21.2], [5.2, -19.4], [3.6, -19]], k), 'C', 1); });
+      P.setF(6.8 * k, -10.6 * k, 'K', 1); P.setF(7.3 * k, -10.6 * k, 'K', 1); P.setF(6.8 * k, -10.1 * k, 'K', 1); P.setF(7.3 * k, -10.6 * k - 0.5, 'W', 1);
+      P.setF(9 * k, -9.6 * k, 'E', 1); P.lineF(8.2 * k, -8.8 * k, 9.4 * k, -8.5 * k, 'S', 2);
+    };
+    SPX0.seal.draw = function (P, o) { // harbour seal on its belly, head raised: speckled back, whiskered muzzle, flippers
+      var j = o.juv, k = j ? 0.75 : 1, u = sg(o.fr), A = baseHex(P, 'A'), C = baseHex(P, 'C'), s = function (p) { return S(p, k); };
+      P.key('S', mix0(A, '#6a7aa0', 0.32)); P.key('D', j ? mix0(A, '#8a9ab8', 0.4) : C);
+      P.part(function () { P.poly(s([[-8, -2.6], [-12, -4.6 - u], [-12.6, -3.2], [-11, -1.4], [-12.6, 0], [-11.4, 0.2], [-8, -1.2]]), 'D', 1); }, true);
+      P.part(function () {
+        P.poly(s(quadPts([-9, -1], [-6, -7.4], [2, -7.6], 8).concat(quadPts([2, -7.6], [6, -8], [7, -6], 4).slice(1), [[7.4, -1], [-9, -1]])), 'A', 1);
+        P.recolorF('A', 'D', function (x, y) { return y < -5.4 * k + Math.abs(x) * 0.02; });
+        P.recolorF('A', 'S', function (x, y) { return y > -2.4 * k; });
+        if (!j) P.recolorF('D', 'S', function (x, y) { return I2(x, y) < 0.09; });
+      }, true);
+      P.part(function () { P.poly(s([[1 + u * 0.6, -3], [4.6 + u * 0.6, -0.6], [0 + u * 0.6, -0.4]]), 'D', 2); });
+      P.part(function () {
+        P.ell(7.6 * k, -9.4 * k, 3.4 * k, 3.2 * k, 'D'); P.ell(10.2 * k, -8.4 * k, 1.9 * k, 1.5 * k, j ? 'A' : 'S', 1);
+        P.setF(7.8 * k, -10.4 * k, 'K', 1); P.setF(8.3 * k, -10.4 * k, 'K', 1); P.setF(7.8 * k, -9.9 * k, 'K', 1); P.setF(8.3 * k, -9.9 * k, 'K', 1); P.setF(7.8 * k, -10.4 * k, 'W', 1);
+        if (j) { P.setF(8.8 * k, -10.4 * k, 'K', 1); P.setF(8.8 * k, -9.9 * k, 'K', 1); }
+        P.setF(11.6 * k, -8.9 * k, 'N', 1); P.setF(12 * k, -8.9 * k, 'N', 1);
+        P.lineF(10.4 * k, -7.8 * k, 12.6 * k, -7.2 * k, 'S', 2); P.lineF(10.4 * k, -8.1 * k, 12.8 * k, -8.4 * k, 'W', 1);
+      });
+    };
+    function I2(x, y) { return Z._in.h2(Math.floor(x * 2 + 99), Math.floor(y * 2 + 99), 47); }
+    SPX0.otter.draw = function (P, o) { // sea otter floating on its back holding a shell, feet up, pale face, rudder tail
+      var j = o.juv, k = j ? 0.72 : 1, u = sg(o.fr), s = function (p) { return S(p, k); }, A = baseHex(P, 'A');
+      P.key('D', mix0(A, '#2a1a20', 0.35));
+      P.part(function () { P.poly(s([[-6, -4.6], [-11.6, -3.6 - u * 0.6], [-12, -2.6 - u * 0.6], [-6, -2.6]]), 'C', 1); }, true);
+      P.part(function () {
+        P.poly(s(quadPts([-7, -2.4], [-2, -6.6], [5, -5.6], 8).concat([[7, -4], [7.4, -2.2]], quadPts([7.4, -2.2], [0, -1], [-7, -2.4], 6).slice(1))), 'A', 1);
+        P.recolorF('A', 'B', function (x, y) { return y < -4.4 * k && x > -2 * k && x < 4.6 * k; });
+        P.recolorF('A', 'D', function (x, y) { return y > -2.6 * k; });
+      }, true);
+      P.part(function () { P.ell(-5.2 * k, (-6.4 - (u > 0 ? 0.6 : 0)) * k, 1.3 * k, 1.1 * k, 'C'); P.ell(-3 * k, (-6.8 - (u < 0 ? 0.6 : 0)) * k, 1.2 * k, 1 * k, 'C'); });
+      P.part(function () { P.ell(1.4 * k, -6.6 * k, 1.8 * k, 1.1 * k, 'S'); P.lineF(0.4 * k, -6.9 * k, 2.4 * k, -6.9 * k, 'C', 2); P.lineF(1.4 * k, -7.5 * k, 1.4 * k, -6, 'C', 2);
+        P.ell(-0.4 * k, -6.4 * k, 0.8 * k, 0.7 * k, 'C', 1); P.ell(3.2 * k, -6.4 * k, 0.8 * k, 0.7 * k, 'C', 1); });
+      P.part(function () { P.ell(7.6 * k, -5.4 * k, 3.2 * k, 2.9 * k, 'A'); P.ell(8.6 * k, -5 * k, 2.2 * k, 1.9 * k, 'B', 1); P.ell(6 * k, -7.8 * k, 0.8 * k, 0.8 * k, 'A', 1);
+        P.setF(8.4 * k, -6 * k, 'K', 1); P.setF(9.8 * k, -6 * k, 'K', 1); P.setF(8.4 * k, -6.5 * k, 'W', 1); P.ell(10.6 * k, -4.8 * k, 0.6, 0.5, 'N', 1); P.lineF(9.6 * k, -4.2 * k, 11.4 * k, -3.8 * k, 'C', 2); });
+    };
+  }
+
+  // ---------- style D hand passes on the buildings: each gets its own props, emblems and roof work ----------
+  var BOXES = [];
+  function fL(o, u, v) { return [o.Lx + u, o.Ly + u / 2 - v]; }                       // a point on a box's left (front-left) face
+  function fR(o, u, v) { return [o.Fx + u, o.Ry + (2 * o.b - 1 - u) / 2 - v]; }         // a point on its right face
+  function quadL(P, o, u0, v0, u1, v1, k, s) { P.poly([fL(o, u0, v0), fL(o, u1, v0), fL(o, u1, v1), fL(o, u0, v1)], k, s); }
+  function quadR(P, o, u0, v0, u1, v1, k, s) { P.poly([fR(o, u0, v0), fR(o, u1, v0), fR(o, u1, v1), fR(o, u0, v1)], k, s); }
+  function stampF(P, x, y, rows, map) { for (var j = 0; j < rows.length; j++) for (var i = 0; i < rows[j].length; i++) { var c = rows[j].charAt(i); if (c !== '.') P.setF(x + i / 2, y + j / 2, map[c][0], map[c][1]); } }
+  function propKeys(P) {
+    var K = { pw: '#b07c44', pd: '#7a5230', pg: '#4fa648', pl: '#8fd86a', pm: '#8a8e9e', pk: '#4a4a5c', pr: '#e8503a', py: '#f4c838', pb: '#4a8ae0', pp: '#f08aa8', pc: '#bfeaf8', pt: '#c86a3c', pe: '#fff8e6', pv: '#8a5ad8' };
+    for (var k in K) if (P.ki[k] == null) P.key(k, K[k]);
+  }
+  function planter(P, x, y, fc) { P.part(function () { P.poly([[x - 3, y - 2.5], [x + 3, y - 2.5], [x + 2.4, y], [x - 2.4, y]], 'pt', 'a'); P.lineF(x - 3, y - 2.5, x + 3, y - 2.5, 'pt', 0);
+    P.ell(x, y - 4, 3, 2, 'pg'); P.ell(x - 1, y - 4.8, 1.2, 0.7, 'pl', 1); [[-1.5, -4.5], [1, -5.2], [1.8, -3.6], [-0.4, -3.4]].forEach(function (q) { P.setF(x + q[0], y + q[1], fc || 'pp', 1); P.setF(x + q[0] + 0.5, y + q[1], fc || 'pp', 0); }); }); }
+  function bin(P, x, y) { P.part(function () { P.poly([[x - 1.6, y - 4], [x + 1.6, y - 4], [x + 1.3, y], [x - 1.3, y]], 'pg', 'a'); P.ell(x, y - 4.2, 1.9, 0.8, 'pk', 1); P.lineF(x - 0.6, y - 3.2, x - 0.6, y - 0.8, 'pl', 1); }); }
+  function vent(P, x, y) { P.part(function () { P.poly([[x - 1, y - 4], [x + 1, y - 4], [x + 1, y], [x - 1, y]], 'pm', 1); P.lineF(x + 0.5, y - 4, x + 0.5, y, 'pm', 2); P.ell(x, y - 4.6, 1.8, 0.8, 'pm', 0); P.lineF(x - 1.5, y - 4.2, x + 1.5, y - 4.2, 'pk', 1); }); }
+  function chair(P, x, y, k) { P.part(function () { P.lineF(x - 1, y, x - 1, y - 2, 'pk', 1); P.lineF(x + 1, y, x + 1, y - 2, 'pk', 1); P.poly([[x - 1.5, y - 2.5], [x + 1.5, y - 2.5], [x + 1.5, y - 1.8], [x - 1.5, y - 1.8]], k, 1); P.poly([[x - 1.5, y - 5], [x - 0.8, y - 5], [x - 0.8, y - 2], [x - 1.5, y - 2]], k, 1); }); }
+  function parasol(P, x, y, k1, k2) { P.part(function () { P.lineF(x, y, x, y - 9, 'pm', 1);
+    P.poly([[x - 6, y - 8], [x, y - 12], [x + 6, y - 8], [x + 4, y - 7.4], [x, y - 8], [x - 4, y - 7.4]], k1, 1);
+    P.recolorF(k1, k2, function (px) { return frac((px - x) / 4) < 0.5; }); P.ell(x, y - 2.5, 3, 1, 'pe', 0); P.lineF(x - 1.5, y - 2, x - 1.5, y, 'pk', 1); P.lineF(x + 1.5, y - 2, x + 1.5, y, 'pk', 1); }); }
+  function pennants(P, x0, y0, x1, y1, n, cols) { P.lineF(x0, y0, x1, y1, 'pk', 1); for (var i = 0; i < n; i++) { var t = (i + 0.5) / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t + Math.sin(t * Math.PI) * 1.2; P.poly([[x - 1, y], [x + 1, y], [x, y + 2.2]], cols[i % cols.length], 1); } }
+  function badgeD(P, x, y, r, bg, sym) { P.part(function () { P.ell(x, y, r, r, bg, 1); P.ell(x - r * 0.3, y - r * 0.35, r * 0.3, r * 0.2, bg, 0); sym(x, y); }); }
+  function pawAt(P, x, y, k) { P.ell(x, y + 0.6, 1.2, 0.9, k, 1); [[-1.3, -0.8], [-0.4, -1.4], [0.5, -1.4], [1.4, -0.8]].forEach(function (q) { P.setF(x + q[0], y + q[1], k, 1); }); }
+  function stick(P, o, u, v, k, skirt) { var h = fL(o, u, v); P.setF(h[0], h[1], k, 1); P.setF(h[0] + 0.5, h[1], k, 1); P.lineF(h[0] + 0.25, h[1] + 0.6, h[0] + 0.25, h[1] + 2.2, k, 1); P.lineF(h[0] - 0.6, h[1] + 1, h[0] + 1.1, h[1] + 1, k, 1);
+    if (skirt) P.poly([[h[0] + 0.25, h[1] + 1.2], [h[0] - 0.7, h[1] + 2.6], [h[0] + 1.2, h[1] + 2.6]], k, 1); else { P.lineF(h[0] + 0.25, h[1] + 2.2, h[0] - 0.4, h[1] + 3.2, k, 1); P.lineF(h[0] + 0.25, h[1] + 2.2, h[0] + 0.9, h[1] + 3.2, k, 1); } }
+  function roofTop(o, up) { return [[o.Lx, o.Ly - o.h - (up || 0)], [o.Bx, o.By - o.h - (up || 0)], [o.Rx - 1, o.Ry - o.h - (up || 0)], [o.Fx, o.Fy - o.h - (up || 0)]]; }
+  function lerp(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; }
+  var BPOST = {
+    restroom: function (P, B) {
+      var o = B[0], r = B[1];
+      [[2, 'pe', 0], [10, 'pe', 1]].forEach(function (d) { quadL(P, o, d[0] + 1, 1, d[0] + 4, 5, d[0] < 5 ? 'B' : 'F', 2); stick(P, o, d[0] + 2.2, 7.2, 'W', d[2]); var k = fL(o, d[0] + 3.6, 3.4); P.setF(k[0], k[1], 'py', 1); });
+      var t = roofTop(r), c = lerp(t[0], t[2], 0.5); // skylight, vent and a raised rim on the flat roof
+      P.part(function () { P.poly([[c[0] - 6, c[1] - 1], [c[0] - 2, c[1] - 3], [c[0] + 2, c[1] - 1], [c[0] - 2, c[1] + 1]], 'pc', 1); P.lineF(c[0] - 4, c[1] - 2, c[0], c[1], 'W', 1); P.lineF(c[0] - 2, c[1] - 3, c[0] - 2, c[1] + 1, 'T', 1); }, true);
+      vent(P, c[0] + 7, c[1] + 1); P.lineF(t[0][0] + 1, t[0][1], t[3][0], t[3][1] - 1, 'T', 0); P.lineF(t[3][0], t[3][1] - 1, t[2][0] - 1, t[2][1], 'T', 0);
+      planter(P, -9, 7.5, 'pp'); bin(P, 14, 7);
+    },
+    lab: function (P, B) {
+      var o = B[0], t = roofTop(B[1]);
+      quadL(P, o, 13.6, 2, 16.4, 4.3, 'pc', 1); var kn = fL(o, 16, 2.2); P.setF(kn[0], kn[1], 'py', 1);
+      [3.5, 9, 14].forEach(function (u, i) { var p = fL(o, u, 7.6); P.setF(p[0] + 0.5, p[1], ['G', 'pp', 'py'][i], 1); P.setF(p[0] + 1, p[1] - 0.5, ['G', 'pp', 'py'][i], 1); });
+      var s = fR(o, 14.5, 3.4); badgeD(P, s[0], s[1], 2.2, 'W', function (x, y) { P.poly([[x - 0.4, y - 1.4], [x + 0.6, y - 1.4], [x + 0.6, y - 0.4], [x + 1.4, y + 1], [x - 1.2, y + 1], [x - 0.4, y - 0.4]], 'C', 1); P.lineF(x - 1, y + 0.6, x + 1.2, y + 0.6, 'G', 1); });
+      var c = lerp(t[1], t[2], 0.45); P.part(function () { // solar panel on the roof
+        P.poly([[c[0] - 2, c[1] + 4], [c[0] + 5, c[1] + 0.5], [c[0] + 7, c[1] + 3], [c[0], c[1] + 6.5]], 'D', 1); for (var i = 1; i < 4; i++) { var a = lerp([c[0] - 2, c[1] + 4], [c[0] + 5, c[1] + 0.5], i / 4), b = lerp([c[0], c[1] + 6.5], [c[0] + 7, c[1] + 3], i / 4); P.lineF(a[0], a[1], b[0], b[1], 'C', 2); }
+        P.lineF(c[0] - 1, c[1] + 5.2, c[0] + 6, c[1] + 1.8, 'C', 2); P.setF(c[0] + 1, c[1] + 3.5, 'W', 1); });
+      vent(P, 15, -12); P.part(function () { [[-15, 8.5, 'pg'], [-12.5, 9.6, 'pe']].forEach(function (g) { P.ell(g[0], g[1] - 4, 1.2, 0.8, g[2], 0); P.poly([[g[0] - 1.2, g[1] - 4], [g[0] + 1.2, g[1] - 4], [g[0] + 1.2, g[1]], [g[0] - 1.2, g[1]]], g[2], 'a'); P.setF(g[0], g[1] - 5, 'pk', 1); }); });
+    },
+    kiosk: function (P, B) {
+      var o = B[0];
+      P.part(function () { var a = fL(o, 2, 11), b = fL(o, 10, 11); P.poly([a, b, [b[0] - 1.6, b[1] + 2.6], [a[0] - 1.6, a[1] + 2.6]], 'Y', 1); P.recolorF('Y', 'W', function (x) { return frac((x - a[0]) / 2) < 0.5; }); for (var u = 2; u <= 10; u += 2) { var p = fL(o, u, 11); P.setF(p[0] - 1.4, p[1] + 2.9, 'Y', 2); } });
+      var m0 = fR(o, 2.5, 4.5), m1 = fR(o, 9.5, 7.5); P.lineF(m0[0], m0[1], m1[0], m1[1], 'pt', 1); var m2 = fR(o, 3, 8), m3 = fR(o, 9, 3); P.lineF(m2[0], m2[1], m3[0], m3[1], 'pb', 1);
+      P.part(function () { var x = -2, y = 11.5; P.poly([[x - 2, y - 5], [x + 2, y - 5], [x + 2, y], [x - 2, y]], 'pw', 'a'); [['pr', -1.2], ['pb', 0], ['G', 1.2]].forEach(function (q) { P.poly([[x + q[1] - 0.5, y - 6.2], [x + q[1] + 0.5, y - 6.2], [x + q[1] + 0.5, y - 4.6], [x + q[1] - 0.5, y - 4.6]], q[0], 1); }); });
+      planter(P, 9, 9, 'py');
+    },
+    deck: function (P, B) {
+      var o = B[5], t = roofTop(o);
+      for (var i = 1; i < 6; i++) { var a = lerp(t[0], t[1], i / 6), b = lerp(t[3], t[2], i / 6); P.lineF(a[0], a[1] + 0.3, b[0], b[1] - 0.3, 'T', 2); }
+      pennants(P, -18, -14, 0, -23, 5, ['pr', 'py', 'pb']); pennants(P, 0, -23, 17, -14, 4, ['pg', 'pp', 'py']);
+      P.part(function () { var x = -15, y = 10; P.lineF(x, y, x, y - 8, 'pd', 1); P.lineF(x + 0.5, y, x + 0.5, y - 8, 'pd', 2); P.poly([[x - 3, y - 11], [x + 4, y - 11], [x + 4, y - 7.5], [x - 3, y - 7.5]], 'pw', 'a');
+        P.ell(x + 0.5, y - 9.3, 2.2, 1.2, 'pe', 1); P.ell(x + 0.5, y - 9.3, 0.8, 0.8, 'pb', 1); P.setF(x + 0.5, y - 9.3, 'pk', 1); });
+      planter(P, 12, -12, 'pv');
+    },
+    gift: function (P, B) {
+      var o = B[0];
+      P.part(function () { var a = fL(o, 1.5, 8.5), b = fL(o, 12.5, 8.5); P.poly([a, b, [b[0] - 1.8, b[1] + 2.4], [a[0] - 1.8, a[1] + 2.4]], 'R', 1); P.recolorF('R', 'A', function (x) { return frac((x - a[0]) / 2.2) < 0.5; });
+        for (var u = 1.5; u <= 12.5; u += 1.1) { var p = fL(o, u, 8.5); P.setF(p[0] - 1.6, p[1] + 2.8, 'R', 2); } });
+      quadL(P, o, 14.4, 4.5, 16.6, 7.4, 'C', 1); var kn = fL(o, 16.4, 3.4); P.setF(kn[0], kn[1], 'Y', 1);
+      P.part(function () { [[3, -12, 'pr'], [6, -14, 'pb'], [8, -10.5, 'py']].forEach(function (b) { P.lineF(b[0], b[1] + 2, 4.5, 4, 'pk', 1); P.ell(b[0], b[1], 1.6, 2, b[2]); P.setF(b[0] - 0.5, b[1] - 1, 'W', 1); }); });
+      planter(P, 13, 7, 'py');
+    },
+    cafe: function (P, B) {
+      parasol(P, -14, 12, 'G', 'W'); chair(P, -17.5, 12.5, 'pt'); chair(P, -10.5, 13, 'pt');
+      P.part(function () { var x = 6, y = 13; P.poly([[x - 2, y], [x - 0.6, y - 6], [x + 0.6, y - 6], [x + 2, y]], 'pw', 1); P.poly([[x - 1.4, y - 5], [x + 1.4, y - 5], [x + 1.6, y - 1.5], [x - 1.6, y - 1.5]], 'pk', 1);
+        P.ell(x, y - 3.4, 0.9, 0.7, 'W', 1); P.setF(x + 1, y - 3.4, 'W', 1); P.setF(x - 0.2, y - 4.6, 'pm', 1); });
+      planter(P, 13, 7, 'pp');
+    },
+    vet: function (P, B) {
+      var o = B[0], s = fR(o, 9.5, 5.2);
+      badgeD(P, s[0], s[1], 2.4, 'W', function (x, y) { pawAt(P, x, y + 0.2, 'T'); });
+      var kn = fL(o, 7, 3.2); P.setF(kn[0], kn[1], 'py', 1);
+      var t = roofTop(B[1]), c = lerp(t[1], t[2], 0.6); vent(P, c[0] + 2, c[1] + 4);
+      planter(P, -14, 7.5, 'pp'); P.part(function () { var x = 13, y = 8; P.poly([[x - 3, y - 2], [x + 3, y - 2], [x + 3, y - 1.2], [x - 3, y - 1.2]], 'pw', 1); P.lineF(x - 2.5, y - 1, x - 2.5, y, 'pk', 1); P.lineF(x + 2.5, y - 1, x + 2.5, y, 'pk', 1); P.poly([[x - 3, y - 4], [x + 3, y - 4], [x + 3, y - 3.3], [x - 3, y - 3.3]], 'pw', 1); });
+    },
+    center: function (P, B) {
+      var o = B[0], s = fL(o, 11, 9.4);
+      badgeD(P, s[0], s[1], 2.2, 'W', function (x, y) { P.poly([[x - 1.2, y + 1], [x - 0.6, y - 1.2], [x + 1.4, y - 1.4], [x + 0.8, y + 0.6]], 'G', 1); P.lineF(x - 1.2, y + 1, x + 1, y - 1, 'T', 1); });
+      planter(P, -9, 9, 'py'); planter(P, 9, 10, 'pp'); bin(P, 3, 13);
+    },
+    pavilion: function (P) { pennants(P, -16, -13, 0, -9, 4, ['pv', 'py', 'pr']); pennants(P, 0, -9, 16, -13, 4, ['py', 'pv', 'pr']); planter(P, -15, 10, 'pv'); planter(P, 15, 10, 'pv'); },
+    fountain: function (P) {
+      for (var a = 0.15; a < Math.PI; a += 0.32) { var x = Math.cos(a) * 17, y = 3 + Math.sin(a) * 8; P.lineF(x, y - 3.6, x, y - 0.4, 'S', 2); }
+      P.part(function () { P.ell(7, 0, 1.8, 0.9, 'pg', 1); P.setF(7.5, -0.3, 'pl', 1); P.setF(6.5, 0, 'pp', 1); P.ell(-8, 1.5, 1.4, 0.7, 'pg', 1); }, true);
+      [[-4, 2], [3, 3], [9, -2]].forEach(function (q) { P.setF(q[0], q[1], 'py', 0); });
+    },
+    playground: function (P) { P.part(function () { P.ell(14, 7.2, 1.6, 1.6, 'pr'); P.lineF(12.6, 7.2, 15.4, 7.2, 'W', 1); P.poly([[3, 9], [5, 9], [4.6, 11], [3.4, 11]], 'pb', 1); P.lineF(3, 9, 5, 9, 'py', 1); P.lineF(5.5, 8, 7, 10.5, 'pm', 1); }); },
+    photo: function (P) { planter(P, -14, 9, 'pp'); P.part(function () { [[-6, 8], [-3, 9.5], [0, 10.5]].forEach(function (q, i) { P.lineF(q[0], q[1], q[0], q[1] - 2, 'pg', 1); P.ell(q[0], q[1] - 2.5, 0.9, 0.9, ['pp', 'py', 'pv'][i], 1); P.setF(q[0], q[1] - 2.5, 'py', 0); }); }); },
+    icecream: function (P) { P.part(function () { var x = -10, y = 9; P.lineF(x, y, x, y - 5, 'pd', 1); P.poly([[x - 2.5, y - 9], [x + 2.5, y - 9], [x + 2.5, y - 5], [x - 2.5, y - 5]], 'pk', 1); P.poly([[x - 1, y - 8.4], [x + 1, y - 8.4], [x, y - 5.6]], 'C', 1); P.ell(x, y - 8.4, 1.1, 0.9, 'pp', 1); }); chair(P, 10, 13, 'pp'); },
+    bench: function (P, B) { P.part(function () { var x = 6, y = -6; P.ell(x, y, 1.4, 1.1, 'pb'); P.ell(x + 1.2, y - 1, 0.9, 0.8, 'pb'); P.setF(x + 1.4, y - 1.2, 'pk', 1); P.poly([[x + 2, y - 1], [x + 2.9, y - 0.8], [x + 2, y - 0.5]], 'py', 1); P.lineF(x - 1.6, y, x - 2.6, y - 0.6, 'pb', 2); }); },
+    gate: function (P) { pennants(P, -10, -20, 10, -10, 6, ['pr', 'py', 'pb']); planter(P, -18, 6, 'pr'); planter(P, 18, 16, 'pr'); },
+    entrance: function (P) { pennants(P, -15, -22, 15, -22, 7, ['pr', 'py', 'pb', 'pg']); planter(P, -24, 7, 'pp'); planter(P, 24, 7, 'py'); }
+  };
+
   // =====================================================================================================================
   // PUBLIC API
   // =====================================================================================================================
@@ -1555,7 +2505,7 @@
   function getFlip(key, flip, fn) { var s = cached(key, fn); if (!flip) return s; return cached(key + '|f', function () { return flipSprite(s); }); }
 
   function drawAnimal(id, variant, juv, fr) {
-    var sp = SP[id], pal = {}, k;
+    var sp = (DENS === 2 ? SPX : SP)[id], pal = {}, k;
     for (k in sp.pal) pal[k] = sp.pal[k];
     if (juv && sp.opt.jpal) for (k in sp.opt.jpal) pal[k] = sp.opt.jpal[k];
     if (variant && sp.vpal) for (k in sp.vpal) pal[k] = sp.vpal[k];
@@ -1576,9 +2526,18 @@
     return getFlip('a|' + id + '|' + v + j + fr, opt.flip, function () { return drawAnimal(id, !!v, !!j, fr); });
   }
 
+  // at density 2 every getter draws the sprite kind it names with the matching style-D context
+  var animal0 = animal, person0 = person, fence0 = fence, building0 = building, deco0 = deco, entrance0 = entrance;
+  animal = function (id, opt) { return withD({ t: 'animal', id: id }, function () { return animal0(id, opt); }); };
+  person = function (kind, opt) { return withD({ t: 'person', id: kind }, function () { return person0(kind, opt); }); };
+  fence = function (biome, e) { return withD({ t: 'fence', id: biome }, function () { return fence0(biome, e); }); };
+  building = function (id, opt) { return withD({ t: 'building', id: id }, function () { return building0(id, opt); }); };
+  deco = function (kind, seed) { return withD({ t: 'deco', id: kind }, function () { return deco0(kind, seed); }); };
+  entrance = function () { return withD({ t: 'entrance', id: 'entrance' }, function () { return entrance0(); }); };
+
   var URLS = {};
-  function url(s, scale) {
-    scale = Math.max(1, Math.round(scale || 3)); if (!s || !s.c) s = blank();
+  function url(s, scale) { // at density 2 the default scale is halved so a menu image keeps its size and gains the detail
+    scale = Math.max(1, Math.round((scale || 3) / ((s && s.d) || 1))); if (!s || !s.c) s = blank();
     if (!s._id) s._id = 'u' + (url.n = (url.n || 0) + 1);
     var key = s._id + 'x' + scale; if (URLS[key]) return URLS[key];
     var c = document.createElement('canvas'); c.width = s.w * scale; c.height = s.h * scale;
@@ -1610,7 +2569,8 @@
     tileUrl: function (kind, scale) { return url(tile(kind), scale); },
     ICONS: ICONS, PERSON_KINDS: PERSON_KINDS, DECOS: DECOS, BUILDING_FRAMES: BUILDING_FRAMES, VISITOR_SEEDS: VISITOR_SEEDS, GRASS_VARIANTS: GRASS_VARIANTS, PALETTE: PALETTE,
     FENCE_H: FENCE_H, hasAnimal: function (id) { return !!SP[id] && id !== '?'; }, isWater: function (id) { return !!(SP[id] && SP[id].opt.water); },
-    _mix: mix
+    _mix: mix, setDensity: setDensity
   };
+  Object.defineProperty(ZS, 'DENSITY', { get: function () { return DENS; }, enumerable: true });
   root.ZSprites = ZS;
 })(typeof window !== 'undefined' ? window : this);

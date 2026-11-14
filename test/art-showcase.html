@@ -1,0 +1,128 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Wildside Zoo style D showcase</title>
+<style> html, body { margin: 0; background: #f6eedc; } canvas { display: block; image-rendering: pixelated; } </style></head><body>
+<canvas id="page" width="10" height="10"></canvas>
+<script src="../geo.js"></script>
+<script src="../data.js"></script>
+<script src="../sprites.js"></script>
+<script src="art-hd.js"></script>
+<script>
+/* Artist: one long showcase page of style-D art for the owner, laid out like scrolling on his iPhone: 1170 phone pixels wide
+   (390 CSS px at 3x). Assets are shown at 2x their phone size (12 phone pixels per art pixel) unless a label says otherwise.
+   test/art-showcase.js injects the style-D sprite set (window.ZS_D) and calls window.__showcase(). Nothing in the game changes. */
+'use strict';
+window.__err = []; window.onerror = function (m) { window.__err.push(String(m)); };
+var CREAM = '#f6eedc', CARD = '#fbf6ea', INK = '#2a1d33', SOFT = '#7a6a5a', PW = 1170, SC = 12;
+var BIOMES = [
+  ['savanna', 'Savanna', [['lion', 1], ['zebra'], ['giraffe', 1], ['elephant', 1], ['ostrich']]],
+  ['jungle', 'Jungle', [['gorilla', 1], ['toucan'], ['jaguar'], ['sloth']]],
+  ['desert', 'Desert and outback', [['camel'], ['kangaroo', 1], ['komodo']]],
+  ['arctic', 'Arctic', [['penguin', 1], ['polarbear'], ['walrus'], ['reindeer']]],
+  ['mountain', 'Mountain', [['panda', 1], ['snowleopard'], ['eagle'], ['yak']]],
+  ['ocean', 'Ocean', [['dolphin', 1], ['turtle'], ['octopus'], ['clownfish']]],
+  ['paleo', 'Lost valley (secret)', [['trex', 1], ['triceratops'], ['mammoth']]],
+  ['mythic', 'Mythic grove (secret)', [['unicorn', 1], ['dragon'], ['phoenix']]]];
+function nameOf(id) { var s = (ZD.SPECIES_LIST || []).filter(function (x) { return x.id === id; })[0]; return s ? s.name : id; }
+function rareOf(id) { var s = (ZD.SPECIES_LIST || []).filter(function (x) { return x.id === id; })[0]; return s && s.variant ? s.variant : 'rare'; }
+function put(g, s, x, y, dev) { var K = s.K || 1, f = dev / K; g.drawImage(s.c, Math.round(x - s.ax * f), Math.round(y - s.ay * f), s.w * f, s.h * f); }
+function label(g, t, x, y, sz, col, al, bold) { g.font = (bold ? 'bold ' : '') + sz + 'px system-ui, sans-serif'; g.textAlign = al || 'center'; g.fillStyle = col || SOFT; g.fillText(t, x, y); }
+function sceneD(g, list, ox, oy, dev, extra) {
+  var tiles = [], objs = [], HB = {};
+  list.forEach(function (h) { if (h[2].indexOf('hab:') === 0) HB[h[0] + ',' + h[1]] = h[2].slice(4); });
+  list.forEach(function (h) { var p = G.toScreen(h[0], h[1]); tiles.push({ kind: h[2], seed: ((h[0] * 7 + h[1] * 13) % 18 + 18) % 18, x: p.x, y: p.y });
+    var b = HB[h[0] + ',' + h[1]]; if (b) for (var e = 0; e < 6; e++) { var nb = G.EDGES[e][0]; if (HB[(h[0] + nb[0]) + ',' + (h[1] + nb[1])] !== b) objs.push({ t: 'fence', biome: b, e: e, x: p.x, y: p.y, sy: p.y + G.edgeMidY(e) }); } });
+  (extra || []).forEach(function (o) { if (o.sy == null) o.sy = o.y + (o.t === 'entrance' ? G.HH : 0); objs.push(o); });
+  tiles.sort(function (a, b) { return a.y - b.y || a.x - b.x; }); objs.sort(function (a, b) { return a.sy - b.sy; });
+  tiles.forEach(function (t) { put(g, sprD({ t: 'tile', kind: t.kind, seed: t.seed }), ox + t.x * dev, oy + t.y * dev, dev); });
+  objs.forEach(function (o) { put(g, sprD(o), ox + o.x * dev, oy + o.y * dev, dev); });
+}
+function ob(t, id, q, r, dx, dy, more) { var p = G.toScreen(q, r); return Object.assign({ t: t, id: id, x: p.x + dx, y: p.y + dy }, more || {}); }
+
+function layout(g) { // draws everything; returns the page height. Called twice: once to measure, once to draw.
+  var y = 0; g.fillStyle = CREAM; g.fillRect(0, 0, PW, g.canvas.height);
+  function bg(h) { g.fillStyle = CREAM; g.fillRect(0, y, PW, h); }
+  function heading(t, sub) { bg(sub ? 150 : 110); y += 78; label(g, t, 40, y, 54, INK, 'left', true); if (sub) { label(g, sub, 40, y + 46, 30, SOFT, 'left'); y += 46; } y += 32; }
+  function card(h) { g.fillStyle = CARD; g.fillRect(24, y, PW - 48, h); }
+  // ---- 1. a little zoo at real phone size ----
+  var DEV = 6, OX = 40, OY = 46, SH = 300 * DEV; g.fillStyle = '#86c94e'; g.fillRect(0, 0, PW, SH);
+  var H = {}, list = [];
+  ['0,0', '1,0', '0,1'].forEach(function (k) { H[k] = 'hab:savanna'; }); ['2,2', '1,3', '2,3'].forEach(function (k) { H[k] = 'hab:arctic'; });
+  ['2,0', '1,1', '0,2', '1,2', '0,3', '0,4', '0,5', '0,6', '-1,4', '-1,5', '1,4', '0,7', '-1,7'].forEach(function (k) { H[k] = 'path'; });
+  for (var r = -3; r <= 10; r++) for (var q = -5; q <= 7; q++) { var pq = G.toScreen(q, r); if (pq.x + OX < -30 || pq.x + OX > 225 || pq.y + OY < -25 || pq.y + OY > 325) continue; list.push([q, r, H[q + ',' + r] || 'grass']); }
+  g.save(); g.beginPath(); g.rect(0, 0, PW, SH); g.clip();
+  sceneD(g, list, OX * DEV, OY * DEV, DEV, [ob('animal', 'lion', 0, 0, -6, 4), ob('animal', 'giraffe', 1, 0, -10, -3), ob('animal', 'zebra', 1, 0, 7, 3, { frame: 1 }), ob('animal', 'elephant', 0, 1, 2, 4),
+    ob('animal', 'penguin', 2, 2, -6, 2), ob('animal', 'penguin', 2, 2, 7, 5, { juv: true }), ob('animal', 'polarbear', 1, 3, 2, 4, { flip: true }), ob('animal', 'penguin', 2, 3, 0, 2, { variant: true }),
+    ob('building', 'snack', -1, 4, 0, 0), ob('building', 'gift', -1, 5, 0, 0), ob('person', 'visitor', 1, 1, 4, 6, { seed: VIS[0] }), ob('person', 'visitor', 0, 3, -4, 2, { seed: VIS[3], flip: true }),
+    ob('person', 'visitor', 0, 4, 6, -2, { seed: VIS[1], frame: 1 }), ob('person', 'keeper', 0, 6, -12, -6), ob('person', 'trader', 0, 6, 10, -5, { flip: true }), ob('entrance', 'gate', 0, 7, 0, 0),
+    ob('deco', 'tree', 1, 5, 2, 6), ob('deco', 'bush', -1, 6, 4, 2), ob('deco', 'tree', 2, 4, 6, 0, { seed: 1 }), ob('deco', 'flowers', -2, 6, 6, 4, { seed: 1 }), ob('deco', 'lamp', 1, 6, -14, 6)]); g.restore();
+  g.fillStyle = 'rgba(42,29,51,0.72)'; g.fillRect(0, SH - 70, PW, 70); label(g, 'Style D at real size on your phone', PW / 2, SH - 24, 34, '#ffffff', 'center', true);
+  y = SH;
+  // ---- 2. today versus style D, one small strip ----
+  heading('Today and style D', 'Same animals and people, twice the pixels, bold outline kept.');
+  card(330); var by = y + 250, SS = 8, xs = [120, 330, 520, 670, 860, 1040];
+  [['animal', 'lion'], ['person', 'keeper'], ['deco', 'tree']].forEach(function (a, n) {
+    put(g, a[0] === 'animal' ? LIVE.animal(a[1]) : a[0] === 'person' ? LIVE.person(a[1]) : LIVE.deco(a[1], 0), xs[2 * n], by, SS);
+    put(g, sprD({ t: a[0], id: a[1] }), xs[2 * n + 1], by, SS);
+    label(g, 'today', xs[2 * n], by + 50, 26); label(g, 'style D', xs[2 * n + 1], by + 50, 26); });
+  y += 350;
+  // ---- 3. animals by biome ----
+  BIOMES.forEach(function (b) {
+    heading(b[1]);
+    b[2].forEach(function (a) {
+      var id = a[0], items = [{ o: {}, l: 'normal' }, { o: { variant: true }, l: rareOf(id) }]; if (a[1]) items.push({ o: { juv: true }, l: 'young' });
+      var ss = items.map(function (it) { return sprD(Object.assign({ t: 'animal', id: id }, it.o)); }), hmax = 0, wsum = 0;
+      ss.forEach(function (s) { hmax = Math.max(hmax, s.h / (s.K || 1)); wsum += s.w / (s.K || 1) * SC; });
+      var rowH = hmax * SC + 120, sea = b[0] === 'ocean'; card(rowH - 16); if (sea) { g.fillStyle = '#4aa3d8'; g.fillRect(24, y, PW - 48, rowH - 16); }
+      label(g, nameOf(id), 48, y + 44, 34, sea ? '#ffffff' : INK, 'left', true);
+      var gap = (PW - 48 - wsum) / (ss.length + 1), x = 24 + gap, base = y + rowH - 70;
+      ss.forEach(function (s, n) { var w = s.w / (s.K || 1) * SC; put(g, s, x + s.ax / (s.K || 1) * SC, base, SC); label(g, items[n].l === 'normal' || items[n].l === 'young' ? items[n].l : 'rare: ' + items[n].l.toLowerCase(), x + w / 2, base + 46, 26, sea ? '#ffffff' : SOFT); x += w + gap; });
+      y += rowH;
+    });
+  });
+  // ---- 4. people ----
+  heading('People', 'Visitors, every staff role, callers and a few special guests.');
+  var PP = [['visitor', VIS[0], 'visitor'], ['visitor', VIS[1], 'visitor'], ['visitor', VIS[2], 'visitor'], ['visitor', VIS[3], 'visitor'], ['visitor', VIS[4], 'visitor'], ['visitor', VIS[5], 'visitor'],
+    ['keeper'], ['vet'], ['researcher'], ['explorer'], ['guide'], ['zoologist'], ['leader'], ['showrunner'], ['trader'], ['headhunter'], ['director'], ['vip'], ['teacher'], ['reporter'], ['builder'], ['kid', 0, 'kid']];
+  for (var n = 0; n < PP.length; n += 4) { card(390); for (var m = 0; m < 4 && n + m < PP.length; m++) { var pp = PP[n + m], cx = 24 + (PW - 48) / 4 * (m + 0.5), base = y + 310;
+    put(g, sprD({ t: 'person', id: pp[0], seed: pp[1] }), cx, base, SC); label(g, pp[2] || pp[0], cx, base + 50, 28); } y += 410; }
+  // ---- 5. buildings ----
+  heading('Buildings');
+  var BB = [['snack', 'snack stand'], ['gift', 'gift shop'], ['cafe', 'cafe'], ['restroom', 'restrooms'], ['fountain', 'fountain'], ['playground', 'playground'], ['vet', 'vet clinic'], ['lab', 'lab'], ['icecream', 'ice cream cart'], ['photo', 'photo spot']];
+  for (n = 0; n < BB.length; n += 2) { card(700); for (m = 0; m < 2; m++) { var bb = BB[n + m], cx2 = 24 + (PW - 48) / 2 * (m + 0.5), base2 = y + 430;
+    put(g, sprD({ t: 'building', id: bb[0] }), cx2, base2, SC); label(g, bb[1], cx2, y + 680, 28); } y += 720; }
+  card(760); put(g, sprD({ t: 'entrance' }), PW / 2, y + 470, SC); label(g, 'entrance gate', PW / 2, y + 740, 28); y += 780;
+  // ---- 6. ground and fences ----
+  heading('Ground', 'Shown at 1.5x so two fit across. Grass looks, path, land for sale, every habitat.');
+  var TT = [['grass', 0], ['grass', 7], ['grass', 2], ['grass', 9], ['grass', 4], ['grass', 17], ['path', 0], ['locked', 0], ['hab:savanna', 0], ['hab:jungle', 0], ['hab:desert', 0], ['hab:arctic', 0], ['hab:mountain', 0], ['hab:ocean', 0], ['hab:paleo', 0], ['hab:mythic', 0]], TS = 9;
+  for (n = 0; n < TT.length; n += 2) { card(470); for (m = 0; m < 2; m++) { var tt = TT[n + m], cx3 = 24 + (PW - 48) / 2 * (m + 0.5), base3 = y + 200;
+    put(g, sprD({ t: 'tile', kind: tt[0], seed: tt[1] }), cx3, base3, TS); label(g, tt[0].replace('hab:', '') + (tt[0] === 'grass' ? ' ' + tt[1] : tt[0] === 'locked' ? ' (for sale)' : ''), cx3, base3 + 230, 28); } y += 490; }
+  heading('Fences', 'Three fence styles as whole habitats, at 1.5x.');
+  var RINGS = [['savanna', [['lion', 0, 0, -4, 4], ['zebra', 1, 0, 2, 4], ['giraffe', 0, 1, 4, 2]]], ['arctic', [['polarbear', 0, 0, 0, 4], ['penguin', 1, 0, -4, 4], ['penguin', 1, 0, 8, 6, 1], ['walrus', 0, 1, 2, 4]]],
+    ['mythic', [['unicorn', 0, 0, 0, 4], ['phoenix', 1, 0, 0, 2], ['dragon', 0, 1, 2, 6]]]];
+  RINGS.forEach(function (rg) { card(1010); var ring = [[0, 0, 'hab:' + rg[0]], [1, 0, 'hab:' + rg[0]], [0, 1, 'hab:' + rg[0]]];
+    sceneD(g, ring, 300, y + 420, TS, rg[1].map(function (a) { return ob('animal', a[0], a[1], a[2], a[3], a[4], a[5] ? { juv: true } : {}); }));
+    label(g, rg[0] + ' fence', PW / 2, y + 980, 30); y += 1030; });
+  // ---- 7. decorations ----
+  heading('Decorations');
+  var DD = [['tree', 0, 'tree'], ['tree', 1, 'small tree'], ['tree', 2, 'pine'], ['tree', 3, 'fruit tree'], ['bush', 0, 'bush'], ['bush', 1, 'flowering bush'], ['flowers', 0, 'flowers'], ['flowers', 1, 'flowers'], ['rock', 0, 'rock'], ['rock', 1, 'rocks'], ['lamp', 0, 'lamp'], ['crate', 0, 'crate']];
+  for (n = 0; n < DD.length; n += 4) { card(440); for (m = 0; m < 4; m++) { var dd = DD[n + m], cx4 = 24 + (PW - 48) / 4 * (m + 0.5), base4 = y + 360;
+    put(g, sprD({ t: 'deco', id: dd[0], seed: dd[1] }), cx4 - (dd[0] === 'crate' ? 30 : 0), base4, SC); label(g, dd[2], cx4, base4 + 50, 28); } y += 460; }
+  // ---- 8. icons ----
+  heading('Icons', 'Stats, skills and floor markers.');
+  var II = [['stat-charm', 'charm'], ['stat-vigor', 'energy'], ['stat-wit', 'smarts'], ['skill-care', 'care'], ['skill-sci', 'science'], ['skill-exp', 'scouting'], ['skill-charm', 'hosting'], ['coin', 'coin'], ['rp', 'research'], ['ready-event', 'flag'], ['heart', 'heart'], ['star', 'star'], ['flame', 'flame'], ['ready-breed', 'love'], ['busy', 'busy'], ['sick', 'sick'], ['choice', 'choice'], ['trophy', 'trophy']];
+  for (n = 0; n < II.length; n += 6) { card(270); for (m = 0; m < 6 && n + m < II.length; m++) { var ii = II[n + m], cx5 = 24 + (PW - 48) / 6 * (m + 0.5), base5 = y + 190;
+    put(g, sprD({ t: 'icon', id: ii[0] }), cx5, base5, SC); label(g, ii[1], cx5, base5 + 50, 26); } y += 290; }
+  bg(80); return y + 80;
+}
+var VIS = [];
+window.__showcase = function () {
+  installOverrides(window.ZS_D); window.ZS_D._dmode = true;
+  var adults = [], kids = []; for (var sd = 0; sd < 97; sd++) (LIVE.person('visitor', { seed: sd }).h <= 16 ? kids : adults).push(sd);
+  VIS = [adults[0], adults[9], adults[22], kids[0], kids[4], kids[9]];
+  var cv = document.getElementById('page'), g = cv.getContext('2d');
+  cv.width = PW; cv.height = 30000; g.imageSmoothingEnabled = false; var h = layout(g);
+  cv.height = h; g.imageSmoothingEnabled = false; layout(g);
+  window.__height = h; window.__done = true;
+};
+</script>
+</body></html>

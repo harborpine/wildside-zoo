@@ -15,15 +15,20 @@ let failures = 0; const check = (c, m) => { console.log((c ? '  PASS ' : '  FAIL
   }
   await p.touchscreen.tap(195, 400); taps++; await sleep(500);
   await tapText('Staff'); await tapText('Notice board');
+  console.log('  advert running: ' + await p.evaluate(() => !!ZT.S.hiring) + ' (applicants arrive after the advert; time passing is not a tap)');
+  await p.evaluate(() => { ZT.popAll(); ZT.tick(4); }); await sleep(900);
   const seen = [await stack()];
+  taps += 0;
   // tap through the reveal until the "Who turned up" list is on top
   for (let i = 0; i < 8; i++) {
     const top = (await stack()).split('>').pop(); if (top === 'staff-candidates') break;
+    if (/^mo-caller/.test(top)) { const q = await p.evaluate(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), b = [...L.querySelectorAll('button')].find(x => /Not now/.test(x.textContent)); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await p.touchscreen.tap(q.x, q.y); await sleep(600); continue; }
     await sleep(500); const pos = await p.evaluate(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), e = L.querySelector('.rcard, .panel'), r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, btns: [...L.querySelectorAll('button')].map(b => b.textContent.trim().slice(0, 12)).join('|') }; });
     console.log('  screen: ' + (await stack()) + '  buttons: ' + pos.btns);
     await p.touchscreen.tap(pos.x, pos.y); taps++; await sleep(600); seen.push(await stack());
   }
   console.log('  stacks seen: ' + seen.join('  ->  '));
+  if (!(await stack()).endsWith('staff-candidates')) { await p.evaluate(() => ZT.popAll()); await p.touchscreen.tap(195, 400); taps++; await sleep(500); await tapText('Staff'); await tapText('Who turned up'); }
   const lists = await p.evaluate(() => 0);
   check((await stack()).endsWith('staff-candidates'), 'ends on the single "Who turned up" list (' + await stack() + ')');
   const n0 = await p.evaluate(() => ZT.S.staff.length);

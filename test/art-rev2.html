@@ -1,0 +1,51 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Wildside Zoo style D revision 2</title>
+<style> html, body { margin: 0; background: #f6eedc; } canvas { display: block; image-rendering: pixelated; } </style></head><body>
+<canvas id="page" width="10" height="10"></canvas>
+<script src="../geo.js"></script>
+<script src="../data.js"></script>
+<script src="../sprites.js"></script>
+<script src="art-hd.js"></script>
+<script>
+/* Artist: revision 2 for the owner: gorilla rare colour candidates and three polar bear designs.
+   test/art-rev2.js injects the style-D set (window.ZS_D) and calls window.__rev2(). Nothing in the game changes. */
+'use strict';
+window.__err = []; window.onerror = function (m) { window.__err.push(String(m)); };
+var CREAM = '#f6eedc', CARD = '#fbf6ea', INK = '#2a1d33', SOFT = '#7a6a5a', PW = 1170;
+function label(g, t, x, y, sz, col, al, bold) { g.font = (bold ? 'bold ' : '') + sz + 'px system-ui, sans-serif'; g.textAlign = al || 'center'; g.fillStyle = col || SOFT; g.fillText(t, x, y); }
+function put(g, s, x, y, dev) { var f = dev / (s.K || 1); g.drawImage(s.c, Math.round(x - s.ax * f), Math.round(y - s.ay * f), s.w * f, s.h * f); }
+function solid(s) { // the same sprite as a solid black silhouette (the soft ground shadow left out)
+  var c = document.createElement('canvas'); c.width = s.w; c.height = s.h; var g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(s.c, 0, 0);
+  var im = g.getImageData(0, 0, s.w, s.h), d = im.data; for (var i = 0; i < d.length; i += 4) { if (d[i + 3] === 255) { d[i] = d[i + 1] = d[i + 2] = 20; } else d[i + 3] = 0; }
+  g.putImageData(im, 0, 0); return { c: c, w: s.w, h: s.h, ax: s.ax, ay: s.ay, K: s.K };
+}
+function A(id, o) { return sprD(Object.assign({ t: 'animal', id: id }, o || {})); }
+window.__rev2 = function () {
+  installOverrides(window.ZS_D); window.ZS_D._dmode = true;
+  var cv = document.getElementById('page'), g = cv.getContext('2d'), X = 18, R = 6, y = 0;
+  function layout(draw) {
+    y = 0; g.fillStyle = CREAM; g.fillRect(0, 0, PW, cv.height); g.imageSmoothingEnabled = false;
+    function head(t, sub) { y += 74; label(g, t, 30, y, 50, INK, 'left', true); if (sub) { label(g, sub, 30, y + 42, 28, SOFT, 'left'); y += 42; } y += 26; }
+    function card(h) { g.fillStyle = CARD; g.fillRect(16, y, PW - 32, h); }
+    head('Gorilla', 'Normal and young: your first design, kept. Rare colour: pick one.');
+    card(480); var b = y + 400; put(g, A('gorilla'), 300, b, X); label(g, 'normal', 300, b + 60, 28); put(g, A('gorilla', { juv: true }), 820, b, X); label(g, 'young', 820, b + 60, 28); y += 500;
+    card(490); b = y + 390;
+    [['chestnut', 'rare 1: chestnut red'], ['golden', 'rare 2: golden brown'], ['midnight', 'rare 3: midnight blue']].forEach(function (r, n) { var cx = 200 + n * 385; put(g, A('gorilla_' + r[0]), cx, b, X); label(g, r[1], cx, b + 60, 26); });
+    y += 510;
+    [1, 2, 3].forEach(function (n) {
+      var id = 'polarbear_' + n;
+      head('Polar bear, design ' + n, n === 1 ? 'Longest and lowest of the three.' : n === 2 ? 'Rounder, taller back, sturdy legs.' : 'Most compact, bigger head, the cutest.');
+      card(360); b = y + 300; put(g, A(id), 300, b, X); label(g, 'normal', 300, b + 46, 26); put(g, A(id, { variant: true }), 850, b, X); label(g, 'rare: honey', 850, b + 46, 26); y += 376;
+      card(330); b = y + 230;
+      put(g, A(id, { juv: true }), 190, b, X); label(g, 'cub', 190, b + 60, 26);
+      put(g, solid(A(id)), 470, b, R); put(g, solid(A(id, { juv: true })), 610, b, R); label(g, 'black shape, phone size', 540, b + 60, 24);
+      var tx = 920, ty = b - 90; put(g, sprD({ t: 'tile', kind: 'hab:arctic', seed: 0 }), tx, ty, R); put(g, A(id, { flip: false }), tx - 36, ty + 20, R); put(g, A(id, { juv: true, frame: 1 }), tx + 70, ty + 50, R); label(g, 'on ice, real size', tx, b + 60, 24);
+      y += 350;
+    });
+    return y + 30;
+  }
+  cv.width = PW; cv.height = 7000; var h = layout(); cv.height = h; layout();
+  window.__done = true; return cv.toDataURL('image/png');
+};
+</script>
+</body></html>

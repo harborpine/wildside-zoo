@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><title>sprites regression</title></head><body>
+<script src="../geo.js"></script><script src="../data.js"></script>
+<script>
+/* Artist: loads a sprites file named by ?f= and fingerprints every sprite at density 1, so two versions can be compared. */
+document.write('<script src="' + (location.search.match(/f=([^&]+)/) || [0, '../sprites.js'])[1] + '"><\/script>');
+</script>
+<script>
+window.__print = function () {
+  var S = window.ZSprites, D = window.ZD, out = [];
+  function fp(n, s) { out.push(n + ' ' + s.w + 'x' + s.h + ' ' + s.ax + ',' + s.ay + ' ' + (s.sortDy == null ? '' : s.sortDy) + ' ' + s.c.toDataURL()); }
+  D.SPECIES_LIST.forEach(function (sp) { [0, 1, 3].forEach(function (f) { [0, 1].forEach(function (v) { [0, 1].forEach(function (j) { fp('a ' + sp.id + f + v + j, S.animal(sp.id, { frame: f, variant: !!v, juv: !!j, flip: f === 3 })); }); }); }); });
+  S.PERSON_KINDS.forEach(function (k) { [0, 1].forEach(function (f) { fp('p ' + k + f, S.person(k, { frame: f, seed: 7, flip: !!f })); }); });
+  for (var i = 0; i < 97; i++) fp('v' + i, S.person('visitor', { seed: i }));
+  ['grass', 'path', 'locked', 'water'].concat(D.BIOME_ORDER.map(function (b) { return 'hab:' + b; })).forEach(function (k) { for (var i = 0; i < 18; i++) fp('t ' + k + i, S.tile(k, i)); });
+  D.BIOME_ORDER.forEach(function (b) { for (var e = 0; e < 6; e++) fp('f ' + b + e, S.fence(b, e)); });
+  D.FAC_ORDER.forEach(function (id) { fp('b ' + id, S.building(id, {})); }); fp('b fountain1', S.building('fountain', { frame: 1 })); fp('entrance', S.entrance());
+  S.DECOS.forEach(function (k) { for (var i = 0; i < 8; i++) fp('d ' + k + i, S.deco(k, i)); });
+  S.ICONS.forEach(function (n) { fp('i ' + n, S.icon(n)); });
+  out.push('url ' + S.animalUrl('lion', {}, 4).length + ' ' + S.iconUrl('star').length);
+  return out;
+};
+</script></body></html>

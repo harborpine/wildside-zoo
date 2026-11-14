@@ -1,0 +1,157 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Wildside Zoo pixel density sample</title>
+<style>
+  html, body { margin: 0; background: #1e2a33; }
+  canvas { display: block; image-rendering: pixelated; }
+</style></head><body>
+<canvas id="sample" width="10" height="10"></canvas>
+<canvas id="zoom" width="10" height="10"></canvas>
+<script src="../geo.js"></script>
+<script src="../data.js"></script>
+<script src="../sprites.js"></script>
+<script src="art-hd.js"></script>
+<script>
+/* Artist's pixel-density SAMPLE for the owner (feedback #4). Nothing here changes the game.
+   A = the live sprites (one art pixel = 2 CSS px = 6 device px on a 3x iPhone).
+   B = 1.5x denser (4 device px per art pixel), C = 2x denser (3 device px per art pixel).
+   test/art-density.js loads a private copy of sprites.js twice with a "hi-res painter" switched on (K = 1.5 and K = 2):
+   every shape (ellipses, boxes, polygons, lines) is re-drawn at the finer grid with 1-pixel outlines, then the extra pixels are
+   spent on real detail (fur strokes, eye shine, rim light, mane strands, finer zebra stripes, giraffe network, elephant wrinkles,
+   roof tiles, awning scallops, wood grain, grass blades, paving stones). Words on these images are labels for the owner only. */
+'use strict';
+
+window.__err = []; window.onerror = function (m) { window.__err.push(String(m)); };
+// ---------------------------------------------------------------------------------------------------------------------
+// The scene: the same little corner of a zoo drawn three times.
+// ---------------------------------------------------------------------------------------------------------------------
+var HAB = { '0,0': 1, '1,0': 1, '0,1': 1 }, PATH = { '3,-1': 1, '2,0': 1, '1,1': 1, '0,2': 1, '-1,3': 1, '1,2': 1 };
+var ORIGIN = [44, 52], COLW = 195, COLH = 165; // art pixels (390 x 330 CSS px)
+function sceneItems() {
+  var tiles = [], objs = [];
+  for (var r = -3; r <= 7; r++) for (var q = -4; q <= 6; q++) {
+    var p = G.toScreen(q, r), x = p.x + ORIGIN[0], y = p.y + ORIGIN[1]; if (x < -30 || x > COLW + 30 || y < -25 || y > COLH + 25) continue;
+    var key = q + ',' + r, kind = HAB[key] ? 'hab:savanna' : PATH[key] ? 'path' : 'grass';
+    tiles.push({ kind: kind, seed: ((q * 7 + r * 13) % 18 + 18) % 18, x: x, y: y });
+    if (HAB[key]) for (var e = 0; e < 6; e++) { var nb = G.EDGES[e][0]; if (!HAB[(q + nb[0]) + ',' + (r + nb[1])]) objs.push({ t: 'fence', e: e, x: x, y: y, sy: y + G.edgeMidY(e) }); }
+  }
+  tiles.sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+  function at(q, r, dx, dy) { var p = G.toScreen(q, r); return [p.x + ORIGIN[0] + dx, p.y + ORIGIN[1] + dy]; }
+  var L = at(0, 0, -6, 4), Z2 = at(1, 0, 6, 2), GI = at(1, 0, -10, -3), E = at(0, 1, 2, 4), SN = at(1, 2, 0, 0), V = at(1, 1, 4, 6), KP = at(0, 2, -5, -2), V2 = at(2, 0, -3, 4);
+  objs.push({ t: 'animal', id: 'lion', x: L[0], y: L[1] }, { t: 'animal', id: 'zebra', x: Z2[0], y: Z2[1] }, { t: 'animal', id: 'giraffe', x: GI[0], y: GI[1] },
+    { t: 'animal', id: 'elephant', x: E[0], y: E[1] }, { t: 'building', id: 'snack', x: SN[0], y: SN[1] },
+    { t: 'person', id: 'visitor', seed: 11, x: V[0], y: V[1] }, { t: 'person', id: 'keeper', x: KP[0], y: KP[1] }, { t: 'person', id: 'visitor', seed: 2, x: V2[0], y: V2[1] });
+  objs.forEach(function (o) { if (o.sy == null) o.sy = o.y; });
+  objs.sort(function (a, b) { return a.sy - b.sy; });
+  return { tiles: tiles, objs: objs };
+}
+function sprite(Z, K, o) { // Z = the sprite set (live or hi-res copy)
+  if (o.t === 'tile') return K === 1 ? Z.tile(o.kind, o.seed) : Z._dmode ? dTile(Z, o.kind, o.seed) : hiTile(Z, o.kind, o.seed, K);
+  CUR = { type: o.t }; var s;
+  if (o.t === 'animal') s = Z.animal(o.id, {}); else if (o.t === 'person') s = Z.person(o.id, { seed: o.seed });
+  else if (o.t === 'building') s = Z.building(o.id); else if (o.t === 'fence') s = Z.fence('savanna', o.e);
+  CUR = {}; return s;
+}
+function drawAt(g, s, K, x, y, dev) { // x, y in art pixels; dev = device pixels per art pixel; K fine pixels per art pixel
+  var f = dev / K; g.drawImage(s.c, Math.round(x * dev - s.ax * f), Math.round(y * dev - s.ay * f), s.w * f, s.h * f);
+}
+var SETS;
+window.__go = function () {
+  var B = window.ZS_B, C = window.ZS_C, D = window.ZS_D; D._dmode = true;
+  [B, C, D].forEach(installOverrides);
+  SETS = [{ Z: LIVE, K: 1, name: 'A   today', sub: '1 art pixel = 6 phone pixels' }, { Z: B, K: 1.5, name: 'B   1.5x denser', sub: '1 art pixel = 4 phone pixels' }, { Z: C, K: 2, name: 'C   2x denser', sub: '1 art pixel = 3 phone pixels' }, { Z: D, K: 2, name: 'D   C grid, B boldness', sub: '3 phone pixels, bold outline' }];
+  var DEV = 6, PADX = 40, TOP = 120, cw = COLW * DEV, chh = COLH * DEV, cv = document.getElementById('sample'), g = cv.getContext('2d'), sc = sceneItems();
+  cv.width = SETS.length * cw + (SETS.length + 1) * PADX; cv.height = chh + TOP + 30; g.imageSmoothingEnabled = false; g.fillStyle = '#1e2a33'; g.fillRect(0, 0, cv.width, cv.height);
+  SETS.forEach(function (S, n) {
+    var x0 = PADX + n * (cw + PADX);
+    g.fillStyle = '#ffffff'; g.font = 'bold 64px system-ui, sans-serif'; g.textAlign = 'left'; g.fillText(S.name, x0, 66);
+    g.fillStyle = '#a8c0d0'; g.font = '36px system-ui, sans-serif'; g.fillText(S.sub, x0, 106);
+    g.save(); g.beginPath(); g.rect(x0, TOP, cw, chh); g.clip(); g.translate(x0, TOP); g.fillStyle = '#86c94e'; g.fillRect(0, 0, cw, chh);
+    sc.tiles.forEach(function (t) { drawAt(g, sprite(S.Z, S.K, { t: 'tile', kind: t.kind, seed: t.seed }), S.K, t.x, t.y, DEV); });
+    sc.objs.forEach(function (o) { drawAt(g, sprite(S.Z, S.K, o), S.K, o.x, o.y, DEV); });
+    g.restore();
+  });
+  // zoom: the lion and the snack stand enlarged, same size in each option
+  var ZD = 16, zc = document.getElementById('zoom'), zg = zc.getContext('2d'), ZW = 640, ZH = 1320;
+  zc.width = SETS.length * ZW + (SETS.length + 1) * PADX; zc.height = ZH + TOP; zg.imageSmoothingEnabled = false; zg.fillStyle = '#1e2a33'; zg.fillRect(0, 0, zc.width, zc.height);
+  SETS.forEach(function (S, n) {
+    var x0 = PADX + n * (ZW + PADX);
+    zg.fillStyle = '#ffffff'; zg.font = 'bold 56px system-ui, sans-serif'; zg.textAlign = 'left'; zg.fillText(S.name, x0, 64);
+    zg.fillStyle = '#86c94e'; zg.fillRect(x0, TOP, ZW, ZH);
+    drawAt(zg, sprite(S.Z, S.K, { t: 'animal', id: 'lion' }), S.K, (x0 + ZW / 2) / ZD - 1, (TOP + 430) / ZD, ZD);
+    drawAt(zg, sprite(S.Z, S.K, { t: 'building', id: 'snack' }), S.K, (x0 + ZW / 2) / ZD, (TOP + 1080) / ZD, ZD);
+  });
+  window.__done = true;
+};
+
+function drawSheet(cv, adult, child) {
+  var X = 4, g = cv.getContext('2d'), y = 0;
+  g.imageSmoothingEnabled = false; g.fillStyle = '#d6cfc0'; g.fillRect(0, 0, cv.width, cv.height);
+  function head(t, sub) { y += 70; txt(g, t, 30, y, 40, '#2a1d33', 'left'); if (sub) txt(g, sub, 30, y + 34, 22, '#5a4a40', 'left'); y += sub ? 50 : 20; }
+  function cell(x, w, s, lab, base) { putS(g, s, x + w / 2, base, X); if (lab) txt(g, lab, x + w / 2, base + 30, 17, '#3a2a1a'); }
+  head('First 10% in style D', 'Each pair: left = today, right = new (both at 4x). Then the new walk steps and the new art facing left.');
+  var AN = [['lion', 'Lion'], ['zebra', 'Zebra'], ['elephant', 'Elephant'], ['giraffe', 'Giraffe'], ['penguin', 'Penguin'], ['gorilla', 'Gorilla'], ['toucan', 'Toucan (stands in for the flamingo, which is not in the game)']];
+  head('Animals');
+  AN.forEach(function (a) {
+    var base = y + (a[0] === 'giraffe' ? 200 : 150), CW = 172, x = 20;
+    txt(g, a[1], 24, y + 18, 22, '#2a1d33', 'left');
+    [[{}, 'normal'], [{ variant: true }, 'rare'], [{ juv: true }, 'young']].forEach(function (v) {
+      g.fillStyle = '#e6dfd0'; g.fillRect(x, y + 28, 2 * CW, base - y + 10);
+      cell(x, CW, spr('A', Object.assign({ t: 'animal', id: a[0] }, v[0])), 'now, ' + v[1], base); cell(x + CW, CW, spr('D', Object.assign({ t: 'animal', id: a[0] }, v[0])), 'new, ' + v[1], base); x += 2 * CW + 14; });
+    [[1, 0], [2, 0], [3, 0], [0, 1], [1, 1]].forEach(function (f) { cell(x, 150, spr('D', { t: 'animal', id: a[0], frame: f[0], flip: !!f[1] }), 'new, ' + (f[1] ? 'left, ' : '') + 'step ' + f[0], base); x += 150; });
+    y = base + 50;
+  });
+  head('People');
+  [['visitor', adult, 'Visitor (adult)'], ['visitor', child, 'Visitor (child)'], ['keeper', 0, 'Keeper'], ['trader', 0, 'Trader']].forEach(function (pp, n) {
+    var col = n % 2, x = 20 + col * 1130, base = y + 130;
+    txt(g, pp[2], x + 4, y + 18, 22, '#2a1d33', 'left');
+    g.fillStyle = '#e6dfd0'; g.fillRect(x, y + 28, 220, 140);
+    cell(x, 110, spr('A', { t: 'person', id: pp[0], seed: pp[1] }), 'now', base); cell(x + 110, 110, spr('D', { t: 'person', id: pp[0], seed: pp[1] }), 'new', base);
+    [[1, 0], [2, 0], [3, 0], [0, 1], [1, 1]].forEach(function (f, i) { cell(x + 240 + i * 105, 105, spr('D', { t: 'person', id: pp[0], seed: pp[1], frame: f[0], flip: !!f[1] }), (f[1] ? 'left, ' : '') + 'step ' + f[0], base); });
+    if (col === 1) y = base + 46;
+  });
+  head('Buildings and decorations');
+  var bx = 20, bb = y + 270;
+  [['building', 'snack', 'Snack stand'], ['building', 'gift', 'Gift shop'], ['deco', 'tree', 'Tree'], ['deco', 'bush', 'Bush']].forEach(function (b) {
+    var w = b[0] === 'building' ? 260 : 150; txt(g, b[2], bx + 4, y + 18, 22, '#2a1d33', 'left'); g.fillStyle = '#e6dfd0'; g.fillRect(bx, y + 28, 2 * w, bb - y + 90);
+    var lb = b[0] === 'building' ? bb + 105 : bb + 30;
+    putS(g, spr('A', { t: b[0], id: b[1] }), bx + w / 2, bb, X); putS(g, spr('D', { t: b[0], id: b[1] }), bx + w * 1.5, bb, X); txt(g, 'now', bx + w / 2, lb, 17); txt(g, 'new', bx + w * 1.5, lb, 17); bx += 2 * w + 20; });
+  y = bb + 130;
+  head('Ground', 'Every grass look (6 details x 3 tones), path, land not bought yet, savanna and arctic habitat ground.');
+  var TL = []; for (var i = 0; i < 18; i++) TL.push(['grass', i, 'grass ' + i]); TL.push(['path', 0, 'path'], ['locked', 0, 'locked'], ['hab:savanna', 0, 'savanna'], ['hab:arctic', 0, 'arctic']);
+  TL.forEach(function (t, n) { var col = n % 4, x = 20 + col * 565, base = y + Math.floor(n / 4) * 210 + 100;
+    putS(g, spr('A', { t: 'tile', kind: t[0], seed: t[1] }), x + 130, base, X); putS(g, spr('D', { t: 'tile', kind: t[0], seed: t[1] }), x + 400, base, X); txt(g, t[2] + ':  now | new', x + 265, base + 100, 17); });
+  y += Math.ceil(TL.length / 4) * 210 + 20;
+  head('Fences', 'Savanna fence on each of the 6 edges (now | new), then a whole 3-hex habitat.');
+  for (var e = 0; e < 6; e++) { var x = 20 + e * 375, base = y + 100; g.fillStyle = '#e6dfd0'; g.fillRect(x, y + 10, 360, 190);
+    ['A', 'D'].forEach(function (w, n) { putS(g, spr(w, { t: 'tile', kind: 'hab:savanna', seed: 0 }), x + 95 + n * 170, base, 3); putS(g, spr(w, { t: 'fence', e: e }), x + 95 + n * 170, base, 3); });
+    txt(g, 'edge ' + e + ':  now | new', x + 180, base + 92, 17); }
+  y += 30;
+  y += 200;
+  var ring = [[0, 0, 'hab:savanna'], [1, 0, 'hab:savanna'], [0, 1, 'hab:savanna']];
+  habScene(g, ring, 300, y + 160, X, 'A'); habScene(g, ring, 1300, y + 160, X, 'D'); txt(g, 'now', 480, y + 440, 22); txt(g, 'new', 1480, y + 440, 22);
+  return y + 470;
+}
+window.__template = function () {
+  installOverrides(window.ZS_D); window.ZS_D._dmode = true;
+  var adult = 11, child = 0; for (var sd = 0; sd < 97; sd++) if (LIVE.person('visitor', { seed: sd }).h <= 16) { child = sd; break; }
+  var cv = document.getElementById('sample'); cv.width = 2300; cv.height = 6400;
+  var hgt = drawSheet(cv, adult, child); cv.height = hgt; drawSheet(cv, adult, child);
+  // ---------- the scene: real phone size, D art only ----------
+  var DEV = 6, zc = document.getElementById('zoom'), zg = zc.getContext('2d'), OX = 40, OY = 46;
+  zc.width = 195 * DEV; zc.height = 300 * DEV; zg.imageSmoothingEnabled = false; zg.fillStyle = '#86c94e'; zg.fillRect(0, 0, zc.width, zc.height);
+  var H = {}, list = [];
+  ['0,0', '1,0', '0,1'].forEach(function (k) { H[k] = 'hab:savanna'; }); ['2,2', '1,3', '2,3'].forEach(function (k) { H[k] = 'hab:arctic'; });
+  ['2,0', '1,1', '0,2', '1,2', '0,3', '0,4', '0,5', '0,6', '-1,4', '-1,5', '1,4', '0,7', '-1,7'].forEach(function (k) { H[k] = 'path'; });
+  for (var r = -3; r <= 10; r++) for (var q = -5; q <= 7; q++) { var pq = G.toScreen(q, r); if (pq.x + OX < -30 || pq.x + OX > 225 || pq.y + OY < -25 || pq.y + OY > 325) continue; list.push([q, r, H[q + ',' + r] || 'grass']); }
+  function ob(t, id, q, r, dx, dy, more) { var p = G.toScreen(q, r); return Object.assign({ t: t, id: id, x: p.x + dx, y: p.y + dy }, more || {}); }
+  var extra = [ob('animal', 'lion', 0, 0, -6, 4), ob('animal', 'giraffe', 1, 0, -10, -3), ob('animal', 'zebra', 1, 0, 7, 3, { frame: 1 }), ob('animal', 'elephant', 0, 1, 2, 4),
+    ob('animal', 'penguin', 2, 2, -6, 2), ob('animal', 'penguin', 2, 2, 7, 5, { juv: true }), ob('animal', 'penguin', 1, 3, 2, 3, { frame: 1, flip: true }), ob('animal', 'penguin', 2, 3, 0, 2, { variant: true }),
+    ob('building', 'snack', -1, 4, 0, 0), ob('building', 'gift', -1, 5, 0, 0),
+    ob('person', 'visitor', 1, 1, 4, 6, { seed: adult }), ob('person', 'visitor', 0, 3, -4, 2, { seed: child, flip: true }), ob('person', 'visitor', 0, 4, 6, -2, { seed: 5, frame: 1 }),
+    ob('person', 'keeper', 0, 6, -12, -6), ob('person', 'trader', 0, 6, 10, -5, { flip: true }), ob('entrance', 'gate', 0, 7, 0, 0),
+    ob('deco', 'tree', 1, 5, 2, 6), ob('deco', 'bush', -1, 6, 4, 2), ob('deco', 'tree', 2, 4, 6, 0, { seed: 1 })];
+  habScene(zg, list, OX * DEV, OY * DEV, DEV, 'D', extra);
+  window.__done = true;
+};
+</script>
+</body></html>

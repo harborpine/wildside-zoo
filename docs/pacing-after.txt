@@ -1,3 +1,149 @@
+Wildside Zoo pacing, ROUND 5 (save version still 3). Changes: habitats hold 4 +2 per level, happenings every 10-14 weeks
+with about a third mild setbacks (new: fence, pipe, rival), 5 rarity crates per trader visit, expedition and crate animals
+wait for a sell/keep decision, hiring adverts take 2-3 weeks. The previous record (round 4) is kept further down.
+
+== R5.1 Round 4 against Round 5, bot skill 0.8, bare-land start, average of 16 full runs each ==
+      |        ROUND 4 (section 3 below)                  |        ROUND 5
+year  |     money  idle  rank place  best avgRev species |     money  idle  rank place  best avgRev species
+   Y1 |   $19,760   3.1   3.1  11.8  19.2  16.5   11.4 |   $17,320   3.0   3.1  11.9  18.9  16.2   12.0
+   Y2 |   $49,109   2.7   4.1  10.1  24.2  19.2   21.3 |   $43,181   2.9   4.1  10.1  24.3  19.7   21.5
+   Y3 |   $82,255   2.9   5.0   8.8  26.6  21.6   27.6 |   $72,766   2.8   5.0   9.0  25.9  21.8   26.6
+   Y4 |  $170,971   3.1   5.6   7.8  27.6  23.1   32.2 |  $119,624   2.9   5.3   8.1  26.6  22.7   32.5
+   Y5 |  $267,660   3.9   6.0   6.8  28.8  23.8   35.9 |  $175,940   3.1   6.0   7.2  28.0  23.9   35.8
+   Y6 |  $627,575   5.8   6.4   5.9  29.8  25.0   37.2 |  $263,635   3.7   6.0   6.4  29.3  25.0   37.4
+   Y7 |  $719,358   5.4   7.0   5.1  30.8  25.8   38.6 |  $398,982   3.9   6.9   5.5  30.4  25.9   38.0
+   Y8 |  $662,427   6.0   7.1   4.0  31.2  26.1   40.9 |  $522,854   4.2   7.0   4.5  30.8  26.7   39.3
+   Y9 |  $656,109   4.9   7.9   3.1  31.4  26.3   43.4 |  $758,175   5.1   7.5   3.8  31.2  26.8   41.9
+  Y10 |  $908,111   4.6   8.0   2.3  31.9  26.9   46.6 |  $599,032   4.2   8.0   2.8  31.7  26.9   45.6
+  Y11 |  $887,865   4.8   8.3   1.6  32.1  27.2   48.9 |  $760,259   4.0   8.0   2.1  32.0  27.3   47.9
+  Y12 |$1,060,591   4.7   8.9   1.3  32.5  27.4   51.0 |  $862,883   4.3   8.4   1.6  32.2  27.5   49.1
+  Y13 |$1,142,045   4.4   9.1   1.1  33.6  27.6   53.6 |$1,048,129   3.9   8.9   1.2  32.5  27.8   51.0
+  Y14 |$1,640,495   4.1   9.4   1.0  33.9  28.0   56.2 |$1,487,960   3.6   9.1   1.0  33.6  27.9   54.6
+  Y15 |$2,000,919   4.1   9.9   1.0  34.0  28.0   59.3 |$1,743,860   3.6   9.4   1.0  33.9  28.3   57.1
+  Y16 |$2,472,033   4.3  10.0   1.0  35.1  28.6   60.2 |$2,165,246   3.7   9.8   1.0  34.4  29.0   58.8
+  Y17 |$3,226,778   4.3  10.0   1.0  35.5  29.0   61.8 |$2,557,318   3.9  10.0   1.0  34.8  29.0   59.6
+  Y18 |$4,013,864   4.6  10.0   1.0  35.8  29.1   62.4 |$3,290,976   3.8  10.0   1.0  35.5  29.3   61.3
+  Y19 |$4,616,682   4.9  10.0   1.0  35.7  29.1   63.4 |$4,665,672   4.3  10.0   1.0  35.3  29.5   62.3
+  Y20 |$5,646,558   5.6  10.0   1.0  35.7  29.3   64.3 |$5,083,856   4.3  10.0   1.0  35.3  29.6   62.8
+final score: ROUND 4 296,163   ROUND 5 296,370
+What moved: bank balances are lower through the middle years (crates are now a bigger money sink: about 440 opened per
+run instead of about 90) and rank 9-10 arrives about half a year later (fewer happenings mean less reputation from them:
+about 2,300 instead of 3,000-4,300 per run). Reviews, species and the final score are unchanged within noise.
+
+== R5.2 Other skills, 16 runs each (selected years) ==
+skill 0.5 (round 4 final 269,021 -> round 5 272,490)
+Y1 $22286 idle 3.6wk rank 3.1 place 11.7 best 18.3 avgReview 15.7 species 12.4
+Y5 $219699 idle 3.8wk rank 6.0 place 7.3 best 27.4 avgReview 23.4 species 35.9
+Y10 $842250 idle 5.0wk rank 7.8 place 3.3 best 31.2 avgReview 26.4 species 47.8
+Y15 $1755557 idle 4.3wk rank 9.2 place 1.0 best 33.6 avgReview 27.9 species 60.0
+Y20 $4680116 idle 5.4wk rank 10.0 place 1.0 best 35.1 avgReview 28.9 species 63.8
+ignores every optional system (BOT_OFF=campaign,crate,yearly,choices,happenings), skill 0.8 (round 4 final 246,919 -> round 5 227,438)
+Y1 $19677 idle 3.8wk rank 3.0 place 12.0 best 18.6 avgReview 15.9 species 9.3
+Y5 $366426 idle 6.2wk rank 5.6 place 7.9 best 26.9 avgReview 22.9 species 34.9
+Y10 $1113913 idle 10.1wk rank 7.0 place 4.8 best 29.7 avgReview 25.4 species 48.1
+Y15 $1758189 idle 7.6wk rank 8.1 place 2.3 best 31.7 avgReview 26.6 species 60.6
+Y20 $4735460 idle 10.4wk rank 9.4 place 1.2 best 33.1 avgReview 27.4 species 64.0
+(A player who never answers a happening now takes every setback at its default, so this case dropped about 8%.)
+
+== R5.5 After the "every animal is an arrival" change and holding upkeep, bot skill 0.8, 16 runs ==
+(Births, purchases, the stray and legacy animals now also wait for Sell / Keep; nothing is housed by the engine; undecided
+arrivals go to the holding pen; each animal in the holding pen costs its normal upkeep again on top: D.HOLD_UPKEEP 1.0.)
+year  |     money  idle  rank place  best avgRev species   (R5.1 round 5 column for comparison)
+   Y1 |   $19,921   3.0   3.1  11.5  19.4  16.3   12.9   ($17,320  r3.1  p11.9)
+   Y2 |   $50,586   2.7   4.1   9.9  24.6  19.5   22.1
+   Y3 |   $76,682   3.0   5.0   8.9  26.6  22.1   27.8
+   Y4 |  $125,690   3.0   5.4   8.0  27.6  23.3   32.1
+   Y5 |  $218,339   3.2   6.0   7.1  28.8  23.9   35.6   ($175,940 r6.0  p7.2)
+   Y6 |  $318,021   3.8   6.1   6.4  29.4  25.0   36.8
+   Y7 |  $463,703   4.0   6.9   5.5  30.2  26.0   37.8
+   Y8 |  $504,949   4.2   7.0   4.6  31.4  26.4   39.6
+   Y9 |  $706,186   4.6   7.6   3.8  31.7  26.8   42.6
+  Y10 |  $703,003   4.0   7.9   3.0  32.1  27.2   46.1   ($599,032 r8.0  p2.8)
+  Y11 |  $786,446   4.4   8.0   2.1  32.7  27.5   47.8
+  Y12 |  $943,800   4.3   8.5   1.7  32.6  27.7   49.9
+  Y13 |$1,058,706   4.1   8.8   1.4  32.9  28.0   51.8
+  Y14 |$1,337,884   3.7   8.9   1.3  33.4  28.3   54.2
+  Y15 |$1,759,250   3.6   9.4   1.1  34.3  28.4   56.7
+  Y16 |$1,934,596   3.6   9.8   1.0  34.3  28.8   58.8
+  Y17 |$2,663,282   3.8   9.9   1.0  34.9  29.1   60.2
+  Y18 |$3,123,806   3.9  10.0   1.0  35.2  29.3   61.0
+  Y19 |$3,970,864   4.1  10.0   1.0  35.3  29.6   61.5
+  Y20 |$5,158,236   4.7  10.0   1.0  35.6  29.6   62.6   ($5,083,856 r10 p1.0)
+final score 292,975 (R5.1: 296,370; round 4: 296,163). Within run-to-run noise: the bot decides every arrival itself and keeps
+at most 2 animals in the holding pen, so holding upkeep costs it little.
+
+== R5.3 One run, bot skill 0.8 (node test/bot.js 0.8), latest rules ==
+Y1 place 11 rating 468 (top 5081) $17877 idle 2.7wk inc/wk 3300 cost/wk 978 spent/wk 1200 vis/wk 357 rep 1070 r4 sp 16 best 18 rev 13-18 avg 15.0 ev 5 exp 8 births 5 awards exhibit/rarest/breeder/explorer | staff 4 avgAnimal 30 bestBaby 30 prest 110 rp 38 rows 10 habs savanna2,savanna1,jungle1
+Y2 place 10 rating 1029 (top 5328) $38277 idle 2.7wk inc/wk 13429 cost/wk 2875 spent/wk 4628 vis/wk 1021 rep 2051 r4 sp 23 best 22 rev 14-22 avg 18.1 ev 11 exp 10 births 9 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 33 bestBaby 43 prest 123 rp 195 rows 12 habs savanna3,savanna3,jungle2,desert1
+Y3 place 9 rating 1551 (top 5575) $46892 idle 3wk inc/wk 21240 cost/wk 4637 spent/wk 10967 vis/wk 1486 rep 3165 r5 sp 29 best 26 rev 17-26 avg 20.3 ev 15 exp 9 births 7 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 36 bestBaby 42 prest 123 rp 267 rows 12 habs savanna3,savanna3,jungle2,desert1,jungle2
+Y4 place 8 rating 2089 (top 5822) $121520 idle 2.9wk inc/wk 29328 cost/wk 6340 spent/wk 12400 vis/wk 2021 rep 4489 r5 sp 32 best 24 rev 18-24 avg 21.7 ev 15 exp 7 births 7 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 38 bestBaby 46 prest 151 rp 290 rows 12 habs savanna3,savanna3,jungle3,desert2,jungle2
+Y5 place 7 rating 2653 (top 6069) $120247 idle 3wk inc/wk 44528 cost/wk 8428 spent/wk 20467 vis/wk 2620 rep 5897 r6 sp 34 best 27 rev 17-27 avg 23.2 ev 18 exp 8 births 12 awards exhibit/rarest/breeder | staff 6 avgAnimal 39 bestBaby 51 prest 152 rp 210 rows 14 habs savanna3,savanna3,jungle3,desert2,jungle3,arctic1
+Y6 place 7 rating 3313 (top 6317) $220937 idle 3.1wk inc/wk 66482 cost/wk 10586 spent/wk 36785 vis/wk 3546 rep 7611 r6 sp 36 best 29 rev 15-29 avg 25.0 ev 21 exp 7 births 11 awards exhibit/rarest/breeder | staff 6 avgAnimal 42 bestBaby 58 prest 164 rp 246 rows 14 habs savanna4,savanna4,jungle3,desert3,jungle3,arctic1,desert2
+Y7 place 5 rating 4173 (top 6564) $374779 idle 3.2wk inc/wk 99809 cost/wk 13213 spent/wk 51194 vis/wk 5093 rep 9595 r7 sp 38 best 32 rev 21-32 avg 26.4 ev 22 exp 7 births 13 awards exhibit/rarest/breeder | staff 6 avgAnimal 43 bestBaby 56 prest 164 rp 325 rows 14 habs savanna4,savanna4,jungle4,desert3,jungle4,arctic2,desert3
+Y8 place 4 rating 4993 (top 6811) $516687 idle 4.2wk inc/wk 126771 cost/wk 18002 spent/wk 89125 vis/wk 6260 rep 11981 r7 sp 39 best 32 rev 20-32 avg 25.8 ev 23 exp 11 births 8 awards exhibit/rarest/breeder | staff 6 avgAnimal 43 bestBaby 59 prest 169 rp 617 rows 14 habs savanna4,savanna4,jungle4,desert3,jungle4,arctic2,desert3,arctic2
+Y9 place 3 rating 5636 (top 7058) $584322 idle 3.3wk inc/wk 137727 cost/wk 21680 spent/wk 56679 vis/wk 6442 rep 14339 r8 sp 47 best 31 rev 19-31 avg 25.7 ev 28 exp 12 births 7 awards exhibit/rarest/breeder/explorer | staff 7 avgAnimal 46 bestBaby 61 prest 171 rp 411 rows 17 habs savanna4,savanna4,jungle4,desert3,jungle4,arctic2,desert3,arctic2,mountain1
+Y10 place 3 rating 6237 (top 7305) $462511 idle 3.4wk inc/wk 158052 cost/wk 23003 spent/wk 89029 vis/wk 6884 rep 16335 r8 sp 47 best 33 rev 20-33 avg 26.6 ev 26 exp 13 births 8 awards exhibit/rarest/breeder | staff 7 avgAnimal 47 bestBaby 64 prest 174 rp 286 rows 17 habs savanna4,savanna4,jungle4,desert4,jungle4,arctic2,desert4,arctic2,mountain1
+Y11 place 3 rating 6818 (top 7552) $570229 idle 3.3wk inc/wk 167916 cost/wk 23903 spent/wk 92525 vis/wk 7335 rep 18358 r8 sp 48 best 31 rev 22-31 avg 27.2 ev 25 exp 12 births 8 awards exhibit/rarest/breeder | staff 7 avgAnimal 49 bestBaby 70 prest 180 rp 805 rows 17 habs savanna4,savanna4,jungle4,desert4,jungle4,arctic3,desert4,arctic2,mountain1
+Y12 place 2 rating 7603 (top 7800) $884725 idle 3.6wk inc/wk 187038 cost/wk 27600 spent/wk 106765 vis/wk 8054 rep 21060 r8 sp 52 best 33 rev 24-33 avg 27.5 ev 28 exp 13 births 12 awards exhibit/rarest/breeder/explorer | staff 7 avgAnimal 50 bestBaby 79 prest 189 rp 1195 rows 17 habs savanna4,savanna4,jungle4,desert4,jungle4,arctic3,desert4,arctic3,mountain1,ocean1
+Y13 place 1 rating 8480 (top 8047) $1154719 idle 3.1wk inc/wk 216077 cost/wk 30952 spent/wk 101998 vis/wk 8811 rep 24157 r9 sp 56 best 34 rev 18-34 avg 27.5 ev 28 exp 12 births 9 awards exhibit/rarest/breeder/explorer/zoo | staff 7 avgAnimal 52 bestBaby 77 prest 189 rp 1557 rows 17 habs savanna5,savanna5,jungle5,desert4,jungle5,arctic3,desert4,arctic3,mountain1,ocean1
+Y14 place 1 rating 9923 (top 8294) $1225356 idle 3.1wk inc/wk 281433 cost/wk 36317 spent/wk 164648 vis/wk 11241 rep 27957 r9 sp 58 best 34 rev 21-34 avg 28.6 ev 30 exp 13 births 9 awards exhibit/rarest/breeder/explorer/zoo | staff 7 avgAnimal 53 bestBaby 81 prest 191 rp 227 rows 17 habs savanna5,savanna5,jungle5,desert4,jungle5,arctic3,desert4,arctic3,mountain2,ocean1
+Y15 place 1 rating 10704 (top 8541) $1339121 idle 2.9wk inc/wk 297408 cost/wk 39898 spent/wk 192554 vis/wk 11666 rep 30865 r9 sp 58 best 35 rev 22-35 avg 28.4 ev 33 exp 11 births 11 awards exhibit/rarest/breeder/zoo | staff 7 avgAnimal 54 bestBaby 84 prest 194 rp 2528 rows 17 habs savanna5,savanna5,jungle5,desert4,jungle5,arctic3,desert4,arctic3,mountain2,ocean1,mountain2
+Y16 place 1 rating 11833 (top 8788) $1770026 idle 4wk inc/wk 368404 cost/wk 41569 spent/wk 245950 vis/wk 13358 rep 34208 r10 sp 58 best 35 rev 23-35 avg 28.1 ev 34 exp 13 births 11 awards exhibit/rarest/breeder/zoo | staff 8 avgAnimal 57 bestBaby 93 prest 203 rp 2116 rows 17 habs savanna5,savanna5,jungle5,desert5,jungle5,arctic3,desert4,arctic3,mountain2,ocean1,mountain2
+Y17 place 1 rating 12756 (top 9035) $2598798 idle 3.7wk inc/wk 392093 cost/wk 44686 spent/wk 287967 vis/wk 14259 rep 37514 r10 sp 59 best 35 rev 23-35 avg 28.7 ev 35 exp 10 births 9 awards exhibit/rarest/breeder/explorer/zoo | staff 8 avgAnimal 58 bestBaby 93 prest 203 rp 3582 rows 17 habs savanna5,savanna5,jungle5,desert5,jungle5,arctic3,desert4,arctic3,mountain2,ocean1,mountain2
+Y18 place 1 rating 13514 (top 9283) $2879310 idle 4wk inc/wk 388844 cost/wk 45951 spent/wk 243983 vis/wk 14048 rep 41093 r10 sp 62 best 35 rev 23-35 avg 29.1 ev 32 exp 11 births 8 awards exhibit/rarest/breeder/explorer/zoo | staff 8 avgAnimal 58 bestBaby 99 prest 203 rp 1587 rows 17 habs savanna5,savanna5,jungle5,desert5,jungle5,arctic3,desert4,arctic3,mountain2,ocean1,mountain2
+Y19 place 1 rating 14549 (top 9530) $4072860 idle 3.6wk inc/wk 404725 cost/wk 46506 spent/wk 317458 vis/wk 14666 rep 45238 r10 sp 63 best 35 rev 24-35 avg 29.4 ev 34 exp 11 births 12 awards exhibit/rarest/breeder/explorer/zoo | staff 8 avgAnimal 60 bestBaby 99 prest 209 rp 3609 rows 17 habs savanna5,savanna5,jungle5,desert5,jungle5,arctic3,desert5,arctic3,mountain2,ocean1,mountain2
+Y20 place 1 rating 15500 (top 9777) $6466047 idle 4.5wk inc/wk 466342 cost/wk 54350 spent/wk 244425 vis/wk 15291 rep 48865 r10 sp 64 best 36 rev 24-36 avg 29.3 ev 36 exp 10 births 9 awards exhibit/rarest/breeder/explorer/zoo | staff 8 avgAnimal 61 bestBaby 99 prest 209 rp 5870 rows 20 habs savanna5,savanna5,jungle5,desert5,jungle5,arctic4,desert5,arctic3,mountain2,ocean1,mountain2,paleo1
+score {"total":307314,"parts":[["Zoo rating",77500],["Final ranking",22000],["Species recorded",38400],["Rare variants",27900],["Trophies",100000],["Combos found",2000],["Best exhibit review",9000],["Bank balance",30514]]}
+regions savanna,jungle,desert,arctic,paleo,mountain,ocean,mythic | frag 4 | combos picnic,trail,scoop,icefire,row | vips reporter,photog,filmcrew,professor,critic,mayor,royal | variants 31 | hall of fame 19
+happenings 80 (one per 12.0 weeks, 33% setbacks) {"school":7,"escape":6,"viral":4,"feature":6,"mentor":4,"volunteers":3,"cold":4,"scholar":6,"stray":4,"sale":3,"storm":4,"coins":5,"tv":4,"pipe":1,"rival":6,"heat":2,"donor":4,"spring":2,"powercut":3,"fence":2}
+choices asked 1371 answered 1183 | seen {"advert":5,"keep":1005,"campaign":549,"report:choice":1371,"choice:star":403,"report:combo":5,"report:applicants":5,"report:caller":192,"choice:boost":408,"report:review":499,"report:vip":7,"report:happening":80,"crate":433,"crate1":121,"train":533,"choice:vet":52,"report:yearlyplan":40,"report:rankup":9,"report:yearly":40,"choice:diet":51,"report:birth":161,"keepPen":133,"sellArrival":108,"choice:tracks":50,"crate2":133,"super":72,"report:expedition":208,"choice:guide":63,"choice:camp":43,"choice:watch":61,"report:show":20,"report:showresult":20,"report:yearend":20,"choice:river":52,"crate3":93,"report:secret":2,"crate4":65,"crate5":21,"report:final":1}
+reputation by source {"species":3668,"campaign":8566,"visitors":9261,"combo":50,"reviews":8091,"vips":1265,"happenings":2844,"yearly":5988,"births":1550,"show":2040,"awards":5646}
+optional spending over the run $113,795,850 | saveKB with log 676 without 45
+
+== R5.4 Headless checks (node test/rules-check.js), latest rules ==
+ok   new game: version 3, portrait grid, entrance at the front
+ok   land grows by rows from the front
+ok   stable habitat numbers and names
+ok   habStatus shape and readiness
+ok   event: star and boost choices arrive, resolve, and the review carries critic scores
+ok   ignored choices fall back to the safe default and nothing deadlocks
+ok   every project choice option resolves (14 option paths)
+ok   every happening works, with every option, and setbacks never undo progress (324 cases)
+ok   happenings: unanswered ones resolve themselves; one every 10 to 14 weeks; about a third setbacks (8 runs) (one per 12.1 weeks, 30% setbacks)
+ok   new setbacks: fence closes a habitat 2 weeks (rush job reopens), pipe and rival are short dips
+ok   compareOwned: species, sex, better / worse / mixed, offers, ids and arrivals
+ok   rarity crates: 5 of one rarity per trader visit, rarer visits rarer, price by rarity and rank (rank 1 visits by rarity 1096/660/199/45/0, rank 9 323/545/593/410/129)
+ok   arrivals: keep / sell / where, choices order, and the safety default
+ok   expedition finds wait as arrivals; nothing deadlocks with a full pen
+ok   habitat capacity: 4 at level 1, +2 per level, whatever the shape; pen unchanged
+ok   timed hiring: advert takes weeks, then applicants arrive with a report; one at a time
+ok   an old-shaped version 3 save (before round 5) loads and plays 50 ticks
+ok   training: Super! is triple and about 1 in 8 (12.3%)
+ok   hiring tiers
+ok   campaigns and yearly spend ladders
+ok   births: babies wait as arrivals; the parents habitat is suggested, else another with room; reveal data is complete (363 babies suggested next door)
+ok   expedition reveal data
+ok   auto-housing in one step
+ok   rule lookups the interface used to copy
+ok   reports raised inside an action are in S.reports when it returns
+ok   save: serialize, deserialize, 50 more ticks (fresh game and several points of a played game) (9 saves from a played game)
+ok   bot: 20 years at skills 0.3, 0.6, 0.8 and 1.0 (0.3: 266212, 0.6: 292050, 0.8: 260159, 1: 304389)
+ok   display names and icons: tables match the state keys, no old stat words in player text
+ok   blank start: bare land, two penned zebras, money covers the starter
+ok   starter:true reproduces the classic layout
+ok   a bare zoo left alone: 60 quiet weeks (and 3 years), no errors, nothing lost, never stuck (first caller or happening 2 weeks after opening)
+ok   bot: blank start and classic start both finish and land in the same range (blank 288605, classic 301947)
+ok   no engine path houses an animal without a player action (source scan) (9 places, all player actions (plus the classic starter))
+ok   no engine path houses an animal without a player action (played: births, finds, crates, trader, director, stray, legacy) (7 arrival sources, none housed by the engine)
+ok   holding upkeep: charged per animal in the pen when open, waived when closed, arrivals free (a Common in holding costs +$20/wk)
+ok   movableTo and moveIn after building; remove sends animals to the pen
+ok   short labels
+
+RULES CHECK: ALL PASSED
+
+==================================================================================================================
+PREVIOUS RECORD (round 4) BELOW
+==================================================================================================================
 Wildside Zoo pacing AFTER the rules rebuild (save version 3). Compare with docs/pacing-before.txt.
 The bot now starts on BARE LAND and builds the starter (Savanna habitat, Snack Stand) itself in week 0, with the higher starting money.
 Part 1 is one run in the same layout as the before file (node test/bot.js 0.8). One run is noisy, so the other parts are averages.

@@ -8,7 +8,7 @@ const { chromium } = require('./pw.js');
 const BIOMES = ['savanna', 'jungle', 'desert', 'arctic', 'mountain', 'ocean', 'paleo', 'mythic'];
 const ALL = BIOMES.map(b => 'animals-' + b).concat(['people', 'tiles', 'fences', 'buildings', 'extras', 'icons2', 'patch', 'scene', 'scene2']);
 (async () => {
-  const want = process.argv.slice(2).length ? process.argv.slice(2) : ALL;
+  const d2 = process.argv.includes('--d2'), args = process.argv.slice(2).filter(a => a !== '--d2'), want = args.length ? args : ALL;
   const out = path.join(__dirname, 'shots'); fs.mkdirSync(out, { recursive: true });
   const browser = await chromium.launch({ headless: true });
   let bad = 0;
@@ -18,13 +18,13 @@ const ALL = BIOMES.map(b => 'animals-' + b).concat(['people', 'tiles', 'fences',
     const page = await ctx.newPage(); const errs = [];
     page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.text()); });
     page.on('pageerror', e => errs.push(String(e)));
-    await page.goto('file:///' + path.join(__dirname, 'art-sheet.html').replace(/\\/g, '/') + '?s=' + s);
+    await page.goto('file:///' + path.join(__dirname, 'art-sheet.html').replace(/\\/g, '/') + '?s=' + s + (d2 ? '&d=2' : ''));
     await page.waitForFunction('window.__done === true', null, { timeout: 30000 });
     const e2 = await page.evaluate('window.__err');
-    const file = path.join(out, 'art-' + s + '.png');
+    const file = path.join(out, 'art-' + s + (d2 ? '-d2' : '') + '.png');
     await page.locator('#c').screenshot({ path: file });
     const all = errs.concat(e2); if (all.length) bad++;
-    console.log((all.length ? 'PROBLEM ' : 'ok      ') + 'test/shots/art-' + s + '.png' + (all.length ? '\n   ' + all.slice(0, 6).join('\n   ') : ''));
+    console.log((all.length ? 'PROBLEM ' : 'ok      ') + 'test/shots/art-' + s + (d2 ? '-d2' : '') + '.png' + (all.length ? '\n   ' + all.slice(0, 6).join('\n   ') : ''));
     await ctx.close();
   }
   await browser.close();

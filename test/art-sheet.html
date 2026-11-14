@@ -15,10 +15,19 @@
 'use strict';
 var S = window.ZSprites, D = window.ZD, G = window.ZGeo, cv = document.getElementById('c'), g = cv.getContext('2d');
 window.__err = []; window.onerror = function (m) { window.__err.push(String(m)); };
+// ?d=2: style D (density 2) with ZGeo doubled the way the Lead will ship it; the sheet layout keeps today's geometry (G)
+if (/[?&]d=2/.test(location.search)) {
+  var A2 = [G.A[0] * 2, G.A[1] * 2], B2 = [G.B[0] * 2, G.B[1] * 2], g2 = { A: A2, B: B2 }, DET2 = A2[0] * B2[1] - B2[0] * A2[1];
+  g2.CORNERS = G.CORNERS.map(function (c) { return [c[0] * 2, c[1] * 2]; }); g2.EDGES = G.EDGES; g2.W = G.W * 2; g2.H = G.H * 2; g2.HW = G.HW * 2; g2.HH = G.HH * 2;
+  g2.toScreen = function (q, r) { return { x: A2[0] * q + B2[0] * r, y: A2[1] * q + B2[1] * r }; };
+  g2.toAxial = function (x, y) { var a = G.toAxial(x / 2, y / 2); return a; };
+  g2.edgeMidY = function (e) { return G.edgeMidY(e) * 2; }; g2.depth = function (q, r, dy) { return A2[1] * q + B2[1] * r + (dy || 0); };
+  window.ZGeo = g2; S.setDensity(2);
+}
 var sheet = (location.search.match(/[?&]s=([\w:-]+)/) || [0, 'animals-savanna'])[1];
 var GRASS = '#86c94e';
 function size(w, h, bg) { cv.width = w; cv.height = h; g.imageSmoothingEnabled = false; g.fillStyle = bg || GRASS; g.fillRect(0, 0, w, h); }
-function put(s, x, y, k) { k = k || 1; g.drawImage(s.c, Math.round(x - s.ax * k), Math.round(y - s.ay * k), s.w * k, s.h * k); }
+function put(s, x, y, k) { k = (k || 1) / (s.d === 2 ? 2 : 1); g.drawImage(s.c, Math.round(x - s.ax * k), Math.round(y - s.ay * k), s.w * k, s.h * k); }
 function label(t, x, y, col, sz) { g.font = 'bold ' + (sz || 13) + 'px system-ui, sans-serif'; g.textAlign = 'center'; g.fillStyle = col || '#16301a'; g.fillText(t, x, y); }
 function hexes(list, x, y, k, fn) { list.forEach(function (c) { var p = G.toScreen(c[0], c[1]); fn(c, x + p.x * k, y + p.y * k); }); }
 

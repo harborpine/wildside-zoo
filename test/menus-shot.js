@@ -46,7 +46,7 @@ async function run(name) {
       const layers = [...document.querySelectorAll('.layer:not([hidden])')], L = layers[layers.length - 1]; if (!L) return { err: 'no screen' };
       const all = [...L.querySelectorAll('button, .row.tappable, .tab')].filter(b => b.getBoundingClientRect().width > 0);
       const t = b => b.textContent.trim();
-      let m = all.filter(b => t(b).startsWith(text)); if (!m.length) m = all.filter(b => t(b).includes(text));
+      let m = all.filter(b => t(b).startsWith(text)); if (!m.length) m = all.filter(b => t(b).includes(text) || (b.getAttribute('aria-label') || '').includes(text));
       if (!m.length) return { err: 'not found: ' + text + ' among ' + all.map(b => t(b).slice(0, 18)).join(' | ') };
       const b = m[nth || 0]; if (!b) return { err: 'no nth ' + nth };
       b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect();
@@ -60,7 +60,7 @@ async function run(name) {
   async function screen(label, file) { await audit(label); if (file !== false) await shot(file || label); }
   async function dismiss() { for (let i = 0; i < 6; i++) { const top = await ev(() => ZT.stack().slice(-1)[0] || ''); if (!/^mo-|result|crate-/.test(top)) return; await sleep(600); const p = await ev(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), c = L.querySelector('.rcard, .panel'), r = c.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await page.touchscreen.tap(p.x, p.y); await sleep(500); } }
   // Every stat chip on the open screen is an icon and a number, never a letter label.
-  async function chipCheck(label) { const r = await ev(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), cs = [...L.querySelectorAll('.row .chip:not(.grade)')]; return { n: cs.length, bad: cs.filter(c => c.querySelector('b') || !/^[0-9?!*]+$/.test(c.textContent.trim()) || !c.querySelector('img.sym')).map(c => c.textContent.trim().slice(0, 12)) }; }); check(r.n > 0 && r.bad.length === 0, label + ': ' + r.n + ' chips are icon plus number, no letter labels' + (r.bad.length ? ' BAD ' + r.bad.join('|') : '')); }
+  async function chipCheck(label) { const r = await ev(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), cs = [...L.querySelectorAll('.row .chip:not(.grade), .mn-at .chip:not(.grade)')]; return { n: cs.length, bad: cs.filter(c => c.querySelector('b') || !/^[0-9?!*]+$/.test(c.textContent.trim()) || !c.querySelector('img.sym')).map(c => c.textContent.trim().slice(0, 12)) }; }); check(r.n > 0 && r.bad.length === 0, label + ': ' + r.n + ' chips are icon plus number, no letter labels' + (r.bad.length ? ' BAD ' + r.bad.join('|') : '')); }
   async function back() { await tap('Back'); }
 
   await page.goto(URL); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready && window.ZMenus, null, { timeout: 8000 });
@@ -77,10 +77,15 @@ async function run(name) {
   await tap('Staff'); await screen('staff'); await chipCheck('staff list');
   const staffN = await S(() => ZT.S.staff.length);
   await screen('hire');
-  await tap('Notice board', { wait: 500 }); await screen('candidates');
-  await sleep(300); await screen('hire-reveal', 'hire-reveal');
-  await ev(() => { let g = 0; while (ZT.stack().length && ZT.stack().slice(-1)[0] !== 'staff-candidates' && g++ < 8) ZCore.pop(); }); await sleep(300); await screen('candidates');
-  check(await stack() === 'menu>staff>staff-candidates', 'advert shows who turned up (' + await stack() + ')');
+  await tap('Notice board', { wait: 500 }); await screen('advert-out');
+  check(await ev(() => !!ZT.S.hiring) && await stack() === 'menu>staff', 'paying for an advert starts a timed job and stays on Staff (' + await stack() + ')');
+  check(await ev(() => !!document.querySelector('.layer:not([hidden]) .bar')), 'the running advert shows a progress bar on the Staff screen');
+  await ev(() => { ZT.popAll(); ZT.tick(4); }); await sleep(900); await shot('hire-reveal');
+  for (let i = 0; i < 6; i++) { await dismiss().catch(() => 0); await sleep(300); }
+  await ev(() => ZT.popAll()); await openMenu(); await tap('Staff'); await tap('Who turned up'); await screen('candidates');
+
+
+  check(await stack() === 'menu>staff>staff-candidates' && await ev(() => ZT.S.candidates.length > 0), 'applicants arrive later and the Who turned up list is on Staff (' + await stack() + ')');
   await tap('Hire'); check(await S(() => ZT.S.staff.length) === staffN + 1, 'hired one candidate with one tap');
   await back(); await screen('staff-after-hire', false);
   await ev(() => ZT.popAll());
@@ -113,10 +118,10 @@ async function run(name) {
   check(await ev(() => ZT.S.projects.some(p => p.type === 'breed')), 'breeding started when a pair was ready');
   // running project detail + a pending choice answered from the Projects list
   await openMenu(); await tap('Projects');
-  await tap('Expedition ·'); await screen('project-detail'); await back();
+  await tap('Savanna'); await screen('project-detail'); await back();
   await ev(() => { const p = ZT.S.projects.find(p => p.type === 'breed'); ZT.S.projects.forEach(x => { x.choice = null; }); p.choice = { key: 'vet', title: 'Call the vet?', text: 'A check-up would help.', who: 'keeper', def: 1, options: [{ label: 'Call the vet', note: 'Better odds, stronger baby', cost: 300 }, { label: 'Wait and see' }] }; });
   await ev(() => ZT.popAll()); await openMenu(); await screen('menu-badge'); await tap('Projects'); await screen('projects-choice');
-  await tap('Breeding ·'); await screen('choice-fallback', 'choice');
+  await tap('Zebra'); await screen('choice-fallback', 'choice');
   const usedMoments = await ev(() => !!(window.ZMoments && ZMoments.showChoice));
   if (!usedMoments) { await tap('Wait and see'); await sleep(300); check(await ev(() => !ZT.S.projects.some(p => p.choice)), 'pending choice answered from Projects (fallback screen)'); await tap('Tap to continue', { wait: 100 }).catch(() => 0); }
   else { console.log('  (Moments screen used for the choice)'); await ev(() => { ZT.S.projects.forEach(x => { x.choice = null; }); }); }
@@ -221,16 +226,24 @@ async function run(name) {
   await back();
   await tap('Market'); await screen('animals-market');
   await ev(() => { ZE.debug.caller(ZT.S, 'trader'); ZT.S.reports.length = 0; }); await ev(() => ZCore.rerender()); await sleep(300); await screen('animals-market-2');
-  await tap('Mystery crate'); await screen('crate');
+  check(await ev(() => document.querySelectorAll('.layer:not([hidden]) .row .mn-cmp, .layer:not([hidden]) .row img.sym[alt="New species"]').length) >= 1, 'every offer row carries a buying-comparison badge (have it / better / worse / new)');
+  // an animal waiting for a decision shows at the top of Animals and can be kept somewhere
+  await ev(() => { const S = ZT.S, sp = ZD.SPECIES.zebra; S.arrivals = S.arrivals || []; S.arrivals.push({ a: { id: 9900, sp: 'zebra', name: 'Arri', sex: 'F', charm: 50, vigor: 50, wit: 50, variant: false, gen: 1, born: null, hab: null, rest: 0, sick: 0 }, src: 'crate', at: S.week }); ZCore.rerender(); }); await sleep(300); await screen('arrival-row');
+  check(await ev(() => !!document.querySelector('.layer:not([hidden]) .row.mn-hot')), 'a waiting arrival shows as a highlighted row at the top of Animals');
+  await ev(() => { ZT.S.arrivals.length = 0; ZCore.rerender(); });
+  await tap('/5'); await screen('crate');
   const aN = await S(() => ZT.S.animals.length);
-  await tap('Open', { wait: 500 }); await shot('crate-rarity'); await sleep(900); await shot('crate-animal'); await dismiss();
-  check(await S(() => ZT.S.animals.length) === aN + 1, 'opened the mystery crate: one more animal');
+  await tap('Open', { wait: 700 }); await shot('crate-rarity');
+  for (let i = 0; i < 8 && await ev(() => ZT.S.arrivals && ZT.S.arrivals.length > 0); i++) { await sleep(700); const top = (await stack()).split('>').pop(); if (/arrival-where/.test(top)) { await tap('Savanna', { wait: 500 }).catch(() => tap('pen', { wait: 500 }).catch(() => 0)); } else if (/^arrival$/.test(top)) await tap('Keep', { wait: 500 }); else { await tap('Keep', { wait: 600 }).catch(async () => dismiss()); const t2 = (await stack()).split('>').pop(); if (/where|house|habitat/i.test(t2) || (await ev(() => !!document.querySelector('.layer:not([hidden]) .row.tappable')))) await tap('Savanna', { wait: 500 }).catch(() => 0); } }
+  await shot('crate-animal'); await dismiss();
+  check(await S(() => ZT.S.animals.length) === aN + 1 && await S(() => (ZT.S.arrivals || []).length === 0), 'opened a rarity crate, chose Keep and a home: one more animal, nothing waiting');
   await ev(() => { if (ZT.stack().length && ZT.stack().slice(-1)[0] !== 'animals') ZT.popAll(); });
   if (!(await stack()).includes('animals')) { await openMenu(); await tap('Animals'); }
   await tap('Market'); const offerNames = await ev(() => ZT.S.offers.list.map(x => ZE.animalLabel(x.a)));
   await tap(offerNames[0]); await screen('offer');
-  const aN2 = await S(() => ZT.S.animals.length); await tap('Buy', { wait: 500 });
-  check(await S(() => ZT.S.animals.length) === aN2 + 1, 'bought an offered animal');
+  const aN2 = await S(() => ZT.S.animals.length); await tap('Buy', { wait: 800 });
+  for (let i = 0; i < 6 && await ev(() => ZT.S.arrivals && ZT.S.arrivals.length > 0); i++) { await sleep(600); const top = (await stack()).split('>').pop(); if (/arrival-where/.test(top)) await tap('Savanna', { wait: 500 }).catch(() => tap('pen', { wait: 500 }).catch(() => 0)); else if (/^arrival$/.test(top)) await tap('Keep', { wait: 500 }); else { await tap('Keep', { wait: 600 }).catch(async () => dismiss()); await tap('Savanna', { wait: 500 }).catch(() => 0); } }
+  check(await S(() => ZT.S.animals.length) === aN2 + 1, 'bought an offered animal and chose where it goes');
   await tap('Zoo'); await tap('Meerkat').catch(() => 0);
   await ev(() => ZT.popAll()); await openMenu(); await tap('Animals');
   const sellable = await ev(() => ZT.S.animals.filter(a => !ZE.busyAnimals(ZT.S)[a.id] && a.hab != null).pop().name); const nA = await S(() => ZT.S.animals.length);

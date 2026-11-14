@@ -27,7 +27,8 @@
   Z.holdCap = S => S.research['tech:pen'] ? 12 : 6;
   Z.maxExp = S => S.research['tech:jeep'] ? 2 : 1;
   Z.habLevelCap = S => S.research['tech:hab5'] ? 5 : S.research['tech:hab4'] ? 4 : S.research['tech:hab3'] ? 3 : 2;
-  Z.habCap = h => 4 + h.lvl + (D.SHAPES[h.t].length >= 5 ? 1 : 0);
+  Z.habCap = h => D.CAP_BASE + D.CAP_STEP * ((h.lvl || 1) - 1);       // 4, 6, 8, 10, 12 whatever the shape
+  Z.isClosed = (S, h) => !!h && (h.closedUntil || 0) > S.week;        // closed for repairs (a setback): draws no visitors
   Z.sp = a => D.SPECIES[a.sp];
   Z.avg = a => (a.charm + a.vigor + a.wit) / 3;
   Z.isJuv = (S, a) => a.born != null && S.week - a.born < 16;
@@ -109,7 +110,7 @@
   function makeAnimal(S, spId, base, o) {
     o = o || {};
     const st = () => clamp(Math.round(base + rnd(-5, 5)), 1, 99);
-    const used = {}; S.animals.forEach(a => { used[a.name] = 1; });
+    const used = {}; S.animals.forEach(a => { used[a.name] = 1; }); (S.arrivals || []).forEach(e => { used[e.a.name] = 1; });
     let name = pick(D.ANIMAL_NAMES), tries = 0;
     while (used[name] && tries++ < 30) name = pick(D.ANIMAL_NAMES);
     if (used[name]) name = name + ' ' + (S.nextId % 97);
@@ -144,7 +145,14 @@
         list.push({ a: a, price: Math.round(Z.animalValue(a) * 2.2 / 50) * 50 });
       }
     }
-    S.offers = { kind: kind, at: S.week, list: list, crates: kind === 'trader' ? 1 : 0 };
+    S.offers = { kind: kind, at: S.week, list: list, crates: kind === 'trader' ? D.CRATES_PER_VISIT : 0, crateRarity: kind === 'trader' ? rollCrateRarity(S) : null };
+  }
+  // One rarity for all of this trader visit's crates (rarer rarities come on rarer visits; better odds at higher ranks).
+  function rollCrateRarity(S) {
+    const w = D.CRATE_VISIT[clamp(Math.floor((Z.rank(S) - 1) / 2), 0, D.CRATE_VISIT.length - 1)];
+    let r = Math.random() * w.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0 && w[i] > 0) return i + 1; }
+    return 1;
   }
   function callerArrive(S) {
     const n = S.callerN = (S.callerN || 0) + 1, kind = n % 4 === 2 ? 'headhunter' : n % 4 === 0 ? 'director' : 'trader';
@@ -154,7 +162,7 @@
   // Callers standing at the gate right now (they stay 5 weeks; their offers stay open until the next one of that kind arrives).
   Z.callersHere = function (S) {
     const out = [];
-    if (S.offers && S.week - S.offers.at < 5 && (S.offers.list.length || S.offers.crates)) out.push({ kind: S.offers.kind, since: S.offers.at, offers: S.offers.list.length, crates: S.offers.crates || 0 });
+    if (S.offers && S.week - S.offers.at < 5 && (S.offers.list.length || S.offers.crates)) out.push({ kind: S.offers.kind, since: S.offers.at, offers: S.offers.list.length, crates: S.offers.crates || 0, crateRarity: S.offers.crates ? S.offers.crateRarity || null : null });
     if (S.headhunt && S.week - (S.headhuntAt || 0) < 5) out.push({ kind: 'headhunter', since: S.headhuntAt || 0, role: S.headhunt.role, name: S.headhunt.name });
     return out;
   };
@@ -185,7 +193,80 @@
     return best;
   };
   function house(S, a, prefer) { const h = Z.bestHab(S, a, prefer); a.hab = h ? h.id : null; return a.hab; }
-  function houseWaiting(S, biome) { let n = 0; Z.holding(S).forEach(a => { if ((!biome || Z.sp(a).biome === biome) && house(S, a)) n++; }); return n; }
+  // Buying comparison: this animal against the best one you own of the same species and sex.
+  Z.compareOwned = function (S, x) {
+    if (typeof x === 'number') { const e = Z.arrival(S, x); x = e ? e.a : Z.animal(S, x); }
+    if (x && x.a && x.a.sp) x = x.a; // an offer {a, price} or an arrival entry {a, ...}
+    if (!x || !x.sp) return { haveSpecies: false, haveSameSex: false, sex: null, count: 0, best: null, better: null };
+    const own = S.animals.filter(o => o.sp === x.sp && o.id !== x.id), same = own.filter(o => o.sex === x.sex);
+    let best = null; same.forEach(o => { if (!best || Z.avg(o) > Z.avg(best)) best = o; });
+    let better = null;
+    if (best) {
+      let up = 0, down = 0; D.ASTAT_ORDER.forEach(k => { if (x[k] > best[k]) up++; else if (x[k] < best[k]) down++; });
+      better = up && !down ? 'yes' : up && down ? 'mixed' : 'no';
+    }
+    return { haveSpecies: own.length > 0, haveSameSex: same.length > 0, sex: x.sex, count: same.length,
+      best: best ? { charm: best.charm, vigor: best.vigor, wit: best.wit, avg: Math.round(Z.avg(best)) } : null, better: better };
+  };
+  // ----- arrivals: expedition finds and crate animals wait here until the player sells or keeps them -----
+  Z.arrival = (S, id) => (S.arrivals || []).find(e => e.a.id === id);
+  // Every animal that joins the zoo comes through here. prefer = the suggested habitat (a baby's parents' habitat).
+  function addArrival(S, a, src, prefer) { a.hab = null; const e = { a: a, src: src, at: S.week }; if (prefer != null) e.hab = prefer; S.arrivals.push(e); return e; }
+  Z.arrivalChoices = function (S, id) {
+    const e = Z.arrival(S, id); if (!e) return [];
+    const a = e.a, best = Z.bestHab(S, a, e.hab), out = [];
+    S.items.forEach(h => { if (h.k !== 'hab' || h.t !== Z.sp(a).biome) return; const room = Z.habCap(h) - Z.inHab(S, h.id).length; out.push({ hab: h.id, room: room, fit: room > 0, best: !!best && best.id === h.id }); });
+    out.sort((x, y) => (y.fit - x.fit) || (y.best - x.best) || (y.room - x.room));
+    out.push({ hab: null, room: Z.holdCap(S) - Z.holding(S).length, fit: true, best: !best });
+    return out;
+  };
+  function settle(S, e, hid) { S.arrivals = S.arrivals.filter(x => x !== e); e.a.hab = hid; S.animals.push(e.a); }
+  Z.keepArrival = function (S, id, hid) {
+    const e = Z.arrival(S, id); if (!e) return fail('Already decided.');
+    if (hid != null) {
+      const h = Z.item(S, hid); if (!h || h.k !== 'hab') return fail('Pick a habitat.');
+      if (h.t !== Z.sp(e.a).biome) return fail('Needs a ' + D.BIOMES[Z.sp(e.a).biome].name + ' habitat.');
+      if (Z.inHab(S, hid).length >= Z.habCap(h)) return fail('That habitat is full.');
+    }
+    settle(S, e, hid == null ? null : hid);
+    ev(S, 'keep', { sp: e.a.sp, src: e.src, pen: hid == null }); Z.refresh(S); return { ok: true, hab: e.a.hab };
+  };
+  Z.sellArrival = function (S, id) {
+    const e = Z.arrival(S, id); if (!e) return fail('Already decided.');
+    const v = Z.animalValue(e.a); S.money += v; S.arrivals = S.arrivals.filter(x => x !== e);
+    ev(S, 'sell', { sp: e.a.sp, price: v, avg: Math.round(Z.avg(e.a)), variant: e.a.variant, src: e.src }); Z.refresh(S); return { ok: true, price: v };
+  };
+  function toPen(S, e) { settle(S, e, null); } // the safety default for an undecided arrival: the holding pen, never a habitat
+  Z.keepAllArrivals = function (S) { // player button: keep everything waiting at its suggested place
+    const moved = []; (S.arrivals || []).slice().forEach(e => { const h = Z.bestHab(S, e.a, e.hab); settle(S, e, h ? h.id : null); moved.push({ id: e.a.id, hab: e.a.hab }); });
+    Z.refresh(S); return { ok: true, moved: moved };
+  };
+  // Animals in the holding pen, then waiting arrivals, that fit this habitat (for a "move them in?" prompt after building).
+  Z.movableTo = function (S, hid) {
+    const h = Z.item(S, hid); if (!h || h.k !== 'hab') return [];
+    const fits = a => Z.sp(a).biome === h.t;
+    return Z.holding(S).filter(fits).map(a => a.id).concat((S.arrivals || []).filter(e => fits(e.a)).map(e => e.a.id));
+  };
+  Z.moveIn = function (S, hid, ids) { // player action: move these (default movableTo) into the habitat until it is full
+    const h = Z.item(S, hid); if (!h || h.k !== 'hab') return fail('Pick a habitat.');
+    ids = (ids || Z.movableTo(S, hid)).slice(); const moved = [], busy = Z.busyAnimals(S); let left = 0;
+    ids.forEach(id => {
+      const room = Z.habCap(h) - Z.inHab(S, hid).length, e = Z.arrival(S, id), a = e ? e.a : Z.animal(S, id);
+      if (!a || Z.sp(a).biome !== h.t || a.hab === hid || busy[id]) return;
+      if (room <= 0) { left++; return; }
+      if (e) settle(S, e, hid); else a.hab = hid;
+      moved.push(id);
+    });
+    if (moved.length) ev(S, 'movein', { n: moved.length, b: h.t });
+    Z.refresh(S); return { ok: true, moved: moved, left: left };
+  };
+  // Holding upkeep: the pen is a waiting room, not storage. Waived while the zoo is closed.
+  Z.holdFee = (S, a) => Math.round(D.RARITY.upkeep[Z.sp(a).rarity] * D.HOLD_UPKEEP * (1 + clamp(Z.modSum(S, 'cost'), -0.5, 0.3)));
+  Z.holdUpkeep = function (S) {
+    const per = {}; let total = 0; const open = Z.isOpen(S);
+    Z.holding(S).forEach(a => { const f = open ? Z.holdFee(S, a) : 0; per[a.id] = f; total += f; });
+    return { perAnimal: per, total: total, count: Z.holding(S).length, mult: D.HOLD_UPKEEP };
+  };
   function randomSpecies(S, maxRarity) { return pick(D.SPECIES_LIST.filter(s => S.regions[s.biome] && !D.BIOMES[s.biome].secret && s.rarity <= maxRarity)); }
 
   Z.newGame = function (legacy, opts) {
@@ -193,7 +274,7 @@
     const S = {
       v: Z.SAVE_VERSION, runId: 'run' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), zooName: opts.zooName || 'Wildside Zoo',
       ng: legacy.runs || 0, startedAt: Date.now(), week: 0, money: (opts.starter ? D.START_MONEY_CLASSIC : D.START_MONEY) + Math.min(legacy.runs || 0, 5) * 6000, rp: 0, rep: 0, rows: D.START_ROWS,
-      items: [], animals: [], staff: [], candidates: [], candAt: 0, projects: [], reports: [], news: [], elog: [],
+      items: [], animals: [], arrivals: [], staff: [], candidates: [], candAt: 0, hiring: null, projects: [], reports: [], news: [], elog: [],
       offers: null, headhunt: null, headhuntAt: 0, show: null, yearly: null, happening: null, hapAt: ri(5, 7), hapLast: [], openedAt: null, mods: [], campaigns: {}, habN: {}, fx: [], callerN: 0,
       research: {}, regions: { savanna: true }, aff: Object.assign({}, legacy.aff || {}), combos: {}, knownCombos: Object.assign({}, legacy.combos || {}),
       book: {}, fragments: 0, flags: {}, vips: {}, trophies: 0, history: [], nextId: 1, finished: false, score: null,
@@ -215,7 +296,7 @@
       hid = S.items[0].id; S.openedAt = 0;
     }
     [['zebra', 'M'], ['zebra', 'F']].forEach(p => { const a = makeAnimal(S, p[0], 15, { sex: p[1] }); a.hab = hid; S.animals.push(a); discover(S, a, 'start'); });
-    if (opts.animal) { const c = JSON.parse(JSON.stringify(opts.animal)); c.id = uid(S); c.rest = 0; c.sick = 0; c.born = null; S.animals.push(c); house(S, c); discover(S, c, 'legacy'); }
+    if (opts.animal) { const c = JSON.parse(JSON.stringify(opts.animal)); c.id = uid(S); c.rest = 0; c.sick = 0; c.born = null; addArrival(S, c, 'legacy'); discover(S, c, 'legacy'); }
     S.rep = 0; S.rp = 5; S.news = []; S.elog = []; S.reports = []; S.yr = newYearStats();
     if (opts.starter) rollOffers(S, 'trader'); // on bare land the trader waits until the zoo opens
     news(S, opts.starter ? 'Welcome to ' + S.zooName + '.' : 'Build a Savanna habitat to open.', '');
@@ -315,7 +396,7 @@
       const cb = comboDraw[h.id] || 0;
       const buzz = Z.buzzNow(S, h);
       let seas = 1; if (season === 3 && (h.t === 'arctic' || h.t === 'mountain')) seas = 1.25; if (season === 1 && h.t === 'ocean') seas = 1.15;
-      const draw = base * variety * (1 + 0.12 * (h.lvl - 1)) * (1 + adj + cb) * (1 + buzz) * seas * dutyDraw;
+      const draw = Z.isClosed(S, h) ? 0 : base * variety * (1 + 0.12 * (h.lvl - 1)) * (1 + adj + cb) * (1 + buzz) * seas * dutyDraw;
       hab[h.id] = { draw: draw, base: base, adj: adj, combo: cb, buzz: buzz, kiosk: kiosk, variety: variety, count: an.length };
       total += draw;
     });
@@ -336,14 +417,15 @@
     // costs
     let salaries = 0; S.staff.forEach(s => { salaries += Z.salary(s); });
     let upkeep = 0; S.animals.forEach(a => { upkeep += D.RARITY.upkeep[Z.sp(a).rarity]; });
+    const hold = Z.holdUpkeep(S).total; // extra for animals in the holding pen (0 while closed); cost multiplier already in holdFee
     let maint = 0; S.items.forEach(i => { maint += i.k === 'hab' ? D.BIOMES[i.t].hab * 0.003 * i.lvl : D.FAC[i.t].cost * 0.004; });
     const costMult = 1 + clamp(Z.modSum(S, 'cost'), -0.5, 0.3); upkeep *= costMult; maint *= costMult;
     const mkt = (S.research['tech:mkt1'] ? 1 : 0) + (S.research['tech:mkt2'] ? 1 : 0) + (S.research['tech:mkt3'] ? 1 : 0);
     const boost = clamp(Z.modSum(S, 'visitors'), -0.4, 0.8);
     const open = Z.isOpen(S);
     const visitors = !open ? 0 : (3.2 * Math.pow(total, 0.8) + 40) * D.SEASONS[season].mult * (1 + 0.05 * (Z.rank(S) - 1)) * (1 + 0.1 * mkt) * (1 + crowd) * (1 + boost);
-    S._c = { nb: nb, active: active, occ: L.occ, hab: hab, total: total, spend: spend, shopVal: shopVal, crowd: crowd, boost: boost, rpw: rpw, repw: repw, vet: vet, salaries: salaries, upkeep: upkeep, maint: maint,
-      open: open, visitors: visitors, ticket: Z.ticket(S), income: visitors * (Z.ticket(S) + spend), cost: open ? salaries + upkeep + maint : 0, duty: { care: care, sci: sci, charm: charm } };
+    S._c = { nb: nb, active: active, occ: L.occ, hab: hab, total: total, spend: spend, shopVal: shopVal, crowd: crowd, boost: boost, rpw: rpw, repw: repw, vet: vet, salaries: salaries, upkeep: upkeep, maint: maint, hold: hold,
+      open: open, visitors: visitors, ticket: Z.ticket(S), income: visitors * (Z.ticket(S) + spend), cost: open ? salaries + upkeep + maint + hold : 0, duty: { care: care, sci: sci, charm: charm } };
     return S._c;
   };
   Z.c = S => S._c || Z.refresh(S);
@@ -364,7 +446,6 @@
       if (!pay(S, c)) { if (firstHab && t === 'savanna') S.money -= c; else return need(c); } // a patron always covers the very first habitat, so a bare zoo can never get stuck
       it = newHab(S, t, q, r, rot); S.items.push(it);
       if (S.openedAt == null) { S.openedAt = S.week; S.hapAt = Math.max(S.hapAt, S.week + ri(5, 7)); if (!S.offers) rollOffers(S, 'trader'); news(S, S.zooName + ' is open!', 'good'); }
-      housed = houseWaiting(S, t);
       ev(S, 'build', { k: 'hab', b: t, q: q, r: r, cost: c });
     } else {
       const F = D.FAC[t]; if (!F || !S.research['fac:' + t]) return fail('Research that first.');
@@ -373,7 +454,7 @@
       it = { id: uid(S), k: 'fac', t: t, q: q, r: r, rot: 0 }; S.items.push(it);
       ev(S, 'build', { k: 'fac', f: t, q: q, r: r, cost: c });
     }
-    Z.refresh(S); return { ok: true, id: it.id, housed: housed };
+    Z.refresh(S); return { ok: true, id: it.id, housed: housed, movable: kind === 'hab' ? Z.movableTo(S, it.id) : [] };
   };
   Z.move = function (S, id, q, r, rot) {
     const it = Z.item(S, id); if (!it) return fail('Nothing there.');
@@ -390,15 +471,15 @@
     }
     const refund = Math.round((it.k === 'hab' ? D.BIOMES[it.t].hab : D.FAC[it.t].cost) * 0.5);
     S.money += refund; S.items = S.items.filter(i => i.id !== id);
-    moved.forEach(a => { house(S, a); }); // try the other habitats before the holding pen
+    // its animals wait in the holding pen (the player moves them)
     ev(S, 'remove', { k: it.k, t: it.t, refund: refund }); Z.refresh(S); return { ok: true, refund: refund };
   };
   Z.upgrade = function (S, id) {
     const h = Z.item(S, id); if (!h || h.k !== 'hab') return fail('Pick a habitat.');
     if (h.lvl >= Z.habLevelCap(S)) return fail(h.lvl >= 5 ? 'Already at the top level.' : 'Research Habitat Design first.');
     const c = Z.habUpgradeCost(h, S); if (!pay(S, c)) return need(c);
-    h.lvl++; const housed = houseWaiting(S, h.t);
-    ev(S, 'upgrade', { b: h.t, lvl: h.lvl, cost: c }); Z.refresh(S); return { ok: true, lvl: h.lvl, housed: housed };
+    h.lvl++; const housed = 0;
+    ev(S, 'upgrade', { b: h.t, lvl: h.lvl, cost: c }); Z.refresh(S); return { ok: true, lvl: h.lvl, housed: housed, movable: Z.movableTo(S, h.id) };
   };
   Z.nextLand = S => D.LAND.find(l => l.rows > S.rows) || null;
   Z.buyLand = function (S) {
@@ -408,14 +489,12 @@
     S.rows = L.rows; ev(S, 'land', { rows: L.rows, cost: L.cost }); news(S, 'New land opened at the back.', 'good'); Z.refresh(S); return { ok: true, rows: L.rows };
   };
 
-  const roomFor = (S, a) => Z.holding(S).length < Z.holdCap(S) || !!Z.bestHab(S, a);
   Z.buyAnimal = function (S, i) {
     const o = S.offers && S.offers.list[i]; if (!o) return fail('That offer is gone.');
-    if (!roomFor(S, o.a)) return fail('No room. Add ' + D.BIOMES[Z.sp(o.a).biome].name + ' space or clear the pen.');
     if (!pay(S, o.price)) return need(o.price);
-    S.offers.list.splice(i, 1); S.animals.push(o.a); const h = house(S, o.a); discover(S, o.a, 'market');
+    S.offers.list.splice(i, 1); addArrival(S, o.a, S.offers.kind); discover(S, o.a, 'market');
     ev(S, 'buy', { sp: o.a.sp, price: o.price, avg: Math.round(Z.avg(o.a)) }); Z.refresh(S);
-    return { ok: true, housed: !!h, hab: h, animal: o.a };
+    return { ok: true, housed: false, hab: null, animal: o.a, pending: true, price: o.price };
   };
   Z.sellAnimal = function (S, id) {
     const a = Z.animal(S, id); if (!a) return fail('No such animal.');
@@ -452,22 +531,38 @@
 
   // ----- staff -----
   const hireCost = (S, T) => price(T.k * Z.scale(S));
-  Z.hireTiers = S => D.HIRE_TIERS.map(T => ({ key: T.key, name: T.name, cost: hireCost(S, T), note: T.note, n: T.n, star: T.star, lock: T.rank && Z.rank(S) < T.rank ? 'Rank ' + T.rank : '' }));
+  Z.hireTiers = S => D.HIRE_TIERS.map(T => ({ key: T.key, name: T.name, cost: hireCost(S, T), note: T.note, n: T.n, star: T.star, weeks: T.weeks, lock: T.rank && Z.rank(S) < T.rank ? 'Rank ' + T.rank : '' }));
+  // Paying for an advert starts a hiring job; the applicants arrive when it ends (see finishHiring).
   Z.advertise = function (S, i) {
     const T = D.HIRE_TIERS[i]; if (!T) return fail('Pick an advert.');
     if (T.rank && Z.rank(S) < T.rank) return fail('Needs zoo rank ' + T.rank + '.');
+    if (S.hiring) return fail('An advert is already out.');
     if (S.staff.length >= Z.staffCap(S)) return fail('Staff room is full.');
     const c = hireCost(S, T); if (!spendOpt(S, c)) return need(c);
+    S.hiring = { id: 'hire', tier: T.key, start: S.week, end: S.week + T.weeks, cost: c };
+    ev(S, 'advertise', { tier: T.key, cost: c, weeks: T.weeks });
+    return { ok: true, cost: c, weeks: T.weeks, end: S.hiring.end };
+  };
+  function finishHiring(S) {
+    const H = S.hiring, T = D.HIRE_TIERS.find(t => t.key === H.tier) || D.HIRE_TIERS[0];
     const q = 8 + Z.rank(S) * 5 + T.q, roles = BASIC.slice().sort(() => Math.random() - 0.5);
-    S.candidates = []; S.candAt = S.week;
+    S.hiring = null; S.candidates = []; S.candAt = S.week;
     for (let n = 0; n < T.n; n++) {
       const star = Math.random() < T.star, s = makeStaff(S, roles[n % roles.length], q + ri(-3, 6) + (star ? 12 : 0));
       if (star) s.star = true;
       S.candidates.push(s);
     }
-    ev(S, 'advertise', { tier: T.key, cost: c, stars: S.candidates.filter(s => s.star).length });
-    return { ok: true, cost: c, candidates: S.candidates };
+    const stars = S.candidates.filter(s => s.star).length;
+    ev(S, 'applicants', { tier: T.key, stars: stars }); news(S, S.candidates.length + ' people answered the advert.', 'good');
+    fx(S, { type: 'hire', gate: true });
+    report(S, { type: 'applicants', tier: T.key, tierName: T.name, n: S.candidates.length, stars: stars, candidates: S.candidates.slice() });
+  }
+  Z.hiringInfo = function (S) {
+    const H = S.hiring; if (!H) return null;
+    const T = D.HIRE_TIERS.find(t => t.key === H.tier) || D.HIRE_TIERS[0];
+    return { id: 'hire', type: 'hire', name: 'Hiring', detail: T.name, tier: H.tier, hab: null, staff: [], weeksLeft: Math.max(0, H.end - S.week), progress: clamp((S.week - H.start) / Math.max(1, H.end - H.start), 0, 1), choice: false };
   };
+  Z.runningList = S => S.projects.map(p => Z.projectInfo(S, p)).concat(S.hiring ? [Z.hiringInfo(S)] : []);
   Z.hireCandidate = function (S, i) {
     const s = S.candidates[i]; if (!s) return fail('They have left.');
     if (S.staff.length >= Z.staffCap(S)) return fail('Staff room is full.');
@@ -561,29 +656,29 @@
     return { ok: true, cost: c, rep: rep, weeks: C.weeks, vis: C.vis };
   };
 
-  // ----- mystery crate at the trader -----
-  const crateOdds = S => D.CRATE_ODDS[clamp(Math.floor((Z.rank(S) - 1) / 2), 0, D.CRATE_ODDS.length - 1)];
+  // ----- rarity crates at the trader: 5 crates of one rarity per visit -----
   const crateBase = S => 12 + Z.rank(S) * 4;
+  const cratePool = (S, rarity) => {
+    let pool = D.SPECIES_LIST.filter(s => S.regions[s.biome] && !D.BIOMES[s.biome].secret && s.rarity === rarity);
+    if (!pool.length) pool = D.SPECIES_LIST.filter(s => s.biome === 'savanna' && s.rarity <= rarity);
+    return pool;
+  };
+  Z.crateCost = (S, rarity) => price(D.RARITY.value[rarity] * (0.5 + (crateBase(S) + 6) / 50) * 1.3 + Z.scale(S) * D.CRATE_RANK_K * rarity);
   Z.crateInfo = function (S) {
     if (!S.offers || S.offers.kind !== 'trader' || !S.offers.crates) return null;
-    const w = crateOdds(S), tot = w.reduce((a, b) => a + b, 0); let evv = 0;
-    const odds = w.map((x, i) => { const p = x / tot; evv += p * D.RARITY.value[i + 1] * (0.5 + (crateBase(S) + 6) / 50); return { rarity: i + 1, name: D.RARITY.name[i + 1], p: p }; }).filter(o => o.p > 0);
-    return { cost: price(Math.max(evv * 1.2, Z.scale(S))), odds: odds, left: S.offers.crates };
+    const r = S.offers.crateRarity || 1;
+    return { rarity: r, name: D.RARITY.name[r], left: S.offers.crates, total: D.CRATES_PER_VISIT, cost: Z.crateCost(S, r),
+      pool: cratePool(S, r).map(s => s.id), odds: [{ rarity: r, name: D.RARITY.name[r], p: 1 }] };
   };
   Z.openCrate = function (S) {
     const info = Z.crateInfo(S); if (!info) return fail('No crate on offer.');
-    if (Z.holding(S).length >= Z.holdCap(S)) return fail('The holding pen is full.');
     if (!spendOpt(S, info.cost)) return need(info.cost);
-    let r = Math.random(), rarity = info.odds[0].rarity;
-    for (let i = 0; i < info.odds.length; i++) { r -= info.odds[i].p; if (r <= 0) { rarity = info.odds[i].rarity; break; } }
-    let pool = D.SPECIES_LIST.filter(s => S.regions[s.biome] && !D.BIOMES[s.biome].secret && s.rarity === rarity);
-    if (!pool.length) pool = D.SPECIES_LIST.filter(s => s.biome === 'savanna' && s.rarity <= rarity);
-    const sp = pick(pool), a = makeAnimal(S, sp.id, crateBase(S) + ri(0, 12), { variant: Math.random() < 0.06 });
+    const sp = pick(cratePool(S, info.rarity)), a = makeAnimal(S, sp.id, crateBase(S) + ri(0, 12), { variant: Math.random() < 0.06 });
     oppositeIfLonely(S, a);
     const isNew = !S.book[sp.id];
-    S.offers.crates--; S.animals.push(a); const h = house(S, a); discover(S, a, 'crate');
+    S.offers.crates--; addArrival(S, a, 'crate'); discover(S, a, 'crate');
     ev(S, 'crate', { sp: a.sp, rarity: sp.rarity, cost: info.cost, avg: Math.round(Z.avg(a)), variant: a.variant }); Z.refresh(S);
-    return { ok: true, animal: a, rarity: sp.rarity, isNew: isNew, variant: a.variant, housed: !!h, hab: h, cost: info.cost };
+    return { ok: true, animal: a, rarity: sp.rarity, isNew: isNew, variant: a.variant, cost: info.cost, price: Z.animalValue(a), pending: true };
   };
 
   // ---------- projects ----------
@@ -782,8 +877,8 @@
       if (own.length && own.every(x => x.sex === own[0].sex) && Math.random() < 0.75) sex = own[0].sex === 'M' ? 'F' : 'M';
       const a = makeAnimal(S, sp.id, clamp(10 + Math.min(ratio, 1.6) * 10 + rnd(0, 10) + D.BIOME_ORDER.indexOf(p.region) * 2, 8, 60), { sex: sex, variant: Math.random() < 0.02 + 0.01 * (p.budget || 0) });
       const isNew = !S.book[sp.id];
-      S.animals.push(a); const h = house(S, a); discover(S, a, 'expedition');
-      found.push({ id: a.id, sp: a.sp, rarity: sp.rarity, isNew: isNew, variant: a.variant, charm: a.charm, vigor: a.vigor, wit: a.wit, hab: h });
+      addArrival(S, a, 'expedition'); discover(S, a, 'expedition');
+      found.push({ id: a.id, sp: a.sp, sex: a.sex, rarity: sp.rarity, isNew: isNew, variant: a.variant, charm: a.charm, vigor: a.vigor, wit: a.wit, hab: null, pending: true, price: Z.animalValue(a) });
     }
     const rp = Math.round(rnd(3, 8) * (1 + ratio) * (1 + S.week / 200)); S.rp += rp; notes.push('Field notes: +' + rp + ' research.');
     let fragment = 0;
@@ -821,17 +916,16 @@
         k[st] = clamp(Math.round(par + rnd(-4.5, 4) + bonus + (lucky ? ri(6, 10) : 0)), 1, 99);
         return { stat: st, parents: Math.round(par), value: k[st], delta: k[st] - Math.round(par), lucky: lucky };
       });
-      S.animals.push(k);
-      const h = house(S, k, a.hab); // the parents' habitat first, then any other of the same biome, then the holding pen
+      addArrival(S, k, 'birth', a.hab); // waits for Sell / Keep; the parents' habitat is the suggested first choice
       discover(S, k, 'bred');
-      kids.push({ id: k.id, sp: k.sp, sex: k.sex, name: k.name, rolls: rolls, variantChance: pv, variant: variant, hab: h });
+      kids.push({ id: k.id, sp: k.sp, sex: k.sex, name: k.name, rolls: rolls, variantChance: pv, variant: variant, hab: null, pending: true, suggest: a.hab, price: Z.animalValue(k) });
       const av = Z.avg(k); if (av > S.yr.bestBaby) { S.yr.bestBaby = av; S.yr.bestBabyName = k.name + ' the ' + Z.animalLabel(k); }
       if (k.variant) S.flags.variantBred = true;
     }
     S.book[a.sp].bred = true; S.yr.births += n; S.life.births += n; fx(S, { type: 'birth', hab: a.hab });
     if (firstBred) addRep(S, 8 * sp.rarity, 'births');
     addRep(S, 2 * sp.rarity, 'births');
-    ev(S, 'birth', { sp: a.sp, n: n, parents: [Math.round(Z.avg(a)), Math.round(Z.avg(b))], kids: kids.map(kk => { const k = Z.animal(S, kk.id); return { avg: Math.round(Z.avg(k)), variant: k.variant, lucky: kk.rolls.filter(r => r.lucky).length }; }) });
+    ev(S, 'birth', { sp: a.sp, n: n, parents: [Math.round(Z.avg(a)), Math.round(Z.avg(b))], kids: kids.map(kk => { const k = Z.arrival(S, kk.id).a; return { avg: Math.round(Z.avg(k)), variant: k.variant, lucky: kk.rolls.filter(r => r.lucky).length }; }) });
     news(S, (n > 1 ? 'Twins! ' : '') + 'A baby ' + sp.name + ' was born.', 'good');
     report(S, { type: 'birth', fail: false, kids: kids, a: a.id, b: b.id, lead: lead.id, sp: a.sp, chance: chance, twins: n > 1, firstBred: firstBred });
   }
@@ -908,7 +1002,7 @@
     stray: {
       make: S => { const sp = randomSpecies(S, Z.rank(S) >= 5 ? 3 : 2), a = makeAnimal(S, sp.id, 12 + Z.rank(S) * 2 + ri(0, 8)); oppositeIfLonely(S, a); const d = { rep: repChunk(S, 0.015) };
         return { text: 'Someone left a ' + sp.name + ' in a box.', d: d, newAnimal: a, def: 1, options: [{ label: 'Take it in', note: sp.name + ', free' }, { label: 'Find it a home', note: 'Reputation +' + d.rep }] }; },
-      done: (S, h, i) => { if (i === 0) { const a = h.newAnimal; S.animals.push(a); house(S, a); discover(S, a, 'stray'); return [a.name + ' has a new home.', true]; } gain(S, { src: 'happenings', rep: h.d.rep }); return ['A good home was found.', true]; }
+      done: (S, h, i) => { if (i === 0) { const a = h.newAnimal; addArrival(S, a, 'stray'); discover(S, a, 'stray'); return [a.name + ' is safe with us.', true]; } gain(S, { src: 'happenings', rep: h.d.rep }); return ['A good home was found.', true]; }
     },
     scholar: {
       make: S => { const s = pick(S.staff), d = { cost: price(0.5 * Z.scale(S)), rp: 3 * Z.rpScale(S), staff: s.id }; return { text: 'A scientist is visiting town.', d: d, def: 1, options: [{ label: 'Fund a study', note: '+' + d.rp + ' research', cost: d.cost }, { label: 'Staff seminar', note: first(s) + ' +2 ' + D.SKILL.sci.name, skill: 'sci', staff: s.id, gain: 2 }] }; },
@@ -953,6 +1047,19 @@
     powercut: {
       make: S => { const m = addMod(S, 'rp', -0.5, 2, 'powercut'), d = { cost: price(0.2 * Z.scale(S)), until: m.until }; return { text: 'The lab lights are out.', d: d, def: 1, options: [{ label: 'Rent a generator', note: 'No loss', cost: d.cost }, { label: 'Use candles', note: 'Research halved, 2 weeks' }] }; },
       done: (S, h, i) => { if (i === 0) { S.mods = S.mods.filter(m => !(m.src === 'powercut' && m.until === h.d.until)); return ['Lights back on.', true]; } return ['A quiet fortnight in the lab.', true]; }
+    },
+    fence: { // one habitat closed for two weeks (draws no visitors); a rush job reopens it
+      can: S => habsWithAnimals(S).some(h => !Z.isClosed(S, h)),
+      make: S => { const hb = pick(habsWithAnimals(S).filter(h => !Z.isClosed(S, h))); hb.closedUntil = S.week + 2; fx(S, { type: 'closed', hab: hb.id }); const d = { hab: hb.id, cost: price(0.4 * Z.scale(S)) };
+        return { text: Z.habName(S, hb) + ' is closed for repairs.', hab: hb.id, d: d, def: 1, options: [{ label: 'Rush job', note: 'Open again now', cost: d.cost }, { label: 'Wait', note: 'Closed for 2 weeks' }] }; },
+      done: (S, h, i) => { const hb = Z.item(S, h.d.hab); if (i === 0) { if (hb) hb.closedUntil = 0; return ['Open again. Good as new.', true]; } return ['The builders are on it.', true]; }
+    },
+    pipe: { // shops earn less for three weeks; a plumber fixes it
+      make: S => { const m = addMod(S, 'spend', -0.15, 3, 'pipe'), d = { cost: price(0.3 * Z.scale(S)), until: m.until }; return { text: 'Water everywhere by the shops.', d: d, def: 1, options: [{ label: 'Call a plumber', note: 'Fixed now', cost: d.cost }, { label: 'Patch it', note: 'Shops -15%, 3 weeks' }] }; },
+      done: (S, h, i) => { if (i === 0) { S.mods = S.mods.filter(m => !(m.src === 'pipe' && m.until === h.d.until)); return ['All dry again.', true]; } return ['Buckets and mops for now.', true]; }
+    },
+    rival: { // a short visitor dip, no choice
+      make: S => { addMod(S, 'visitors', -0.15, 3, 'rival'); return { text: 'A new park opened nearby. Visitors -15%, 3 weeks.' }; }
     }
   };
   function coldPool(S) { const ev = {}; S.projects.forEach(p => { if (p.hab) ev[p.hab] = 1; }); const busy = Z.busyAnimals(S); return S.animals.filter(a => a.hab != null && !ev[a.hab] && !busy[a.id] && !Z.isSick(S, a)); }
@@ -972,7 +1079,7 @@
   }
   // For tests and for building the pop-up screens: force a moment to happen right now.
   Z.debug = {
-    happening: (S, key) => { S.happening = null; return rollHappening(S, key); },
+    happening: (S, key) => { S.happening = null; const ok = rollHappening(S, key); Z.refresh(S); return ok; },
     caller: (S, kind) => { if (kind === 'headhunter') { S.headhunt = makeStaff(S, pick(BASIC), 22 + Z.rank(S) * 5); S.headhuntAt = S.week; } else rollOffers(S, kind); report(S, { type: 'caller', kind: kind }); return true; },
     yearly: (S, id) => { if (id === 'show') openShow(S); else yearlyPlan(S, id); return true; }
   };
@@ -1100,7 +1207,7 @@
   }
   Z.showScore = (S, a) => S.show ? a[S.show.stat] + Z.sp(a).rarity * 5 + (a.variant ? 8 : 0) : 0;
   Z.showMedals = S => S.show ? { gold: Math.round(S.show.bar * D.SHOW_MEDALS.gold), silver: Math.round(S.show.bar * D.SHOW_MEDALS.silver), bronze: Math.round(S.show.bar * D.SHOW_MEDALS.bronze) } : null; // score needed for each medal
-  Z.showMedal = function (S, a) { if (!S.show) return null; const sc = Z.showScore(S, a), bar = S.show.bar; return sc >= bar * D.SHOW_MEDALS.gold ? 'gold' : sc >= bar * D.SHOW_MEDALS.silver ? 'silver' : sc >= bar * D.SHOW_MEDALS.bronze ? 'bronze' : null; };
+  Z.showMedal = function (S, a) { if (!S.show) return null; const sc = Z.showScore(S, a), m = Z.showMedals(S); return sc >= m.gold ? 'gold' : sc >= m.silver ? 'silver' : sc >= m.bronze ? 'bronze' : null; }; // same rounded bars the screen shows
   Z.enterShow = function (S, id) {
     const a = Z.animal(S, id); if (!S.show || !a) return fail('The show is over for this year.');
     const sc = Z.showScore(S, a), y = S.show.year, medal = Z.showMedal(S, a), medals = Z.showMedals(S);
@@ -1142,7 +1249,11 @@
     addRep(S, visitors / D.VISITORS_PER_REP + c.repw, 'visitors');
     S.week++;
     S.mods = S.mods.filter(m => m.until > S.week);
-    if (S.candidates.length && S.week - S.candAt >= 8) S.candidates = [];
+    if (S.candidates.length && S.week - S.candAt >= D.CANDIDATE_WEEKS) S.candidates = [];
+    if (S.hiring && S.week >= S.hiring.end) finishHiring(S);
+    // safety: an arrival nobody decided on is housed the classic way after D.ARRIVAL_WEEKS
+    const late = S.arrivals.filter(e => S.week - e.at >= D.ARRIVAL_WEEKS);
+    if (late.length) { late.forEach(e => toPen(S, e)); news(S, late.length > 1 ? late.length + ' new animals wait in holding.' : late[0].a.name + ' the ' + Z.sp(late[0].a).name + ' waits in holding.', ''); ev(S, 'arrive_auto', { n: late.length }); }
     // every project takes its weekly step, then finished ones resolve (an unanswered choice falls back to its safe default)
     S.projects.slice().forEach(p => projectWeek(S, p));
     const done = S.projects.filter(p => p.end <= S.week);
@@ -1153,12 +1264,12 @@
     });
     if (S.yearly && S.week > S.yearly.at) applyYearly(S, S.yearly.def, true);
     if (S.week % 5 === 2 && lively(S)) callerArrive(S);
-    // happenings: about one every 6 to 8 weeks
+    // happenings: about one every 10 to 14 weeks (D.HAP_GAP)
     if (S.happening) { if (!S.happening.options) S.happening = null; else if (S.week - S.happening.at >= 2) applyHappening(S, S.happening.def, true); }
     const woy = S.week % D.WPY;
     if (!S.happening && !S.finished && S.week >= S.hapAt && lively(S)) {
       if (woy === D.YEARLY.openday || woy === D.YEARLY.festival || woy === D.YEARLY.show || woy === 0) S.hapAt = S.week + 1; // not on top of a yearly event
-      else { rollHappening(S); S.hapAt = S.week + ri(6, 8); }
+      else { rollHappening(S); S.hapAt = S.week + ri(D.HAP_GAP[0], D.HAP_GAP[1]); }
     }
     const open = Z.isOpen(S); // a bare zoo holds no yearly events
     if (open && woy === D.YEARLY.openday) yearlyPlan(S, 'openday');
@@ -1173,8 +1284,9 @@
 
   // What a habitat should quietly show on the floor.
   Z.habStatus = function (S, h) {
-    const out = { event: false, breed: false, busy: null, progress: null, sick: false, choice: false };
+    const out = { event: false, breed: false, busy: null, progress: null, sick: false, choice: false, closed: false };
     if (!h || h.k !== 'hab') return out;
+    out.closed = Z.isClosed(S, h);
     out.sick = Z.inHab(S, h.id).some(a => Z.isSick(S, a));
     const pe = S.projects.find(p => p.type === 'event' && p.hab === h.id), pb = S.projects.find(p => p.type === 'breed' && p.hab === h.id), p = pe || pb;
     if (p) { out.busy = p.type; out.progress = clamp((S.week - p.start) / Math.max(1, p.end - p.start), 0, 1); }
@@ -1188,7 +1300,7 @@
   Z.snapshot = function (S) { // compact picture of the zoo for the gameplay log
     const c = Z.c(S);
     return { week: S.week, year: Z.year(S), money: Math.round(S.money), rp: Math.round(S.rp), rep: S.rep, rank: Z.rank(S), visitors: S.visitorsLast, income: S.incomeLast, cost: S.costLast,
-      species: Z.speciesCount(S), variants: Z.variantCount(S), animals: S.animals.length, holding: Z.holding(S).length, avgStat: S.animals.length ? Math.round(S.animals.reduce((t, a) => t + Z.avg(a), 0) / S.animals.length) : 0,
+      species: Z.speciesCount(S), variants: Z.variantCount(S), animals: S.animals.length, holding: Z.holding(S).length, arrivals: (S.arrivals || []).length, avgStat: S.animals.length ? Math.round(S.animals.reduce((t, a) => t + Z.avg(a), 0) / S.animals.length) : 0,
       open: Z.isOpen(S), habitats: S.items.filter(i => i.k === 'hab').map(h => h.t + h.lvl).join(','), facilities: S.items.filter(i => i.k === 'fac').length, rows: S.rows,
       staff: S.staff.map(s => s.role[0] + s.lvl).join(','), combos: Object.keys(S.combos).length, research: Object.keys(S.research).length, regions: Object.keys(S.regions).join(','),
       trophies: S.trophies, draw: Math.round(c.total), spend: +c.spend.toFixed(2), projects: S.projects.length, spentYr: Math.round(S.yr.spent), playSec: Math.round(S.play.sec), bySpeed: S.play.bySpeed.map(Math.round) };
@@ -1198,6 +1310,14 @@
   Z.deserialize = function (str) { // returns null for anything that is not a version 3 save
     let S; try { S = JSON.parse(str); } catch (e) { return null; }
     if (!S || S.v !== Z.SAVE_VERSION) return null;
+    // Round 5 fields: fill defaults so older version 3 saves keep loading
+    if (!Array.isArray(S.arrivals)) S.arrivals = [];
+    if (S.hiring === undefined) S.hiring = null;
+    if (!Array.isArray(S.candidates)) S.candidates = [];
+    if (S.offers && S.offers.kind === 'trader' && S.offers.crateRarity == null) { S.offers.crateRarity = rollCrateRarity(S); if (S.offers.crates) S.offers.crates = D.CRATES_PER_VISIT; }
+    if (S.offers && S.offers.crateRarity === undefined) S.offers.crateRarity = null;
+    // an arrival left undecided when the app closed stays pending (the screens can offer it again from S.arrivals);
+    // the tick houses it the classic way D.ARRIVAL_WEEKS after it came, so nothing waits forever
     Z.refresh(S); return S;
   };
 

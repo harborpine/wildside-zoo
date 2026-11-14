@@ -26,6 +26,8 @@
   const starsOn = n => { const w = el('span', { cls: 'stars mn-stars' }); for (let i = 0; i < n; i++) w.appendChild(el('i', { cls: 'star' })); return w; };
   // Two tiny pixel icons drawn here (no matching art exists for them): arrows for Move, a cross for Remove.
   const PIX = {
+    up: ['....##....', '...####...', '..######..', '.########.', '...####...', '...####...', '...####...', '...####...'],
+    down: ['...####...', '...####...', '...####...', '...####...', '.########.', '..######..', '...####...', '....##....'],
     move: ['......#......', '.....###.....', '....#####....', '......#......', '...#..#..#...', '..##..#..##..', '.#############', '..##..#..##..', '...#..#..#...', '......#......', '....#####....', '.....###.....', '......#......'],
     remove: ['.##.......##.', '####.....####', '.####...####.', '..####.####..', '...#######...', '....#####....', '....#####....', '...#######...', '..####.####..', '.####...####.', '####.....####', '.##.......##.']
   };
@@ -49,12 +51,23 @@
   const kIcon = k => (D.SKILL && D.SKILL[k] && D.SKILL[k].icon) || 'skill-' + k;
   const sexSym = a => ui.sym('sex-' + (a.sex === 'F' ? 'f' : 'm'), { scale: 2, label: a.sex === 'F' ? 'Female' : 'Male', text: a.sex });
   const cnt = (icon, v) => span('mn-cnt', imgEl(iUrl(icon, 2), 'mn-mini'), ' ' + v);
+  // Buying comparison (engine lookup ZE.compareOwned): new species, other sex, better, worse, mixed.
+  function cmpBadge(x) {
+    if (!E.compareOwned) return null; let c = null; try { c = E.compareOwned(S(), x); } catch (e) { return null; } if (!c) return null;
+    const a = x.a || x, w = (icon, label) => span('mn-cmp', imgEl(icon, ''), label || '');
+    if (!c.haveSpecies) return ui.sym('new', { scale: 2, label: 'New species', text: 'New!' });
+    if (!c.haveSameSex) return span('mn-cmp', sexSym(a), '+');
+    if (c.better === 'yes') return w(pixIcon('up', '#58b84a', 2));
+    if (c.better === 'no') return w(pixIcon('down', '#e0584a', 2));
+    return span('mn-cmp', '+-');
+  }
   const pn = (a, one, many) => a + ' ' + (a === 1 ? one : many);
 
   // A short, fixed set of boxes fills the panel and never scrolls: rows share the height, icons shrink a little on short screens.
-  function fitGrid(items, cols, rowMin) {
-    const g = ui.grid(items, { cols, cls: 'mn-fitgrid' }), rowsN = Math.ceil(items.length / cols);
-    g.style.gridTemplateRows = 'repeat(' + rowsN + ', minmax(' + (rowMin || 0) + 'px, 1fr))';
+  function fitGrid(items, cols, rowMin, fixed) {
+    const g = ui.grid(items, { cols, cls: 'mn-fitgrid' + (fixed ? ' mn-fixedgrid' : '') }), rowsN = Math.ceil(items.length / cols);
+    g.style.gridTemplateRows = fixed ? 'repeat(' + rowsN + ', ' + rowMin + 'px)' : 'repeat(' + rowsN + ', minmax(' + (rowMin || 0) + 'px, 1fr))';
+    if (fixed) g.style.flex = 'none';
     return g;
   }
   function guard(fn) { let last = 0; return function (ev) { const t = performance.now(); if (t - last < 300) return; last = t; return fn(ev); }; }
@@ -102,32 +115,42 @@
 .mn-title .pbody{justify-content:flex-start;gap:6px}
 .mn-logo{display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:2px}.mn-logo img{image-rendering:pixelated;display:block;width:auto;height:auto}.mn-logo .lg1{max-width:94%;max-height:clamp(30px,8.5vh,80px)}.mn-logo .lg2{max-width:48%;max-height:clamp(36px,10.5vh,100px)}
 @media (max-height:700px){.mn-cont{display:none}.mn-scene{display:none}.mn-logo .lg1{max-height:5vh}.mn-logo .lg2{max-height:7.5vh}.mn-slot,.mn-slothit{min-height:52px!important}.mn-sinfo .mn-sline:nth-child(3){display:none}.mn-sname{font-size:16px}.mn-del{width:44px;height:44px}.mn-title .pbody{gap:4px}.mn-slots{gap:8px}}
-.mn-ports{flex:none;display:flex;align-items:flex-end}.mn-port{height:clamp(30px,5.5vh,44px);width:auto;max-width:56px;image-rendering:pixelated}.mn-cont{margin-left:8px;font-size:11px;background:var(--green);color:#fff;padding:1px 6px;vertical-align:middle;text-shadow:1px 1px 0 var(--green-d)}.mn-slot.recent{box-shadow:0 0 0 3px var(--green-d),0 5px 0 3px rgba(0,0,0,.25)}
+.mn-ports{flex:none;display:flex;align-items:flex-end}.mn-port{height:clamp(30px,5.5vh,44px);width:auto;max-width:56px;image-rendering:pixelated}.mn-cont{margin-left:8px;font-size:11px;background:var(--green);color:#fff;padding:1px 6px;vertical-align:middle}.mn-slot.recent{box-shadow:0 0 0 3px var(--green-d),0 5px 0 3px rgba(0,0,0,.25)}
 .mn-scene{display:flex;align-items:flex-end;justify-content:center;gap:0;min-height:30px;border-bottom:6px solid #3f7d34}.mn-scene img{image-rendering:pixelated;max-height:clamp(30px,7vh,70px);max-width:21%;width:auto;height:auto}
 .mn-slots{display:flex;flex-direction:column;gap:clamp(6px,1.6vh,12px);margin-top:clamp(2px,1vh,8px)}
 .mn-slot{display:flex;align-items:center;background:var(--paper);box-shadow:0 0 0 3px var(--bd),0 5px 0 3px rgba(0,0,0,.25);min-height:clamp(58px,10.5vh,78px);border:0;padding:0;font:inherit;color:var(--ink)}
-button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream2);cursor:pointer;font-weight:800;font-size:18px;text-align:left}
+button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream2);cursor:pointer;font-weight:700;font-size:18px;text-align:left}
 .mn-slothit{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:clamp(58px,10.5vh,78px);padding:6px 8px;border:0;background:none;font:inherit;font-weight:700;color:inherit;text-align:left;cursor:pointer}
-.mn-sn{flex:none;width:34px;height:34px;line-height:34px;text-align:center;background:var(--gold);color:var(--ink);font-weight:800;font-size:18px;box-shadow:0 0 0 2px var(--bd)}
-.mn-sinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.mn-sname{font-size:18px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mn-sline{font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.mn-sn{flex:none;width:34px;height:34px;line-height:34px;text-align:center;background:var(--gold);color:var(--ink);font-weight:700;font-size:18px;box-shadow:0 0 0 2px var(--bd)}
+.mn-sinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.mn-sname{font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mn-sline{font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .mn-del{flex:none;width:44px;height:44px;margin:0 8px 0 14px;border:0;background:var(--cream2);box-shadow:0 0 0 2px var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .mn-name{font-size:18px;text-align:center;min-height:52px}
-.mn-coach{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 0 0 10px;background:#ffe27a;box-shadow:0 0 0 3px var(--bd);font-size:14px;font-weight:800;color:var(--ink);position:absolute;top:6px;left:6px;right:6px;z-index:15;pointer-events:none}
-.mn-coach .mn-ct{flex:1;min-width:0}.mn-coach .mn-skip{pointer-events:auto;flex:none;min-width:56px;min-height:44px;border:0;background:var(--paper);font:inherit;font-weight:800;font-size:13px;color:var(--ink2);cursor:pointer;box-shadow:-2px 0 0 var(--bd)}
+.mn-coach{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 0 0 10px;background:#ffe27a;box-shadow:0 0 0 3px var(--bd);font-size:14px;font-weight:700;color:var(--ink);position:absolute;top:6px;left:6px;right:6px;z-index:15;pointer-events:none}
+.mn-coach .mn-ct{flex:1;min-width:0}.mn-coach .mn-skip{pointer-events:auto;flex:none;min-width:56px;min-height:44px;border:0;background:var(--paper);font:inherit;font-weight:700;font-size:13px;color:var(--ink2);cursor:pointer;box-shadow:-2px 0 0 var(--bd)}
 .mn-coach.inpanel{position:static;flex:none;margin:6px 6px 0;pointer-events:auto}
 @keyframes mnglow{0%{outline-color:#ffcf33}50%{outline-color:#fff}100%{outline-color:#ffcf33}}
 .mn-glow{outline:4px solid #ffcf33;outline-offset:-4px;animation:mnglow .9s steps(2) infinite}
 .mn-capwrap{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}.mn-slot.recent .mn-sn{background:var(--green);color:#fff}
+.row.mn-r{min-height:50px;padding:3px 8px 3px 4px;margin:0}.row.mn-r .portrait{width:40px;height:40px}.row.mn-r .portrait img{max-width:36px;max-height:36px}.list{gap:4px}
+.mn-fixedgrid .gbox .ico{height:30px!important}.mn-fixedgrid .btn.gbox{gap:0;line-height:1.1;padding:2px}.mn-fixedgrid .btn.gbox .sub{display:block!important;font-size:12px;min-height:14px}
+.mn-run .sym{height:16px;width:auto}.mn-run .portrait{width:38px;height:38px}
+.mn-ag{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.mn-at{display:flex;align-items:center;gap:4px;min-height:44px;padding:3px 4px;background:var(--paper);box-shadow:0 0 0 2px var(--line);border:0;font:inherit;color:var(--ink);cursor:pointer;text-align:left;min-width:0}
+.mn-at .pt{flex:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:#bfe0a0}.mn-at .pt img{max-width:30px;max-height:30px;image-rendering:pixelated}
+.mn-at .inf{display:flex;flex-direction:column;gap:2px;min-width:0}.mn-at .c3,.mn-at .c2{display:flex;align-items:center;gap:2px;white-space:nowrap}
+.mn-at .chip.iconchip{padding:0 2px 0 1px;gap:1px}.pbody.mn-tight .sec{margin-top:0;padding:2px 8px}.mn-at .chip{margin:0;font-size:11px}.mn-at .chip .v{padding:1px 2px;min-width:12px;font-size:11px}.mn-at .chip img.sym{height:12px;width:auto;margin:0 1px}.mn-at .sym{height:13px;width:auto}
+.mn-run .bar{height:6px;min-width:0;box-shadow:0 0 0 1px var(--bd)}.mn-run .main{gap:4px}.mn-runtop{display:flex;align-items:center;justify-content:space-between;gap:8px}.mn-runtop .t{flex:1;min-width:0}
 @media (max-width:360px){.row.mn-split{flex-wrap:wrap}.row.mn-split .mn-hit{flex:1 1 100%}.row.mn-split>.btn{flex:1 0 100%;margin:2px 0 4px}.mn-cl{flex-wrap:wrap}.mn-cl .chip{max-width:100%}}
 .mn-key{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink2);justify-content:center}.mn-cap{font-size:11px;padding:0 4px;color:var(--ink2);display:flex;align-items:center}.mn-capchip{align-items:center}.mn-legend .lg2{display:flex;align-items:center;gap:8px;min-height:34px}
+.mn-pool{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}.mn-pool img{height:34px;width:auto;image-rendering:pixelated;background:#bfe0a0;box-shadow:0 0 0 2px var(--bd);padding:2px}.mn-cmp{display:inline-flex;align-items:center;gap:1px;font-weight:700;font-size:12px}.mn-cmp img{height:14px;width:auto}
 .mn-cnt{display:inline-flex;align-items:center;gap:2px}.mn-legend{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 10px}.mn-legend .lg{display:flex;align-items:center;gap:8px;min-height:34px;font-size:14px}.mn-legend .lg .sym{height:26px;width:auto}.mn-legend .lg img.sym{height:26px}
 .mn-hit{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:56px;padding:0;margin:0;border:0;background:none;text-align:left;font:inherit;font-weight:700;color:inherit;cursor:pointer}
 .row.mn-split{padding-right:4px}.row.mn-split>.btn{flex:none;margin:0;min-width:84px}
 .mn-stars{filter:none}
 .mn-hot{box-shadow:0 0 0 3px var(--gold-d),inset 0 -3px 0 rgba(0,0,0,.06)!important;background:#fff3b8}
 .mn-on{box-shadow:0 0 0 3px var(--blue)!important;background:#e6f4ff}
-.mn-why{font-size:12px;color:var(--red-d);font-weight:800}
-.mn-grade{font-size:15px;font-weight:800;color:var(--ink2)}
+.mn-why{font-size:12px;color:var(--red-d);font-weight:700}
+.mn-grade{font-size:15px;font-weight:700;color:var(--ink2)}
 .mn-kv{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;background:var(--paper);box-shadow:0 0 0 2px var(--line);min-height:44px}
 .mn-kv .k{color:var(--ink2);font-size:14px}.mn-kv .v{font-size:16px;text-align:right}
 .mn-mini{height:26px;width:auto;image-rendering:pixelated}
@@ -136,8 +159,8 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
 .mn-pic.one img{max-width:90%}
 .mn-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .mn-st{display:flex;flex-direction:column;align-items:center;padding:6px 2px;background:var(--paper);box-shadow:0 0 0 3px var(--bd)}
-.mn-st b{font-size:12px;color:#fff;width:100%;text-align:center;padding:2px 0;text-shadow:1px 1px 0 rgba(0,0,0,.4)}
-.mn-st .n{font-size:28px;font-weight:800;line-height:1.1}.mn-st i{font-style:normal;font-size:13px;color:var(--ink2)}
+.mn-st b{font-size:12px;color:#fff;width:100%;text-align:center;padding:2px 0}
+.mn-st .n{font-size:28px;font-weight:700;line-height:1.1}.mn-st i{font-style:normal;font-size:13px;color:var(--ink2)}
 .mn-st.charm b{background:var(--charm)}.mn-st.vigor b{background:var(--vigor)}.mn-st.wit b{background:var(--wit)}
 .mn-odd{display:grid;grid-template-columns:92px 1fr 44px;align-items:center;gap:8px;min-height:26px}
 .mn-odd .p{text-align:right;font-size:14px}.mn-odd .nm{font-size:12px;color:var(--ink2)}
@@ -169,7 +192,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   function mainDef() {
     return { id: 'menu', title: 'Menu', backLabel: 'Play', render(body) {
       body.classList.add('mn-tight'); const s = S();
-      const waiting = s.projects.filter(p => p.choice).length + (s.happening && s.happening.options ? 1 : 0) + (s.yearly ? 1 : 0) + (s.show ? 1 : 0);
+      const waiting = (s.arrivals ? s.arrivals.length : 0) + s.projects.filter(p => p.choice).length + (s.happening && s.happening.options ? 1 : 0) + (s.yearly ? 1 : 0) + (s.show ? 1 : 0);
       const pen = E.holding(s).length;
       body.appendChild(fitGrid([
         { icon: iUrl('m-projects', 6), label: 'Projects', badge: waiting || false, onTap: projectsScreen },
@@ -227,37 +250,42 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   const shortWhy = t => (/rest/i.test(t) ? ['Rest ', clk((/(\d+)/.exec(t) || [])[1] || '')] : /young/i.test(t) ? 'Too young' : /paired|busy/i.test(t) ? 'Already busy' : t.split(' ').slice(0, 4).join(' '));
   function eventHabs() { return habs().map(h => ({ hab: h, why: E.eventCheck(S(), h.id) })); }
 
+  const shortRegion = r => (D.BIOMES[r] && D.BIOMES[r].name) || r;
+  function runRow(p) {
+    const s = S(), info = p.type === 'hire' ? p : E.projectInfo(s, p), lead = p.staff && p.staff.length ? E.staffer(s, p.staff[0]) : null;
+    let img = null, name = info.detail;
+    if (p.type === 'hire') { img = pUrl('headhunter', 2); name = info.detail || 'Hiring'; }
+    else if (p.type === 'expedition') { img = pUrl(lead ? lead.role : 'explorer', 2); name = shortRegion(p.region); }
+    else if (p.type === 'breed') { const a = E.animal(s, p.a); img = a ? aUrl(a, 2) : null; name = a ? E.sp(a).name : info.detail; }
+    else { img = iUrl('ready-event', 3); name = D.THEMES[p.theme] ? D.THEMES[p.theme].name : info.detail; }
+    const b = el('button', { type: 'button', cls: 'row mn-r mn-run tappable' + (info.choice ? ' mn-hot' : '') },
+      el('span', { cls: 'portrait' }, imgEl(img)),
+      el('span', { cls: 'main' }, el('span', { cls: 'mn-runtop' }, span('t', name), info.choice ? imgEl(iUrl('choice', 3), 'mn-mini') : wkc(info.weeksLeft)), ui.bar(info.progress)));
+    b.addEventListener('click', guard(() => (p.type === 'hire' ? staffScreen() : info.choice ? showChoice(p.id) : projectScreen(p.id))));
+    return b;
+  }
   function projectsScreen() {
     push({ id: 'projects', title: 'Projects', render(body) { body.classList.add('mn-tight');
-      const s = S();
+      const s = S(), open = E.isOpen ? E.isOpen(s) : true;
+      const ex = expStatus(), pairs = pairList().filter(x => !x.why), free = E.freeStaff(s).length;
+      const evs = eventHabs().filter(x => !x.why), cost = E.eventCost(s);
+      const evWhy = evs.length ? (!free ? 'No one' : s.money < cost ? needMoney(cost) : '') : (habs().length ? 'None' : 'No habitat');
+      const camps = E.campaigns(s), runningC = camps.filter(c => c.weeksLeft > 0).length;
+      const g = fitGrid([
+        { icon: pUrl('explorer', 4), label: 'Expedition', sub: ex.ok ? '' : ex.why.replace('Convoy is out', 'Out').replace('No one free', 'No one'), disabled: !ex.ok, onTap: expStart },
+        { icon: iUrl('ready-breed', 4), label: 'Breeding', sub: pairs.length ? pairs.length + ' ready' : 'None', disabled: !pairs.length || !free, onTap: breedPairs },
+        { icon: iUrl('ready-event', 4), label: 'Event', sub: evWhy || evs.length + ' ready', disabled: !!evWhy, onTap: eventHabsScreen },
+        { icon: iUrl('rep', 4), label: 'Advertise', sub: !open ? 'No habitat' : runningC ? runningC + ' on' : '', disabled: !open, onTap: campaignScreen }
+      ], 2, 84, true);
+      body.appendChild(g);
       const hot = [];
       if (s.happening && s.happening.options) hot.push(row({ img: iUrl('choice', 4), title: s.happening.title, sub: 'Decide', cls: 'mn-hot', tap: happeningScreen }));
       if (s.yearly) hot.push(row({ img: iUrl('star', 4), title: s.yearly.name, sub: 'Plan it', cls: 'mn-hot', tap: yearlyScreen }));
       if (s.show) hot.push(row({ img: iUrl('star', 4), title: 'Animal Show', sub: 'Pick an entry', cls: 'mn-hot', tap: showScreen }));
-      if (hot.length) { body.appendChild(ui.section('Needs you')); body.appendChild(el('div', { cls: 'list' }, hot)); }
-      if (s.projects.length) {
-        body.appendChild(ui.section('Running'));
-        body.appendChild(el('div', { cls: 'list' }, s.projects.map(p => {
-          const info = E.projectInfo(s, p), lead = E.staffer(s, p.staff[0]);
-          let img = null;
-          if (p.type === 'expedition') img = pUrl(lead ? lead.role : 'explorer', 3);
-          else if (p.type === 'breed') { const a = E.animal(s, p.a); img = a ? aUrl(a, 2) : null; } else img = iUrl('ready-event', 4);
-          return row({ img, title: info.name + ' · ' + info.detail, sub: info.choice ? 'Waiting for you' : wkc(info.weeksLeft),
-            extra: ui.bar(info.progress), right: info.choice ? imgEl(iUrl('choice', 3), 'mn-mini') : null, cls: info.choice ? 'mn-hot' : '',
-            tap: () => (info.choice ? showChoice(p.id) : projectScreen(p.id)) });
-        })));
-      }
-      body.appendChild(ui.section('Start'));
-      const ex = expStatus(), pairs = pairList().filter(x => !x.why), free = E.freeStaff(s).length;
-      const evs = eventHabs().filter(x => !x.why), cost = E.eventCost(s);
-      const evWhy = evs.length ? (!free ? 'No one free' : s.money < cost ? needMoney(cost) : '') : (habs().length ? 'None ready' : 'Build a habitat');
-      const camps = E.campaigns(s), runningC = camps.filter(c => c.weeksLeft > 0).length;
-      body.appendChild(fitGrid([
-        { icon: pUrl('explorer', 5), label: 'Expedition', sub: ex.why, disabled: !ex.ok, onTap: expStart },
-        { icon: iUrl('ready-breed', 6), label: 'Breeding', sub: pairs.length ? pn(pairs.length, 'pair', 'pairs') + ' ready' : 'None ready', disabled: !pairs.length || !free, onTap: breedPairs },
-        { icon: iUrl('ready-event', 6), label: 'Event', sub: evWhy || pn(evs.length, 'habitat', 'habitats') + ' ready', disabled: !!evWhy, onTap: eventHabsScreen },
-        { icon: iUrl('rep', 6), label: 'Advertise', sub: !(E.isOpen ? E.isOpen(s) : true) ? 'Needs habitat' : runningC ? runningC + ' running' : '', disabled: !(E.isOpen ? E.isOpen(s) : true), onTap: campaignScreen }
-      ], 2, 72));
+      if (hot.length) body.appendChild(el('div', { cls: 'list' }, hot));
+      const runs = s.projects.slice().concat(s.hiring && E.hiringInfo && E.hiringInfo(s) ? [E.hiringInfo(s)] : []);
+      if (s.arrivals && s.arrivals.length) body.appendChild(el('div', { cls: 'list' }, [row({ img: iUrl('choice', 4), title: s.arrivals.length === 1 ? E.animalLabel(s.arrivals[0].a) : s.arrivals.length + '', sub: 'New arrival', cls: 'mn-hot', tap: () => animalsScreen('zoo') })]));
+      if (runs.length) body.appendChild(el('div', { cls: 'list mn-runlist' }, runs.map(runRow)));
     } });
   }
 
@@ -454,10 +482,26 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       }), 'No habitats yet.'));
     } });
   }
+  // After a habitat is built (or upgraded) the engine no longer moves anyone in: one tap asks.
+  let moveInHandled = false;
+  function movableIds(habId) { try { return E.movableTo ? E.movableTo(S(), habId) : []; } catch (e) { return []; } }
+  function moveInPrompt(habId) {
+    const ids = movableIds(habId); if (!ids.length) return;
+    setTimeout(() => {
+      if (Core.stack().length) return;
+      push({ id: 'movein', modal: true, title: 'Move in?', render(body, api) {
+        const s = S(), animals = ids.map(id => E.animal(s, id)).filter(Boolean); if (!animals.length) { api.pop(); return; }
+        body.appendChild(el('div', { cls: 'mn-pool' }, animals.slice(0, 8).map(a => imgEl(aUrl(a, 3)))));
+        const h = E.item(s, habId); if (h) body.appendChild(el('div', { cls: 'center' }, E.habName(s, h)));
+        body.appendChild(el('div', { cls: 'btnrow' }, ui.btn('Not now', () => { moveInHandled = true; api.pop(); }, { cls: 'ghost big' }),
+          ui.btn('Move in', guard(() => { const r = Core.act('moveIn', habId, ids); moveInHandled = true; if (r && r.ok) { ui.toast('Moved in', 'good'); later(() => api.pop()); } }), { cls: 'primary big', sub: String(animals.length) })));
+      } });
+    }, 450);
+  }
   function placeHab(b) {
     place({ kind: 'hab', t: b, label: D.BIOMES[b].name }, (q, r, rot) => {
       const res = Core.act('build', 'hab', b, q, r, rot);
-      if (res && res.ok) ui.toast(D.BIOMES[b].name + ' built' + (res.housed ? ', ' + res.housed + ' moved in' : ''), 'good');
+      if (res && res.ok) { ui.toast(D.BIOMES[b].name + ' built', 'good'); moveInHandled = false; moveInPrompt(res.id); }
       return res;
     }, buildScreen);
   }
@@ -506,7 +550,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
         const c = E.habUpgradeCost(h, s), room = E.habCap(h), next = E.habCap(Object.assign({}, h, { lvl: h.lvl + 1 }));
         const reason = h.lvl >= 5 ? 'Top level' : h.lvl >= cap ? 'Research needed' : s.money < c ? needMoney(c) : '';
         return row({ img: itemUrl(h), title: E.habName(s, h), sub: 'Level ' + h.lvl + (h.lvl < 5 ? ' to ' + (h.lvl + 1) : '') + ' · Room ' + room + (h.lvl < 5 ? ' to ' + next : ''), extra: reason ? why(reason) : null, right: h.lvl < 5 ? money(c) : null, off: !!reason,
-          tap: () => ui.confirm('Upgrade ' + E.habName(s, h) + ' for ' + money(c) + '?', () => { const r = Core.act('upgrade', h.id); if (r.ok) { ui.toast('Level ' + r.lvl, 'good'); api.rerender(); } }, { yes: 'Upgrade' }) });
+          tap: () => ui.confirm('Upgrade ' + E.habName(s, h) + ' for ' + money(c) + '?', () => { const r = Core.act('upgrade', h.id); if (r.ok) { ui.toast('Level ' + r.lvl, 'good'); api.rerender(); if (movableIds(h.id).length) { Core.popAll(); moveInPrompt(h.id); } } }, { yes: 'Upgrade' }) });
       }), 'No habitats yet.'));
     } });
   }
@@ -524,29 +568,62 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   let animalTab = 'zoo';
   const ageText = a => { const s = S(); if (E.isJuv(s, a)) return 'Baby'; if (a.born == null) return 'Adult'; const y = Math.floor((s.week - a.born) / D.WPY); return y < 1 ? 'Young' : y + 'y'; };
   const ageSym = a => { const s = S(); if (E.isJuv(s, a)) return [' ', ui.sym('juv', { scale: 2, label: 'Baby', text: 'baby' })]; if (a.born == null) return null; const y = Math.floor((s.week - a.born) / D.WPY); return y >= 1 ? ' ' + y + 'y' : null; };
+  function animalTile(a) {
+    const s = S(), sick = E.isSick(s, a) ? imgEl(iUrl('sick', 2), 'mn-mini') : null;
+    return el('button', { type: 'button', cls: 'mn-at', tap: guard(() => animalScreen(a.id)), 'aria-label': (a.name || '') + ' ' + E.animalLabel(a) },
+      el('span', { cls: 'pt' }, imgEl(aUrl(a, 2))),
+      el('span', { cls: 'inf' }, el('span', { cls: 'c3' }, [A('charm', a.charm), A('vigor', a.vigor), A('wit', a.wit)]), el('span', { cls: 'c2' }, sexSym(a), ageSym(a), ui.grade(E.grade(E.avg(a))), sick)));
+  }
   function animalRow(a, o) {
     const s = S();
-    return row({ img: aUrl(a, 2), title: a.name, sub: [E.animalLabel(a), ' ', sexSym(a), ageSym(a)],
-      extra: o && o.act ? null : animalChips(a), line: o && o.act ? animalChips(a) : null,
-      right: o && o.act ? null : [starsOn(E.sp(a).rarity), E.isSick(s, a) ? imgEl(iUrl('sick', 3), 'mn-mini') : null], tap: () => animalScreen(a.id), act: o && o.act });
+    const sick = E.isSick(s, a) ? imgEl(iUrl('sick', 3), 'mn-mini') : null;
+    if (o && o.act) return row({ img: aUrl(a, 2), title: [E.animalLabel(a), ' ', sexSym(a), ageSym(a)], line: animalChips(a), tap: () => animalScreen(a.id), act: o.act });
+    return row({ img: aUrl(a, 2), title: [E.animalLabel(a), ' ', sexSym(a), ageSym(a), sick], right: animalChips(a), tap: () => animalScreen(a.id) });
+  }
+  // ---- arrivals waiting for a sell-or-keep decision (engine S.arrivals)
+  function arrivalRow(en) {
+    const a = en.a;
+    return row({ img: aUrl(a, 2), title: [E.animalLabel(a), ' ', sexSym(a)], extra: animalChips(a), right: [cmpBadge(en), ui.sym('choice', { scale: 3, label: 'Decide', text: '!' })], cls: 'mn-hot', tap: () => showArrival(a.id) });
+  }
+  function showArrival(id) {
+    if (window.ZMoments && ZMoments.showArrival) { try { ZMoments.showArrival(id); return; } catch (e) { /* fall back */ } }
+    arrivalScreen(id);
+  }
+  function arrivalScreen(id) {
+    push({ id: 'arrival', title: 'New arrival', render(body, api) {
+      const s = S(), en = E.arrival ? E.arrival(s, id) : null; if (!en) { api.pop(); return; }
+      animalCard(body, en.a);
+      const b = cmpBadge(en); if (b) body.appendChild(el('div', { cls: 'center' }, b));
+      body.appendChild(el('div', { cls: 'btnrow' }, ui.btn('Sell', () => ui.confirm('Sell for ' + money(E.animalValue(en.a)) + '?', () => { const r = Core.act('sellArrival', id); if (r.ok) { ui.toast('Sold for ' + money(r.price), 'good'); later(() => api.pop()); } }, { danger: true, yes: 'Sell' }), { cls: 'danger big', sub: mny(E.animalValue(en.a)) }), ui.btn('Keep', () => arrivalWhere(id), { cls: 'primary big' })));
+    } });
+  }
+  function arrivalWhere(id) {
+    push({ id: 'arrival-where', title: 'Where?', render(body, api) {
+      const s = S(), en = E.arrival ? E.arrival(s, id) : null; if (!en) { api.pop(); return; }
+      body.appendChild(rows(E.arrivalChoices(s, id).map(c => { const h = c.hab != null ? E.item(s, c.hab) : null;
+        return row({ img: h ? itemUrl(h) : iUrl('pen', 4), title: h ? E.habName(s, h) : 'Holding pen', sub: h ? (c.room != null ? cnt('m-animals', Math.max(0, c.room)) : null) : (E.holdFee ? [mny(E.holdFee(s, en.a)), '/wk'] : null), extra: c.fit ? null : why('Full'), right: c.best ? ui.sym('ok', { scale: 3, label: 'Best' }) : null, off: !c.fit,
+          tap: () => { const r = Core.act('keepArrival', id, c.hab); if (r.ok) { ui.toast('Kept', 'good'); later(() => { Core.pop(); if (Core.stack().slice(-1)[0] === 'arrival') Core.pop(); }); } } }); })));
+    } });
   }
   function animalsScreen(tab) {
     if (tab) animalTab = tab;
     push({ id: 'animals', title: 'Animals', render(body, api) {
+      body.classList.add('mn-tight');
       const s = S(), pen = E.holding(s), offers = s.offers, mk = offers ? offers.list.length + (E.crateInfo(s) ? 1 : 0) : 0;
-      body.appendChild(keyRow('a'));
+      if (s.arrivals && s.arrivals.length) body.appendChild(el('div', { cls: 'list' }, s.arrivals.map(arrivalRow)));
       body.appendChild(ui.tabs([{ id: 'zoo', label: 'Zoo' }, { id: 'pen', label: 'Pen ' + pen.length + '/' + E.holdCap(s) }, { id: 'market', label: mk ? 'Market ' + mk : 'Market' }], animalTab, t => { animalTab = t; api.rerender(); }));
       if (animalTab === 'zoo') {
         let any = false;
         habs().forEach(h => {
-          const an = E.inHab(s, h.id).sort((a, b) => E.avg(b) - E.avg(a)); if (!an.length) return; any = true;
+          const an = E.inHab(s, h.id).sort((a, b) => (a.sp < b.sp ? -1 : a.sp > b.sp ? 1 : E.avg(b) - E.avg(a))); if (!an.length) return; any = true;
           body.appendChild(ui.section(E.habName(s, h) + '  ' + an.length + '/' + E.habCap(h)));
-          body.appendChild(el('div', { cls: 'list' }, an.map(a => animalRow(a))));
+          body.appendChild(el('div', { cls: 'mn-ag' }, an.map(animalTile)));
         });
         if (!any) body.appendChild(el('div', { cls: 'empty' }, 'No animals in habitats.'));
       } else if (animalTab === 'pen') {
         const canAny = pen.some(a => E.bestHab(s, a));
         if (pen.length && !habs().length) body.appendChild(ui.note('Build a habitat first.'));
+        if (pen.length && E.holdUpkeep) { const hu = E.holdUpkeep(s); body.appendChild(el('div', { cls: 'mn-kv' }, span('k', ui.sym('pen', { scale: 3, label: 'Pen', text: 'Pen' })), span('v', mny(hu.total), '/wk'))); }
         if (pen.length > 1) body.appendChild(ui.btn('House all', () => { const r = Core.act('autoHouseAll'); if (r.ok) { ui.toast(r.moved.length ? pn(r.moved.length, 'animal', 'animals') + ' housed' : 'No room'); api.rerender(); } }, { cls: 'primary big', disabled: !canAny, sub: canAny ? '' : 'No room' }));
         body.appendChild(rows(pen.map(a => { const h = E.bestHab(s, a); return animalRow(a, { act: ui.btn('House', () => { const r = Core.act('autoHouse', a.id); if (r.ok) { const hh = E.item(s, r.hab); ui.toast('Housed' + (hh ? ' in ' + E.habName(s, hh) : ''), 'good'); api.rerender(); } }, { cls: 'primary', disabled: !h, sub: h ? '' : (habs().length ? 'No room' : 'Needs habitat') }) }); }), 'The pen is empty.'));
       } else marketBody(body, api);
@@ -556,8 +633,8 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     const s = S(), o = s.offers, info = E.crateInfo(s);
     if (!o || (!o.list.length && !info)) { body.appendChild(el('div', { cls: 'empty' }, 'Nobody is selling.')); return; }
     body.appendChild(ui.section(o.kind === 'director' ? 'Visiting director' : 'Trader'));
-    if (info) body.appendChild(row({ img: iUrl('coin', 4), title: 'Mystery crate', sub: 'Odds shown inside', right: mny(info.cost), tap: () => crateScreen() }));
-    body.appendChild(rows(o.list.map((x, i) => row({ img: aUrl(x.a, 2), title: E.animalLabel(x.a), sub: [sexSym(x.a), S().book[x.a.sp] ? null : [' ', ui.sym('new', { scale: 2, label: 'New', text: 'New!' })]],
+    if (info) body.appendChild(row({ img: iUrl('coin', 4), title: [starsOn(info.rarity || 1), ' ', info.left != null ? info.left + '/' + (info.total || 5) : ''], sub: info.name || null, right: mny(info.cost), tap: () => crateScreen() }));
+    body.appendChild(rows(o.list.map((x, i) => row({ img: aUrl(x.a, 2), title: [E.animalLabel(x.a), ' ', sexSym(x.a), ' ', cmpBadge(x) || (S().book[x.a.sp] ? null : ui.sym('new', { scale: 2, label: 'New', text: 'New!' }))],
       extra: animalChips(x.a), right: [mny(x.price), starsOn(E.sp(x.a).rarity)], tap: () => offerScreen(i) })), info ? '' : 'Nothing left.'));
   }
   function statBoxes(a) {
@@ -579,7 +656,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       if (!h) { const best = E.bestHab(s, a); body.appendChild(ui.btn('House', () => { const r = Core.act('autoHouse', id); if (r.ok) { ui.toast('Housed', 'good'); later(() => api.pop()); } }, { cls: 'primary big', disabled: !best, sub: best ? E.habName(s, best) : 'No room' })); }
       const inProj = !!E.busyAnimals(s)[id];
       body.appendChild(ui.btn('Choose habitat', () => habChooser(id), { cls: 'big', disabled: inProj, sub: inProj ? 'In a project' : '' }));
-      if (h) body.appendChild(ui.btn('To holding pen', () => { const r = Core.act('moveAnimal', id, null); if (r.ok) { ui.toast('In the pen'); api.rerender(); } }, { cls: 'ghost' }));
+      if (h) body.appendChild(ui.btn('To holding pen', () => { const r = Core.act('moveAnimal', id, null); if (r.ok) { ui.toast('In the pen'); api.rerender(); } }, { cls: 'ghost', sub: E.holdFee ? [mny(E.holdFee(s, a)), '/wk'] : '' }));
       const v = E.animalValue(a);
       body.appendChild(ui.btn('Sell', () => ui.confirm('Sell ' + (a.name || 'it') + ' for ' + money(v) + '?', () => { const r = Core.act('sellAnimal', id); if (r.ok) { ui.toast('Sold for ' + money(r.price), 'good'); later(() => api.pop()); } }, { danger: true, yes: 'Sell' }), { cls: 'danger', sub: money(v) }));
     } });
@@ -598,21 +675,25 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     push({ id: 'offer', title: 'For sale', render(body, api) {
       const s = S(), o = s.offers && s.offers.list[i]; if (!o) { api.pop(); return; }
       animalCard(body, o.a);
-      body.appendChild(ui.btn('Buy', guard(() => { const r = Core.act('buyAnimal', i); if (r.ok) { const h = r.hab != null ? E.item(s, r.hab) : null; ui.toast('Bought' + (h ? ', housed in ' + E.habName(s, h) : ', in the pen'), 'good'); later(() => api.pop()); } }), { cls: 'primary big', sub: money(o.price), disabled: s.money < o.price, onDisabled: () => ui.toast(needMoney(o.price), 'bad') }));
+      { const b = cmpBadge(o); if (b) body.appendChild(el('div', { cls: 'center' }, b)); }
+      body.appendChild(ui.btn('Buy', guard(() => { const r = Core.act('buyAnimal', i); if (r.ok) { ui.toast('Bought', 'good'); later(() => { api.pop(); if (r.pending && E.arrival && r.animal && E.arrival(S(), r.animal.id)) showArrival(r.animal.id); }); } }), { cls: 'primary big', sub: money(o.price), disabled: s.money < o.price, onDisabled: () => ui.toast(needMoney(o.price), 'bad') }));
     } });
   }
   function crateScreen() {
-    push({ id: 'crate', title: 'Mystery crate', render(body, api) {
+    push({ id: 'crate', title: 'Crate', render(body, api) {
       const s = S(), info = E.crateInfo(s); if (!info) { api.pop(); return; }
       body.appendChild(el('div', { cls: 'center' }, imgEl(iUrl('coin', 8))));
-      info.odds.forEach(o => body.appendChild(el('div', { cls: 'mn-odd' }, starsOn(o.rarity), ui.bar(o.p, { cls: 'gold' }), span('p', pct(o.p)))));
-      const full = E.holding(s).length >= E.holdCap(s), poor = s.money < info.cost;
+      const big = starsOn(info.rarity || 1); big.classList.add('big'); body.appendChild(el('div', { cls: 'center' }, big, ' ', info.left != null ? info.left + '/' + (info.total || 5) : ''));
+      if (info.pool) body.appendChild(el('div', { cls: 'mn-pool' }, info.pool.slice(0, 24).map(id => imgEl(spUrl(id, {}, 2)))));
+      else (info.odds || []).forEach(o => body.appendChild(el('div', { cls: 'mn-odd' }, starsOn(o.rarity), ui.bar(o.p, { cls: 'gold' }), span('p', pct(o.p)))));
+      const full = !info.pool && E.holding(s).length >= E.holdCap(s), poor = s.money < info.cost;
       body.appendChild(ui.btn('Open', guard(() => openCrate(api)), { cls: 'primary big', sub: full ? 'Pen is full' : poor ? needMoney(info.cost) : money(info.cost), disabled: full || poor }));
     } });
   }
   function openCrate(api) {
     const r = Core.act('openCrate'); if (!r.ok) return;
     if (window.ZMoments && ZMoments.revealCrate) { try { ZMoments.revealCrate(r, () => { try { Core.rerender(); } catch (e) { /* ignore */ } }); return; } catch (e) { /* use ours */ } }
+    if (r.pending && E.arrival) { showArrival(r.animal.id); return; }
     const a = r.animal, sp = E.sp(a);
     reveal(api, { id: 'crate-rarity', kicker: 'Mystery crate', title: D.RARITY.name[r.rarity], body: (() => { const w = starsOn(r.rarity); w.classList.add('big'); return w; })(), tone: r.rarity >= 4 ? 'rare' : '' }, a1 => {
       a1.replace({ id: 'crate-animal', modal: true, render(b, a2) {
@@ -630,7 +711,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   function staffScreen() {
     push({ id: 'staff', title: 'Staff', render(body, api) {
       const s = S(), busy = E.busyStaff(s), cap = E.staffCap(s);
-      body.appendChild(ui.section('Hire  ' + s.staff.length + '/' + cap)); body.appendChild(hireOptions(api, false));
+      body.appendChild(ui.section('Hire  ' + s.staff.length + '/' + cap)); body.appendChild(hireOptions(api));
       if (s.candidates && s.candidates.length) body.appendChild(ui.btn('Who turned up', candidatesScreen, { cls: 'blue', sub: s.candidates.length + ' waiting' }));
       if (s.headhunt) {
         const h = s.headhunt, fee = E.headhuntFee(h);
@@ -685,12 +766,12 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       })));
     } });
   }
-  function hireOptions(api, replace) {
-    const s = S(), full = s.staff.length >= E.staffCap(s);
-    return ui.choices(E.hireTiers(s).map(t => ({ label: t.name, note: full ? 'Staff room full' : t.lock ? 'Needs ' + t.lock : t.note + (t.star >= 0.1 ? ' · stars likely' : ''), cost: t.cost, disabled: full || !!t.lock })), i => {
+  function hireOptions(api) {
+    const s = S(), full = s.staff.length >= E.staffCap(s), out = s.hiring ? (E.hiringInfo ? E.hiringInfo(s) : null) : null;
+    if (s.hiring) return row({ img: pUrl('headhunter', 3), title: out ? out.detail : 'Advert', sub: out ? wkc(out.weeksLeft) : 'Out', extra: ui.bar(out ? out.progress : 0), tap: () => ui.toast('Applicants arrive soon.') });
+    return ui.choices(E.hireTiers(s).map(t => ({ label: t.name, note: full ? 'Staff room full' : t.lock ? 'Needs ' + t.lock : [t.note, t.weeks ? ' · ' : '', t.weeks ? ui.sym('time', { scale: 2, label: 'Weeks', text: 'wk' }) : null, t.weeks ? ' ' + t.weeks : ''], cost: t.cost, disabled: full || !!t.lock })), i => {
       const r = Core.act('advertise', i); if (!r.ok) return;
-      if (replace) api.replace(candidatesDef()); else push(candidatesDef());
-      if (window.ZMoments && ZMoments.revealHire) { try { ZMoments.revealHire(r.candidates, () => { try { Core.rerender(); } catch (e) { /* ignore */ } }); } catch (e) { /* list is already there */ } }
+      ui.toast('Advert out', 'good'); try { api.rerender(); } catch (e) { /* ignore */ }
     });
   }
   function hireScreen() {
@@ -870,6 +951,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       body.appendChild(el('div', { cls: 'mn-setrow' }, span('mn-lab', 'Speed'), ui.tabs([{ id: '1', label: '1x' }, { id: '2', label: '2x' }], String(Core.speed), id => { Core.setSpeed(+id); api.rerender(); })));
       if (window.ZRender && ZRender.getZoom) body.appendChild(el('div', { cls: 'mn-setrow' }, span('mn-lab', 'Zoom'), ui.tabs([{ id: '1', label: 'Close' }, { id: '0', label: 'Far' }], String(ZRender.getZoom()), id => { ZRender.setZoom(+id); api.rerender(); })));
       body.appendChild(el('div', { cls: 'btnrow' }, ui.btn('How to play', howScreen, { cls: 'big' }), ui.btn('Replay tutorial', () => { startTutorial(); Core.popAll(); }, { cls: 'big' })));
+      if (Core.devTools && Core.screens && Core.screens.screenCheck) body.appendChild(ui.btn('Screen check', () => Core.screens.screenCheck(), { cls: 'ghost' }));
     } });
   }
   function toTitle() {
@@ -890,6 +972,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
         ['d', 'c', 'b', 'a', 's', 'ss'].map(g => lg('grade-' + g, 'Grade ' + g.toUpperCase()))));
       grp('Zoo', [lg('coin', 'Money'), lg('rp', 'Research'), lg('rep', 'Fame'), lg('visitors', 'Visitors'), lg(ui.stars(3, 3), 'Rank'), lg(ui.flames(2, 3), 'Buzz'), lg('habitat', 'Habitat'), lg('pen', 'Pen'), lg('land', 'Land'), lg('trophy', 'Trophy'), lg('star', 'Rarity'),
         lg('medal-gold', 'Gold'), lg('medal-silver', 'Silver'), lg('medal-bronze', 'Bronze'), lg(badge, 'Needs you')]);
+      grp('Buying', [lg('new', 'New species'), lg(span('mn-cmp', sexSym({ sex: 'F' }), '+'), 'Other sex'), lg(imgEl(pixIcon('up', '#58b84a', 2)), 'Better'), lg(imgEl(pixIcon('down', '#e0584a', 2)), 'Worse'), lg(span('mn-cmp', '+-'), 'Mixed')]);
       grp('On the floor', [lg('ready-event', 'Event ready'), lg('ready-breed', 'Pair ready'), lg('busy', 'Working'), lg('sick', 'Unwell'), lg('choice', 'Answer me'), lg(el('span', { style: { width: '40px' } }, ui.bar(0.6)), 'Progress'), lg('flame', 'Buzz')]);
       body.appendChild(ui.note('-- - + ++ : poor to great.'));
     } });
@@ -994,7 +1077,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   const BLANK_GLOW = { menu: 'Build', build: 'Habitats', 'build-habs': 'Savanna' };   // the obvious first move on bare land, tutorial or not
   const TUT = [
     { text: 'Tap your land to open the menu.', done: () => Core.stack().length > 0, glow: BLANK_GLOW },
-    { text: 'Build, Habitats: place a Savanna home.', done: (s, b) => habCount(s) > (b.hab || 0), glow: BLANK_GLOW, hold: 2600 },
+    { text: 'Build, Habitats: place a Savanna home.', done: (s, b) => habCount(s) > (b.hab || 0) && (moveInHandled || !s.items.some(i => i.k === 'hab' && movableIds(i.id).length)), glow: BLANK_GLOW, hold: 2600 },
     { text: 'Now place a Snack Stand.', done: (s, b) => count(s, 'snack') > (b.snack || 0), glow: { menu: 'Build', build: 'Facilities', 'build-facs': 'Snack Stand' } },
     { text: 'Place a Bench next to the stand.', done: (s, b) => count(s, 'bench') > (b.bench || 0), glow: { menu: 'Build', build: 'Facilities', 'build-facs': 'Garden Bench' } },
     { text: 'Flag on the habitat: hold an event.', done: (s, b) => didN(s, 'startEvent') > (b.startEvent || 0), glow: { menu: 'Projects', projects: 'Event', 'event-habs': 'Savanna', 'event-theme': 'Feeding' } },
@@ -1059,7 +1142,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     open, title, startTutorial, init() { /* nothing to register */ }, recordLegacy,
     screens: { main: open, projects: projectsScreen, build: buildScreen, animals: () => animalsScreen('zoo'), staff: staffScreen, research: researchScreen, info: infoScreen, system: systemScreen,
       book: bookScreen, combos: comboScreen, fits: fitScreen, rumors: rumorScreen, ranks: rankScreen, years: yearsScreen, awards: awardsScreen, how: howScreen, newZoo: () => newZooName(1),
-      expedition: expStart, breeding: breedPairs, event: eventHabsScreen, campaigns: campaignScreen, hire: hireScreen, market: () => animalsScreen('market'), pen: () => animalsScreen('pen'), crate: crateScreen,
+      candidates: candidatesScreen, whoTurnedUp: candidatesScreen, expedition: expStart, breeding: breedPairs, event: eventHabsScreen, campaigns: campaignScreen, hire: hireScreen, market: () => animalsScreen('market'), pen: () => animalsScreen('pen'), crate: crateScreen,
       animal: animalScreen, staffer: staffDetail, habitats: habitatList, facilities: facilityList, move: moveList, remove: removeList, upgrade: upgradeList, land: landScreen, yearly: yearlyScreen, show: showScreen, decision: happeningScreen }
   };
 })();

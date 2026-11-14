@@ -1,0 +1,84 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Wildside Zoo style D revision 1</title>
+<style> html, body { margin: 0; background: #f6eedc; } canvas { display: block; image-rendering: pixelated; } </style></head><body>
+<canvas id="page" width="10" height="10"></canvas>
+<script src="../geo.js"></script>
+<script src="../data.js"></script>
+<script src="../sprites.js"></script>
+<script src="art-hd.js"></script>
+<script>
+/* Artist: revision 1 of style D (the owner's notes on the showcase). test/art-rev1.js drives this page:
+   window.__parts(list, dev) renders single assets to PNG data URLs (used to keep the BEFORE pictures),
+   window.__sheet(before, dev) lays out BEFORE | AFTER pages and window.__scene() a small zoo at real phone size.
+   Nothing in the game changes. */
+'use strict';
+window.__err = []; window.onerror = function (m) { window.__err.push(String(m)); };
+var CREAM = '#f6eedc', CARD = '#fbf6ea', INK = '#2a1d33', SOFT = '#7a6a5a';
+var ITEMS = [
+  ['Polar bear', [['animal', 'polarbear', {}], ['animal', 'polarbear', { variant: true }], ['animal', 'polarbear', { juv: true }]]],
+  ['Gorilla', [['animal', 'gorilla', {}], ['animal', 'gorilla', { variant: true }], ['animal', 'gorilla', { juv: true }]]],
+  ['Toucan beak', [['animal', 'toucan', {}], ['animal', 'toucan', { variant: true }]]],
+  ['Eagle beak', [['animal', 'eagle', {}], ['animal', 'eagle', { variant: true }]]],
+  ['T. rex', [['animal', 'trex', {}], ['animal', 'trex', { variant: true }], ['animal', 'trex', { juv: true }]]],
+  ['Dolphin', [['animal', 'dolphin', {}], ['animal', 'dolphin', { variant: true }], ['animal', 'dolphin', { juv: true }]]],
+  ['Path', [['tile', 'path', { seed: 0 }], ['tile', 'path', { seed: 1 }]]],
+  ['Trees and bushes', [['deco', 'tree', { seed: 0 }], ['deco', 'tree', { seed: 1 }], ['deco', 'tree', { seed: 2 }], ['deco', 'tree', { seed: 3 }], ['deco', 'bush', { seed: 0 }], ['deco', 'bush', { seed: 1 }]]]];
+function one(it) { var o = Object.assign({ t: it[0], id: it[1] }, it[2]); if (it[0] === 'tile') { o.kind = it[1]; } return sprD(o); }
+function toURL(s, dev, pad) { // one asset on a transparent canvas, crisp, with its anchor recorded
+  var f = dev / (s.K || 1), c = document.createElement('canvas'); c.width = Math.round(s.w * f) + 2 * pad; c.height = Math.round(s.h * f) + 2 * pad;
+  var g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(s.c, pad, pad, s.w * f, s.h * f);
+  return { url: c.toDataURL('image/png'), ax: pad + s.ax * f, ay: pad + s.ay * f, w: c.width, h: c.height };
+}
+function ready() { if (!window.ZS_D._over) { installOverrides(window.ZS_D); window.ZS_D._dmode = true; window.ZS_D._over = 1; } }
+window.__parts = function (dev) { ready(); var out = []; ITEMS.forEach(function (sec) { sec[1].forEach(function (it) { out.push(toURL(one(it), dev, 6)); }); }); return out; };
+function label(g, t, x, y, sz, col, al, bold) { g.font = (bold ? 'bold ' : '') + sz + 'px system-ui, sans-serif'; g.textAlign = al || 'center'; g.fillStyle = col || SOFT; g.fillText(t, x, y); }
+function loadImgs(list) { return Promise.all(list.map(function (p) { return new Promise(function (res) { var im = new Image(); im.onload = function () { res(Object.assign({ im: im }, p)); }; im.src = p.url; }); })); }
+// pages: each section is a card with BEFORE on the left column and AFTER on the right, one row per variant
+window.__sheet = async function (before, dev, maxH) {
+  ready(); var after = window.__parts(dev), B = await loadImgs(before), A = await loadImgs(after), PW = 1170, pages = [], k = 0;
+  var rows = []; ITEMS.forEach(function (sec, si) { sec[1].forEach(function (it, n) { rows.push({ sec: sec[0], first: n === 0, b: B[k], a: A[k], sea: it[1] === 'dolphin', tile: it[0] === 'tile' }); k++; }); });
+  var cur = null, y = 0;
+  function newPage() { cur = document.createElement('canvas'); cur.width = PW; cur.height = maxH; var g = cur.getContext('2d'); g.fillStyle = CREAM; g.fillRect(0, 0, PW, maxH); pages.push({ c: cur, h: 0 }); y = 0; }
+  newPage();
+  rows.forEach(function (rw) {
+    var stack = Math.max(rw.b.w, rw.a.w) > PW / 2 - 30, hh = (stack ? rw.b.h + rw.a.h + 60 : Math.max(rw.b.h, rw.a.h)) + 40 + (rw.first ? 140 : 0);
+    if (y + hh > maxH - 10) newPage();
+    var g = cur.getContext('2d'); g.imageSmoothingEnabled = false;
+    if (rw.first) { y += 70; label(g, rw.sec, 30, y, 50, INK, 'left', true); y += 20; if (!stack) { label(g, 'before', PW * 0.25, y + 30, 30, SOFT); label(g, 'after', PW * 0.75, y + 30, 30, '#3f8f45', 'center', true); } y += 50; }
+    g.fillStyle = rw.sea ? '#4aa3d8' : CARD;
+    if (stack) { g.fillRect(16, y, PW - 32, rw.b.h + rw.a.h + 70);
+      label(g, 'before', 40, y + 40, 30, SOFT, 'left'); g.drawImage(rw.b.im, Math.round(PW / 2 - rw.b.ax), y + 10);
+      label(g, 'after', 40, y + rw.b.h + 70, 30, '#3f8f45', 'left', true); g.drawImage(rw.a.im, Math.round(PW / 2 - rw.a.ax), y + rw.b.h + 50);
+      y += rw.b.h + rw.a.h + 90; }
+    else { g.fillRect(16, y, PW / 2 - 24, Math.max(rw.b.h, rw.a.h) + 20); g.fillRect(PW / 2 + 8, y, PW / 2 - 24, Math.max(rw.b.h, rw.a.h) + 20);
+      var base = y + 10 + Math.max(rw.b.ay, rw.a.ay);
+      g.drawImage(rw.b.im, Math.round(PW * 0.25 - rw.b.w / 2), Math.round(base - rw.b.ay)); g.drawImage(rw.a.im, Math.round(PW * 0.75 - rw.a.w / 2), Math.round(base - rw.a.ay));
+      y += Math.max(rw.b.h, rw.a.h) + 40; }
+    pages[pages.length - 1].h = y + 10;
+  });
+  return pages.map(function (p) { var c = document.createElement('canvas'); c.width = PW; c.height = Math.min(maxH, p.h + 20); c.getContext('2d').drawImage(p.c, 0, 0); return c.toDataURL('image/png'); });
+};
+function ob(t, id, q, r, dx, dy, more) { var p = G.toScreen(q, r); return Object.assign({ t: t, id: id, x: p.x + dx, y: p.y + dy }, more || {}); }
+window.__scene = function () { // a small zoo at real phone size (390 CSS px at 3x = 1170 px), revised path and trees
+  ready(); var DEV = 6, OX = 34, OY = 40, PW = 1170, SH = 230 * DEV, cv = document.createElement('canvas'); cv.width = PW; cv.height = SH;
+  var g = cv.getContext('2d'); g.imageSmoothingEnabled = false; g.fillStyle = '#86c94e'; g.fillRect(0, 0, PW, SH);
+  var H = {}, list = [], tiles = [], objs = [];
+  ['0,0', '1,0', '0,1'].forEach(function (k) { H[k] = 'hab:arctic'; }); ['2,2', '3,1', '3,2'].forEach(function (k) { H[k] = 'hab:jungle'; });
+  ['2,0', '1,1', '0,2', '1,2', '0,3', '0,4', '-1,4', '1,3', '2,3', '-1,5', '0,5'].forEach(function (k) { H[k] = 'path'; });
+  for (var r = -3; r <= 8; r++) for (var q = -5; q <= 7; q++) { var p = G.toScreen(q, r); if (p.x + OX < -30 || p.x + OX > 225 || p.y + OY < -25 || p.y + OY > 255) continue; list.push([q, r, H[q + ',' + r] || 'grass']); }
+  var HB = {}; list.forEach(function (h) { if (h[2].indexOf('hab:') === 0) HB[h[0] + ',' + h[1]] = h[2].slice(4); });
+  list.forEach(function (h) { var p = G.toScreen(h[0], h[1]); tiles.push({ kind: h[2], seed: ((h[0] * 7 + h[1] * 13) % 18 + 18) % 18, x: p.x, y: p.y });
+    var b = HB[h[0] + ',' + h[1]]; if (b) for (var e = 0; e < 6; e++) { var nb = G.EDGES[e][0]; if (HB[(h[0] + nb[0]) + ',' + (h[1] + nb[1])] !== b) objs.push({ t: 'fence', biome: b, e: e, x: p.x, y: p.y, sy: p.y + G.edgeMidY(e) }); } });
+  [ob('animal', 'polarbear', 0, 0, -2, 5), ob('animal', 'polarbear', 1, 0, 4, 6, { juv: true, flip: true }), ob('animal', 'gorilla', 2, 2, -2, 4), ob('animal', 'toucan', 3, 1, 4, -2), ob('animal', 'gorilla', 3, 2, 2, 4, { juv: true, flip: true }),
+    ob('animal', 'eagle', 0, 1, 4, 3), ob('person', 'visitor', 1, 1, 2, 4, { seed: 11 }), ob('person', 'keeper', 0, 3, -4, 2), ob('person', 'visitor', 1, 3, 6, 0, { seed: 5, flip: true }), ob('person', 'trader', 0, 4, 8, 4),
+    ob('deco', 'tree', -1, 2, 0, 6), ob('deco', 'tree', 2, 4, 0, 8, { seed: 1 }), ob('deco', 'tree', -1, 3, -4, 10, { seed: 2 }), ob('deco', 'tree', 4, 0, 0, 6, { seed: 3 }), ob('deco', 'bush', 1, 4, -4, 10, { seed: 1 }), ob('deco', 'bush', -2, 5, 4, 2),
+    ob('deco', 'tree', 3, 3, 2, 10)].forEach(function (o) { o.sy = o.y; objs.push(o); });
+  tiles.sort(function (a, b) { return a.y - b.y || a.x - b.x; }); objs.sort(function (a, b) { return a.sy - b.sy; });
+  function put(s, x, y) { var f = DEV / (s.K || 1); g.drawImage(s.c, Math.round(x - s.ax * f), Math.round(y - s.ay * f), s.w * f, s.h * f); }
+  tiles.forEach(function (t) { put(sprD({ t: 'tile', kind: t.kind, seed: t.seed }), (OX + t.x) * DEV, (OY + t.y) * DEV); });
+  objs.forEach(function (o) { put(sprD(o), (OX + o.x) * DEV, (OY + o.y) * DEV); });
+  g.fillStyle = 'rgba(42,29,51,0.72)'; g.fillRect(0, SH - 64, PW, 64); label(g, 'Revised path and trees at real size', PW / 2, SH - 20, 32, '#ffffff', 'center', true);
+  return cv.toDataURL('image/png');
+};
+</script>
+</body></html>

@@ -207,10 +207,10 @@
 
   // Hiring: pay for an advert, then see who turns up. k = cost as a share of D.SCALE, q = quality bonus, star = chance of a standout.
   D.HIRE_TIERS = [
-    { key: 'board',  name: 'Notice board', k: 0.3, n: 2, q: -3, star: 0.03, note: '2 turn up' },
-    { key: 'paper',  name: 'Newspaper ad', k: 1.0, n: 3, q: 3,  star: 0.08, note: '3 turn up, better' },
-    { key: 'agency', name: 'Agency',       k: 3.0, n: 3, q: 9,  star: 0.16, note: '3 skilled people', rank: 3 },
-    { key: 'tv',     name: 'TV appeal',    k: 8.0, n: 4, q: 16, star: 0.30, note: '4 of the best', rank: 5 }
+    { key: 'board',  name: 'Notice board', k: 0.3, n: 2, q: -3, star: 0.03, weeks: 2, note: '2 turn up' },
+    { key: 'paper',  name: 'Newspaper ad', k: 1.0, n: 3, q: 3,  star: 0.08, weeks: 2, note: '3 turn up, better' },
+    { key: 'agency', name: 'Agency',       k: 3.0, n: 3, q: 9,  star: 0.16, weeks: 3, note: '3 skilled people', rank: 3 },
+    { key: 'tv',     name: 'TV appeal',    k: 8.0, n: 4, q: 16, star: 0.30, weeks: 3, note: '4 of the best', rank: 5 }
   ];
   // Advertising campaigns (one of each kind can run at a time). vis = extra visitors while it runs, rep = share of the current rank gap gained as reputation.
   D.CAMPAIGNS = [
@@ -225,8 +225,16 @@
     festival: [{ key: 'none', name: 'Stalls only', k: 0, mult: 1, rep: 0 }, { key: 'music', name: 'Live music', k: 0.5, mult: 1.3, rep: 0.0045 }, { key: 'fair', name: 'Food fair', k: 1.5, mult: 1.6, rep: 0.009 }, { key: 'star', name: 'Headline act', k: 4, mult: 2, rep: 0.015 }]
   };
   D.YEARLY_NAME = { openday: 'Spring Open Day', festival: 'Summer Festival', show: 'Winter Animal Show' };
-  // Mystery crate at the trader: chance of each rarity (1 to 5), by zoo rank band (ranks 1-2, 3-4, 5-6, 7-8, 9-10).
-  D.CRATE_ODDS = [[55, 33, 10, 2, 0], [45, 33, 16, 5, 1], [35, 32, 22, 9, 2], [25, 30, 27, 14, 4], [15, 27, 31, 20, 7]];
+  // Rarity crates at the trader: each visit brings CRATES_PER_VISIT crates of ONE rarity. Chance of each rarity (1 to 5) for a
+  // visit, by zoo rank band (ranks 1-2, 3-4, 5-6, 7-8, 9-10). CRATE_ODDS is the old name, kept as the same table.
+  D.CRATE_VISIT = [[55, 33, 10, 2, 0], [45, 33, 16, 5, 1], [35, 32, 22, 9, 2], [25, 30, 27, 14, 4], [15, 27, 31, 20, 7]];
+  D.CRATE_ODDS = D.CRATE_VISIT;
+  D.CRATES_PER_VISIT = 5;
+  D.CRATE_RANK_K = 0.12; // crate price = expected animal value x 1.3 + this x the rank money scale x rarity
+  D.ARRIVAL_WEEKS = 2;   // an arrival left undecided this long goes to the holding pen (never a habitat)
+  D.HOLD_UPKEEP = 1.0;   // extra upkeep in the holding pen, as a share of the animal's normal upkeep (1.0 = the pen costs double)
+  D.CAP_BASE = 4; D.CAP_STEP = 2; // habitat capacity: 4 at level 1, +2 per upgrade level
+  D.CANDIDATE_WEEKS = 12; // applicants stay this long (or until the next advert's applicants arrive)
   D.SUPER_CHANCE = 0.12; // training: chance of a "Super!" result worth triple
   D.LUCKY_CHANCE = 0.08; // births: chance per stat of a lucky jump
   // Happenings (random events). w = how often, bad = a mild setback, who = the person who walks up to the gate.
@@ -247,8 +255,12 @@
     storm:      { title: 'Storm',              w: 8,  bad: true },
     cold:       { title: 'A cold',             w: 8,  bad: true, who: 'vet' },
     escape:     { title: 'Slipped out',        w: 7,  bad: true, who: 'keeper' },
-    powercut:   { title: 'Power cut',          w: 5,  bad: true }
+    powercut:   { title: 'Power cut',          w: 6,  bad: true },
+    fence:      { title: 'Fence repair',       w: 9,  bad: true, who: 'builder' },
+    pipe:       { title: 'Burst pipe',         w: 8,  bad: true, who: 'builder' },
+    rival:      { title: 'Rival opening',      w: 8,  bad: true }
   };
+  D.HAP_GAP = [10, 14]; // weeks between happenings (about 12 on average)
   // Person kinds used by happenings ('vet' and 'keeper' are also staff roles).
   D.WHO = ['teacher', 'donor', 'reporter', 'photographer', 'kid', 'professor', 'builder', 'volunteer', 'elder', 'vet', 'keeper'];
   // Habitat footprints on the hex grid, as axial [q, r] offsets from the anchor. They can be rotated in 60 degree steps.
