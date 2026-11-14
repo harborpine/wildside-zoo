@@ -72,6 +72,14 @@ year  |     money  idle  rank place  best avgRev species   (R5.1 round 5 column 
 final score 292,975 (R5.1: 296,370; round 4: 296,163). Within run-to-run noise: the bot decides every arrival itself and keeps
 at most 2 animals in the holding pen, so holding upkeep costs it little.
 
+== R5.6 Holding-pen safety cap (the Tester's "keep everything, one habitat" case) ==
+Before: keeping every arrival with one habitat sank the balance every year (year ends about -$8k, -$10k, -$15k, -$30k).
+After (the pen's whole cost is capped at 90% of the zoo's profit without it; surcharge waived below zero): over 4 years the balance
+never went below $0 after year 1 in 4 of 4 runs (it hovers at a few hundred to a few thousand dollars because that player keeps
+spending everything on crates and purchases). The "pen costs more than you earn" notice appears 1 to 16 times in 4 years.
+Normal play unchanged: bot skill 0.8, 16 runs: Y1 $18,347 r3.1 | Y5 $267,219 r6.0 place 7.1 | Y10 $841,670 r8.0 place 2.6 |
+Y20 $5,306,048 r10 place 1.0 | final score 300,902 (R5.5: 292,975, within noise).
+
 == R5.3 One run, bot skill 0.8 (node test/bot.js 0.8), latest rules ==
 Y1 place 11 rating 468 (top 5081) $17877 idle 2.7wk inc/wk 3300 cost/wk 978 spent/wk 1200 vis/wk 357 rep 1070 r4 sp 16 best 18 rev 13-18 avg 15.0 ev 5 exp 8 births 5 awards exhibit/rarest/breeder/explorer | staff 4 avgAnimal 30 bestBaby 30 prest 110 rp 38 rows 10 habs savanna2,savanna1,jungle1
 Y2 place 10 rating 1029 (top 5328) $38277 idle 2.7wk inc/wk 13429 cost/wk 2875 spent/wk 4628 vis/wk 1021 rep 2051 r4 sp 23 best 22 rev 14-22 avg 18.1 ev 11 exp 10 births 9 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 33 bestBaby 43 prest 123 rp 195 rows 12 habs savanna3,savanna3,jungle2,desert1

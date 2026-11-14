@@ -265,7 +265,9 @@
   Z.holdUpkeep = function (S) {
     const per = {}; let total = 0; const open = Z.isOpen(S);
     Z.holding(S).forEach(a => { const f = open ? Z.holdFee(S, a) : 0; per[a.id] = f; total += f; });
-    return { perAnimal: per, total: total, count: Z.holding(S).length, mult: D.HOLD_UPKEEP };
+    const c = S._c; // the safety cap is worked out in refresh; before the first refresh the full figure is shown
+    return { perAnimal: per, full: total, total: c ? c.hold : total, capped: c ? !!c.holdCapped : false, waived: c ? !!c.holdWaived : false,
+      count: Z.holding(S).length, mult: D.HOLD_UPKEEP };
   };
   function randomSpecies(S, maxRarity) { return pick(D.SPECIES_LIST.filter(s => S.regions[s.biome] && !D.BIOMES[s.biome].secret && s.rarity <= maxRarity)); }
 
@@ -416,16 +418,26 @@
     const rpw = (sci / 12 + rpFlat + rpAdj) * (1 + rpMult) * (1 + 0.1 * Math.min(5, S.ng)) * (1 + clamp(Z.modSum(S, 'rp'), -0.6, 1));
     // costs
     let salaries = 0; S.staff.forEach(s => { salaries += Z.salary(s); });
-    let upkeep = 0; S.animals.forEach(a => { upkeep += D.RARITY.upkeep[Z.sp(a).rarity]; });
-    const hold = Z.holdUpkeep(S).total; // extra for animals in the holding pen (0 while closed); cost multiplier already in holdFee
+    let upkeep = 0, penUpkeep = 0; S.animals.forEach(a => { const u = D.RARITY.upkeep[Z.sp(a).rarity]; if (a.hab == null) penUpkeep += u; else upkeep += u; });
+    const holdFull = Z.holdUpkeep(S).full; // the pen surcharge before the safety cap (0 while closed); cost multiplier already in holdFee
     let maint = 0; S.items.forEach(i => { maint += i.k === 'hab' ? D.BIOMES[i.t].hab * 0.003 * i.lvl : D.FAC[i.t].cost * 0.004; });
-    const costMult = 1 + clamp(Z.modSum(S, 'cost'), -0.5, 0.3); upkeep *= costMult; maint *= costMult;
+    const costMult = 1 + clamp(Z.modSum(S, 'cost'), -0.5, 0.3); upkeep *= costMult; maint *= costMult; penUpkeep *= costMult;
     const mkt = (S.research['tech:mkt1'] ? 1 : 0) + (S.research['tech:mkt2'] ? 1 : 0) + (S.research['tech:mkt3'] ? 1 : 0);
     const boost = clamp(Z.modSum(S, 'visitors'), -0.4, 0.8);
     const open = Z.isOpen(S);
     const visitors = !open ? 0 : (3.2 * Math.pow(total, 0.8) + 40) * D.SEASONS[season].mult * (1 + 0.05 * (Z.rank(S) - 1)) * (1 + 0.1 * mkt) * (1 + crowd) * (1 + boost);
-    S._c = { nb: nb, active: active, occ: L.occ, hab: hab, total: total, spend: spend, shopVal: shopVal, crowd: crowd, boost: boost, rpw: rpw, repw: repw, vet: vet, salaries: salaries, upkeep: upkeep, maint: maint, hold: hold,
-      open: open, visitors: visitors, ticket: Z.ticket(S), income: visitors * (Z.ticket(S) + spend), cost: open ? salaries + upkeep + maint + hold : 0, duty: { care: care, sci: sci, charm: charm } };
+    const income = visitors * (Z.ticket(S) + spend);
+    // Holding pen safety: the pen (its animals' normal upkeep plus the surcharge) never costs more than D.HOLD_PROFIT_SHARE of
+    // the zoo's profit without it, and the surcharge is waived while the balance is below zero, so the pen can never sink the zoo.
+    const debt = S.money < 0, room = Math.max(0, (income - (salaries + upkeep + maint)) * D.HOLD_PROFIT_SHARE);
+    const penWant = penUpkeep + (debt ? 0 : holdFull), penPay = Math.min(penWant, room);
+    const penBase = Math.min(penUpkeep, penPay), hold = Math.max(0, penPay - penBase);
+    const holdCapped = open && (penWant > penPay + 0.5 || (debt && holdFull > 0));
+    upkeep += penBase;
+    S._c = { nb: nb, active: active, occ: L.occ, hab: hab, total: total, spend: spend, shopVal: shopVal, crowd: crowd, boost: boost, rpw: rpw, repw: repw, vet: vet, salaries: salaries, upkeep: upkeep, maint: maint, hold: open ? hold : 0,
+      holdFull: open ? holdFull : 0, holdCapped: holdCapped, holdWaived: open && debt && holdFull > 0, penUpkeep: open ? penUpkeep : 0, penPaid: open ? penBase + hold : 0,
+      profitNoPen: open ? income - (salaries + upkeep - penBase + maint) : 0,
+      open: open, visitors: visitors, ticket: Z.ticket(S), income: income, cost: open ? salaries + upkeep + maint + hold : 0, duty: { care: care, sci: sci, charm: charm } };
     return S._c;
   };
   Z.c = S => S._c || Z.refresh(S);
@@ -1279,7 +1291,17 @@
     if (S.week % D.WPY === 0) yearEnd(S);
     if (S.money < 0 && !S.flags.loan) { S.flags.loan = true; news(S, 'Money is below zero. A patron covers you for now.', 'bad'); }
     if (S.money >= 0) S.flags.loan = false;
-    Z.refresh(S);
+    const cc = Z.refresh(S);
+    // A gentle one-off notice when the holding pen would cost more than the zoo earns (the cap is protecting the balance).
+    if (cc.holdCapped && Z.holding(S).length) {
+      if (!S.flags.holdWarn && S.week - (S.flags.holdWarnAt == null ? -999 : S.flags.holdWarnAt) >= D.HOLD_WARN_WEEKS) {
+        S.flags.holdWarnAt = S.week;
+        const profit = Math.round(cc.profitNoPen);
+        const r = { type: 'holdwarn', count: Z.holding(S).length, cost: Math.round(cc.penUpkeep + cc.holdFull), paid: Math.round(cc.penPaid), profit: profit, debt: S.money < 0 };
+        news(S, 'The holding pen is costing more than you earn.', 'bad'); ev(S, 'holdwarn', { n: r.count, cost: r.cost, profit: profit }); report(S, r);
+      }
+      S.flags.holdWarn = true;
+    } else S.flags.holdWarn = false;
   };
 
   // What a habitat should quietly show on the floor.

@@ -52,10 +52,25 @@ suggest: parentsHabId, price`: after the birth reveal, run Sell / Keep for each 
 **Holding upkeep.** An animal in the holding pen costs extra upkeep every week on top of its normal upkeep: `D.HOLD_UPKEEP`
 (1.0) x its normal upkeep, so the pen costs **double** (a Common $20 + $20, a Rare $90 + $90 a week). Waived while the zoo is
 closed (bare land), like all running costs. Waiting arrivals cost nothing.
-- `ZE.holdUpkeep(S) -> {perAnimal: {animalId: dollars}, total, count, mult}` (`total` = the extra per week now, 0 when closed).
+- `ZE.holdUpkeep(S) -> {perAnimal: {animalId: dollars}, full, total, capped, waived, count, mult}`. `full` = the surcharge
+  before the safety cap; `total` = the surcharge actually charged this week (0 when closed); `capped` = the safety cap is
+  cutting the pen's cost; `waived` = the surcharge is off because money is below zero.
 - `ZE.holdFee(S, animal)` = that one animal's extra per week if it sat in the pen.
 - `ZE.c(S).hold` = the same `total`; it is included in `ZE.c(S).cost` (and so in `S.costLast`). Weekly cost breakdown:
-  `salaries + upkeep + maint + hold = cost`.
+  `salaries + upkeep + maint + hold = cost` (`upkeep` includes the pen animals' normal upkeep as actually charged).
+  Also on `ZE.c(S)`: `holdFull`, `holdCapped`, `holdWaived`, `penUpkeep` (pen animals' normal upkeep before the cap),
+  `penPaid` (what the pen actually costs this week, normal + surcharge), `profitNoPen` (weekly profit without the pen).
+
+**Safety: the pen can never sink the zoo** (the game cannot be lost). The pen's whole cost (its animals' normal upkeep plus
+the surcharge) never takes more than `D.HOLD_PROFIT_SHARE` (90%) of the zoo's weekly profit without it, and the surcharge is
+waived while money is below zero. In normal play (a profitable zoo) the pen costs the full double, so it stays a waiting
+room, not storage. When the cap starts cutting in, the tick raises a gentle one-off report and a news line
+("The holding pen is costing more than you earn."), at most once every `D.HOLD_WARN_WEEKS` (12) weeks, and again only after
+the pen has stopped being capped in between:
+
+| type | Fields |
+|---|---|
+| `holdwarn` | `count` (animals in the pen), `cost` (what the pen would cost a week without the cap), `paid` (what it actually costs), `profit` (the zoo's weekly profit without the pen; can be 0 or less), `debt` (money below zero). Suggest selling or housing pen animals; no answer needed |
 
 - The species counts as discovered (collection book, `isNew`, reputation) the moment it arrives, even if you then sell it.
 - `expedition` report `found[]` entries now carry `{id, sp, sex, rarity, isNew, variant, charm, vigor, wit, hab: null,
@@ -400,6 +415,7 @@ a `choice` report, check `ZE.project(S, pid)` still exists and still has `.choic
 | `yearend` | `year, table:[{name, rating, me?}]` (sorted), `place, awards:[{id, name, won, mine, bar, prize?}], prize, stats:{year, rating, place, of, awards:[ids won], visitors, income, cost, spent, species, bestReview, bestBaby, events, expeditions, births, money, rep, rank}` |
 | `final` | `score:{total, parts:[[label, points], ...]}` (after year 20; play can continue) |
 | `applicants` | `tier, tierName, n, stars, candidates:[staff]`: an advert finished (R5.5) |
+| `holdwarn` | `count, cost, paid, profit, debt`: the holding pen would cost more than the zoo earns, so its cost is being capped (R5.2) |
 
 ## 7. Happenings
 

@@ -233,6 +233,8 @@
   D.CRATE_RANK_K = 0.12; // crate price = expected animal value x 1.3 + this x the rank money scale x rarity
   D.ARRIVAL_WEEKS = 2;   // an arrival left undecided this long goes to the holding pen (never a habitat)
   D.HOLD_UPKEEP = 1.0;   // extra upkeep in the holding pen, as a share of the animal's normal upkeep (1.0 = the pen costs double)
+  D.HOLD_PROFIT_SHARE = 0.9; // safety: the pen's whole cost never takes more than this share of the zoo's weekly profit without it
+  D.HOLD_WARN_WEEKS = 12;    // the "pen costs more than you earn" notice comes at most once per this many weeks
   D.CAP_BASE = 4; D.CAP_STEP = 2; // habitat capacity: 4 at level 1, +2 per upgrade level
   D.CANDIDATE_WEEKS = 12; // applicants stay this long (or until the next advert's applicants arrive)
   D.SUPER_CHANCE = 0.12; // training: chance of a "Super!" result worth triple

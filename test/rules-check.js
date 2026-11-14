@@ -434,6 +434,40 @@ check('holding upkeep: charged per animal in the pen when open, waived when clos
   return 'a Common in holding costs +$' + fee + '/wk';
 });
 
+check('holding pen can never sink the zoo: keep every arrival, one habitat, 4 years (the Tester scenario)', () => {
+  const lows = [];
+  for (let run = 0; run < 4; run++) {
+    const S = Z.newGame(), at = Z.starterSpots(), b = Z.build(S, 'hab', 'savanna', at.hab.q, at.hab.r, 0); Z.build(S, 'fac', 'snack', at.snack.q, at.snack.r, 0); Z.moveIn(S, b.id);
+    const ends = [], warns = []; let low = 0;
+    for (let w = 0; w < 48 * 4; w++) {
+      S.reports = [];
+      S.arrivals.slice().forEach(e => { const best = Z.arrivalChoices(S, e.a.id).find(c => c.best); ok(Z.keepArrival(S, e.a.id, best.hab).ok); });
+      if (Z.crateInfo(S) && S.money > Z.crateInfo(S).cost) Z.openCrate(S);
+      if (S.offers && S.offers.list.length && S.money > S.offers.list[0].price) Z.buyAnimal(S, 0);
+      const fs = Z.freeStaff(S); if (fs.length && !S.projects.some(p => p.type === 'expedition') && S.money > Z.expCost('savanna', 0)) Z.startExpedition(S, 'savanna', [fs[0].id], 0);
+      const pr = Z.readyPairs(S, b.id)[0], f2 = Z.freeStaff(S); if (pr && f2.length) Z.startBreeding(S, pr[0], pr[1], f2[0].id);
+      Z.tick(S); S.reports.forEach(r => { if (r.type === 'holdwarn') warns.push(r); });
+      if (w >= 48) low = Math.min(low, S.money);
+      if (S.week % 48 === 0) ends.push(Math.round(S.money));
+    }
+    ok(Z.holding(S).length > Z.holdCap(S), 'the scenario really overfills the pen');
+    ok(low > -3000, 'money fell to ' + Math.round(low) + ' (year ends ' + ends.join(', ') + ')');
+    ok(ends[3] >= Math.min(ends[1], 0) - 1500, 'still falling: ' + ends.join(', '));
+    ok(warns.length >= 1 && warns.length <= 4 * 48 / D.HOLD_WARN_WEEKS, 'the pen notice comes, but not every week (' + warns.length + ')');
+    const r = warns[0]; ok(r.count > 0 && r.cost > r.paid && typeof r.profit === 'number' && typeof r.debt === 'boolean', 'notice fields');
+    lows.push(Math.round(low));
+  }
+  // already in debt with a full pen of rare animals: the balance recovers
+  const S = NG(); S.money = -20000;
+  for (let i = 0; i < 10; i++) S.animals.push({ id: S.nextId++, sp: 'lion', name: 'L' + i, sex: 'M', charm: 30, vigor: 30, wit: 30, variant: false, gen: 1, born: null, hab: null, rest: 0, sick: 0 });
+  Z.refresh(S); ok(Z.c(S).hold === 0 && Z.holdUpkeep(S).waived && Z.holdUpkeep(S).full > 0, 'surcharge waived while below zero');
+  ok(Z.c(S).income - Z.c(S).cost > 0, 'still a weekly profit with 10 lions in the pen');
+  tickN(S, 96); ok(S.money > -20000 + 5000, 'recovers: ' + Math.round(S.money));
+  // normal play: a profitable zoo pays the full double cost
+  const N = NG(); N.money = 1e5; Z.moveAnimal(N, N.animals[0].id, null); eq(Z.c(N).hold, Z.holdFee(N, N.animals[0]), 'full surcharge when the zoo can afford it'); ok(!Z.c(N).holdCapped);
+  return 'lowest balance after year 1 per run: ' + lows.join(', ');
+});
+
 check('movableTo and moveIn after building; remove sends animals to the pen', () => {
   const S = NG(); S.money = 1e9; const h = S.items[0];
   S.animals.forEach(a => { a.hab = null; }); S.offers = { kind: 'trader', at: 0, list: [], crates: 1, crateRarity: 1 }; const ca = Z.openCrate(S).animal;
