@@ -26,8 +26,8 @@ const engine = process.argv[2] === 'webkit' ? 'webkit' : 'chromium';
   if (!ci) { for (let i = 0; i < 15 && !ci; i++) { await tick(1); ci = await page.evaluate(() => ZE.crateInfo(ZT.S)); } say('after waiting, crate', !!ci); }
   { const t0 = T.taps; await menu(); await T.tapText('Animals'); await T.tapText(/^Market/); await show('x-market');
     const n0 = await page.evaluate(() => ZT.S.animals.length);
-    if (await T.tapText(/Mystery crate/, { sel: '.row', wait: 400 })) { await show('x-crate'); await T.tapText(/^Open/, { wait: 500 }); await sleep(1500); await show('x-crate-reveal1'); await sleep(2500); await show('x-crate-reveal2');
-      for (let i = 0; i < 4; i++) { const s = await st(); if (s.stack.length && /^mo-|crate/.test(s.stack.slice(-1)[0])) { await T.tapXY(195, 440, 700); } }
+    if (await T.tapText(/\d\/\d/, { sel: '.row', wait: 400 })) { await show('x-crate'); await T.tapText(/^Open/, { wait: 500 }); await sleep(1500); await show('x-crate-reveal1'); await sleep(2500); await show('x-crate-reveal2');
+      { const dr = L.makeDrain(T, { maxCrates: 0 }); await sleep(800); await show('x-crate-decision'); await dr(); say('   crate flow decisions:', JSON.stringify({ ...dr.stats, popups: undefined })); }
       say('crate: animals', n0, '->', await page.evaluate(() => ZT.S.animals.length), 'taps', T.taps - t0); }
     else T.find('crate:no-row', 'no Mystery crate row on the Market tab'); await toFloor(); await inv('after crate', { expectClosed: true }); }
 

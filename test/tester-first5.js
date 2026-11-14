@@ -17,22 +17,9 @@ const W = +(process.argv[3] || 390), H = +(process.argv[4] || 753), MODE = proce
   async function toFloor() { for (let i = 0; i < 8; i++) { const s = await st(); if (!s.stack.length && !s.placing) return; if (s.placing) { await T.tapText(/^(Done|Cancel)$/, { floor: true, sel: '#placement-bar button' }); continue; } if (!(await T.tapText(/./, { sel: '.back' }))) await T.tapXY(Math.round(W / 2), Math.round(H * 0.6)); } }
   const free = () => ({ x: Math.round(W / 2), y: Math.round(H * 0.6) });
   async function menu() { await toFloor(); const f = free(); await T.tapXY(f.x, f.y, 450); }
-  let choiceN = 0; const popups = [];
-  async function drain() {
-    for (let g = 0; g < 60; g++) {
-      const s = await st(); if (!s.stack.length) { if (!s.reports) return false; await sleep(300); if (!(await st()).stack.length) return false; continue; }
-      if (s.stack[0] === 'menu' || s.stack[0] === 'title' || s.stack[0].startsWith('newzoo')) return false;
-      const id = s.stack.slice(-1)[0]; const d = await describe(T); popups.push(id + '@' + s.week); const c = await coach(); if (c) say('   (pop-up ' + id + ' arrived while tutorial step ' + c.step + ' was showing)');
-      await shotOnce('pop-' + id + '-' + Math.floor(s.week / 48)); await inv('popup ' + id);
-      if (/^mo-caller/.test(id) && /Not now/.test((d.items || []).join('|'))) { await T.tapText(/Not now/i, { wait: 400 }); continue; }
-      if (/^mo-show$/.test(id) && /Not now/.test((d.items || []).join('|'))) { await T.tapText(/Not now/i, { wait: 400 }); continue; }
-      const opts = await page.evaluate(() => { const l = [...document.querySelectorAll('#screens .layer:not([hidden])')].pop(); return [...l.querySelectorAll('.opt')].map((e, i) => ({ i, dis: e.classList.contains('disabled') })); });
-      if (opts.length) { const ok = opts.filter(o => !o.dis); const pk = ok.length ? ok[choiceN++ % ok.length] : opts[0]; await T.tapText(/./, { sel: '.opt', nth: pk.i, wait: 450 }); continue; }
-      const b = (d.items || []).find(t => /^(Continue|Done|OK|Great|Keep playing|Close)/i.test(t)); if (b) { await T.tapText(b.split(' ')[0], { wait: 450 }); continue; }
-      await T.tapXY(Math.round(W / 2), Math.round(H * 0.55), 650);
-    }
-    T.find('drain:loop', 'drain gave up'); await page.evaluate(() => ZT.popAll()); return true;
-  }
+  const popups = []; const seenPop = new Set();
+  const drainX = L.makeDrain(T, { maxCrates: 2, shot: async (id, txt, wk) => { const k = id + '|' + txt.slice(0, 40); if (!seenPop.has(k) && seenPop.size < 160) { seenPop.add(k); popups.push(id + '@' + wk); const c = await coach(); if (c) say('   (pop-up ' + id + ' arrived while tutorial step ' + c.step + ' was showing)'); await snap('pop-' + id + '-w' + wk); } } });
+  const drain = () => drainX();
   async function through(startRe, pre) {
     for (let i = 0; i < 7; i++) {
       const has = await T.locate(startRe, { sel: 'button, .btn' }); if (has && !/Back|Play/.test(has.text)) { await inv(pre + ' confirm'); return true; }
@@ -47,7 +34,7 @@ const W = +(process.argv[3] || 390), H = +(process.argv[4] || 753), MODE = proce
     await drain(); await toFloor(); return n1 > n0; }
 
   // ================= A. THE OPENING =================
-  await T.goto(''); await sleep(1200);
+  await T.goto(process.env.Q || ''); await sleep(1200);
   say('== TITLE at ' + W + 'x' + H + ' ' + engine); await show('title');
   say('== NEW ZOO'); await T.tapText(/^1/, { sel: 'button', wait: 500 }); await show('name');
   await T.tapText(/^Next/, { sel: 'button, .btn', wait: 600 }); await show('tutorial-question');
@@ -79,6 +66,7 @@ const W = +(process.argv[3] || 390), H = +(process.argv[4] || 753), MODE = proce
       if (!g.ok) T.find('tut:ghost-invalid:hab', 'the first habitat ghost is not valid: ' + g.msg); if (g.y < (cc ? cc.bottom : 0) || g.y > (bar ? bar.top : H)) T.find('tut:ghost-hidden:hab', 'the first ghost is hidden behind the strip or buttons (y ' + g.y + ')');
       const before = await page.evaluate(() => ZT.S.items.length); tapsAtHab = T.taps;
       await T.tapText(/^Place/, { floor: true, sel: '#placement-bar button', wait: 150 });
+      await sleep(700); const mv = await T.locate(/^Move in/, { sel: 'button, .btn' }); say('   Move in? prompt shown:', !!mv, 'stack', (await st()).stack.join('>')); if (mv) { await snap('move-in-prompt'); await inv('move in prompt'); await T.tapText(/^Move in/, { sel: 'button, .btn', wait: 300 }); } else T.find('tut:no-movein', 'no Move in? prompt after building the first habitat');
       const frames = []; let step3Seen = -1; for (let k = 0; k < 8; k++) { await sleep(400); const f = await page.evaluate(() => ({ pen: ZT.S.animals.filter(a => a.hab == null).length, fl: (ZRender.debug().floaters), coach: (document.querySelector('.mn-coach .mn-ct') || {}).textContent })); frames.push(f); if (k === 0) await snap('zebras-moving-in-a'); if (k === 2) await snap('zebras-moving-in-b'); if (/Snack/.test(f.coach || '') && step3Seen < 0) step3Seen = (k + 1) * 400; }
       say('   after Place (every 0.4 s):', JSON.stringify(frames.map(f => [f.pen, f.fl, (f.coach || '').slice(0, 14)])), 'step 3 text first seen at ~' + step3Seen + ' ms');
       const built = (await page.evaluate(() => ZT.S.items.length)) > before; const penNow = await page.evaluate(() => ZT.S.animals.filter(a => a.hab == null).length); say('   habitat built:', built, 'zebras still in pen:', penNow);
@@ -122,13 +110,14 @@ const W = +(process.argv[3] || 390), H = +(process.argv[4] || 753), MODE = proce
       if (!run.includes('expedition') && s.money > 5000 && await startProject('Expedition', /^Send/)) { did.exp = (did.exp || 0) + 1; say('  w' + s.week, 'expedition'); }
       else if (ready('ready-event') && !run.includes('event') && s.money > 400 && await startProject('Event', /^Start/)) { did.event = (did.event || 0) + 1; say('  w' + s.week, 'event'); }
       else if (ready('ready-breed') && !run.includes('breed') && await startProject('Breeding', /^Start/)) { did.breed = (did.breed || 0) + 1; say('  w' + s.week, 'breeding'); }
+      if (!did.hire && s.week >= 6 && s.money > 1500 && await page.evaluate(() => ZT.S.staff.length < 3 && !(ZT.S.advert || ZT.S.adverts || ZT.S.hiring))) { await menu(); await T.tapText('Staff'); const hb = await T.tapText(/^Notice board/, { sel: 'button, .btn, .row', wait: 700 }); say('  w' + s.week, 'advert started:', !!hb, 'screen', (await st()).stack.join('>')); await shotOnce('advert-started'); await drain(); await toFloor(); if (hb) did.hire = 1; }
       if (await page.evaluate(() => ZT.S.animals.some(a => a.hab == null))) { await menu(); await T.tapText('Animals'); await T.tapText(/^Pen/); await T.tapText(/^House/, { wait: 500 }); await toFloor(); did.house = (did.house || 0) + 1; }
       await inv('act w' + s.week, { expectClosed: true });
     }
     await sleep(500);
   }
   const fin = await st(); say('== end of year loop: week', fin.week, 'stack', fin.stack.join('>') || '-', 'money', fin.money, 'elapsed', Math.round((Date.now() - startMs) / 1000) + 's', 'yearend seen', yearend, 'did', JSON.stringify(did));
-  await snap('99-end'); say('popups seen:', JSON.stringify(popups));
+  await snap('99-end'); say('arrival and flow stats:', JSON.stringify({ ...drainX.stats, popups: undefined })); say('popups seen:', JSON.stringify(popups));
   say('FINDINGS (' + T.findings.length + ')'); T.findings.forEach((f, i) => say(' ' + (i + 1) + '. ' + f.msg)); say('console', JSON.stringify(T.consoleErrors), 'ZT.errors', JSON.stringify(await page.evaluate(() => ZT.errors)));
   await T.browser.close();
 })().catch(e => { console.error('CRASH', e); process.exit(1); });

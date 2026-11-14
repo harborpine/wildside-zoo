@@ -12,20 +12,8 @@ const YEARS = +(process.argv[3] || 3);
   async function shotOnce(k, tag) { if (seen.has(k)) return; seen.add(k); await T.shot(tag); }
   async function toFloor() { for (let i = 0; i < 8; i++) { const s = await st(); if (!s.stack.length && !s.placing) return; if (s.placing) { await T.tapText(/^(Done|Cancel)$/, { floor: true, sel: '#placement-bar button' }); continue; } if (!(await T.tapText(/./, { sel: '.back' }))) await T.tapXY(195, 440); } }
   async function menu() { await toFloor(); await T.tapXY(195, 420); }
-  async function drain() {
-    for (let g = 0; g < 80; g++) {
-      const s = await st(); if (!s.stack.length) { if (!s.reports) return; await sleep(300); const s2 = await st(); if (!s2.stack.length) return; continue; }
-      if (s.stack[0] === 'menu') return; const id = s.stack.slice(-1)[0]; const d = await describe(T); popups.push(id + '@' + s.week);
-      await shotOnce('p-' + id + '-' + Math.floor(s.week / 48), 'p-' + id + '-y' + (1 + Math.floor(s.week / 48))); await inv('popup ' + id);
-      if (/^mo-caller/.test(id) && /Not now/.test((d.items || []).join('|'))) { await T.tapText(/Not now/i, { wait: 400 }); continue; }
-      if (/^mo-show$/.test(id) && /Not now/.test((d.items || []).join('|'))) { await T.tapText(/Not now/i, { wait: 400 }); continue; }
-      const opts = await page.evaluate(() => { const l = [...document.querySelectorAll('#screens .layer:not([hidden])')].pop(); return [...l.querySelectorAll('.opt')].map((e, i) => ({ i, dis: e.classList.contains('disabled') })); });
-      if (opts.length) { const ok = opts.filter(o => !o.dis); const pk = ok.length ? ok[choiceN++ % ok.length] : opts[0]; await T.tapText(/./, { sel: '.opt', nth: pk.i, wait: 450 }); continue; }
-      const b = (d.items || []).find(t => /^(Continue|Done|OK|Great|Keep playing|Close)/i.test(t)); if (b) { await T.tapText(b.split(' ')[0], { wait: 450 }); continue; }
-      await T.tapXY(195, 440, 650);
-    }
-    T.find('drain:loop', 'drain gave up (stack ' + (await st()).stack.join('>') + ')'); await page.evaluate(() => ZT.popAll());
-  }
+  const drainX = L.makeDrain(T, { maxCrates: 1, shot: async (id, txt, wk) => { await shotOnce('p-' + id + '-' + Math.floor(wk / 48), 'p-' + id + '-y' + (1 + Math.floor(wk / 48))); } });
+  const drain = () => drainX();
   async function through(startRe, pre) {
     for (let i = 0; i < 6; i++) {
       const has = await T.locate(startRe, { sel: 'button, .btn' }); if (has && !/Back|Play/.test(has.text)) { await inv(pre + ' confirm'); return true; }
@@ -58,8 +46,7 @@ const YEARS = +(process.argv[3] || 3);
   const total = YEARS * 48 + 1;
   let lastYr = 0; let building = 0;
   for (let w = 0; w < total; w++) {
-    const s0 = await st();
-    // tick one week (waiting only)
+        // tick one week (waiting only)
     await page.evaluate(() => ZT.tick(1)); await drain();
     const s = await st(); const yr = Math.floor(s.week / 48);
     if (yr !== lastYr) { // a year ended: screenshot the floor and strip
@@ -90,7 +77,7 @@ const YEARS = +(process.argv[3] || 3);
   }
   await toFloor(); await T.shot('floor-end');
   const sum = await page.evaluate(() => ({ week: ZT.S.week, money: Math.round(ZT.S.money), habs: ZT.S.items.filter(i => i.k === 'hab').length, facs: ZT.S.items.filter(i => i.k === 'fac').length, animals: ZT.S.animals.length, staff: ZT.S.staff.length, did: ZT.S.did, errors: ZT.errors }));
-  say('SUMMARY', JSON.stringify(sum)); say('popups', JSON.stringify(Object.entries(popups.reduce((a, p) => { const k = p.split('@')[0]; a[k] = (a[k] || 0) + 1; return a; }, {}))));
+  say('SUMMARY', JSON.stringify(sum)); say('popups', JSON.stringify(Object.entries((drainX.stats.popups).reduce((a, p) => { const k = p.split('@')[0]; a[k] = (a[k] || 0) + 1; return a; }, {}))));
   say('FINDINGS (' + T.findings.length + ')'); T.findings.forEach((f, i) => say(' ' + (i + 1) + '. ' + f.msg)); say('console', JSON.stringify(T.consoleErrors));
   await T.browser.close();
 })().catch(e => { console.error('CRASH', e); process.exit(1); });

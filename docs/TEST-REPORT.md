@@ -1,5 +1,102 @@
 # Wildside Zoo: test report (Tester)
 
+# ROUND 5 (owner's iPhone feedback: arrivals flow, symbols, fit, timed hiring)
+
+moments.js, menus.js and engine.js were unchanged for over an hour before the pop-up-heavy runs (sprites.js changed 9 minutes before the suites started; art-check and art-regress pass). Style-D art not tested, as asked.
+
+## Summary
+
+**Did the bare-land opening (tutorial Yes, including the new "Move in?" prompt) plus a full first year, every arrival decided by tapping the flow's buttons, play cleanly by touch at 393x852 (`?standalone=1&inset=34`) on both engines: YES.** 0 findings, 0 console errors, 0 game errors, year-end screen reached; about 420 s each.
+
+Decisions made by touch in the year (Chromium / WebKit): sold 6 / 4, kept 8 / 8, to a habitat 8 / 8, to the holding pen 7 / 7, bought 1 / 1, crates opened 2 / 2 (each then decided), births decided 5 / 4, hired 1 / 1 start to finish (advert, "Applicants arrive soon", wait, reveal pop-up, "Who turned up" list, Hire), plus "Move in?" after the first habitat (tutorial) and after an upgrade.
+
+Suites, all pass: rules-check, bot 0.8, art-check, art-regress, render-shot both, shell-shot, menus-shot, menus-title, menus-hire, menus-fit (both engines; includes Projects with 4 running and Animals with 14 animals and 3 habitats at 390x844, 375x667 and 393x852). Also pass with 0 findings: tester-extra (both engines), tester-sizes (both), tester-fit (both, 8 sizes), tester-symbols, tester-first5 at 375x553 (both) and 393x852, tester-years (3 years, from the classic start), `tester-r5check.js` (both). I did not run moments-shot.
+
+**What is wrong:** one real gap (the carried-over animal has no decision screen), one balance problem I found by accident (a player who keeps everything and builds nothing drifts to negative money), and a few polish items.
+
+New scripts: `tester-r5check.js` (items 1, 2, 5, 7, 8, 10, 13 by touch), `tester-edge5.js` (C), and `tester-lib.js` now has `makeDrain`, one pop-up handler for every flow (arrivals sell/keep/where, crates, trader, applicants, move-in), with varied choices.
+
+## The 1 to 13 checklist
+
+| # | Item | Status | Evidence |
+|---|---|---|---|
+| 1 | Buying comparison marks | **Done** | Market and trader rows show a "new" burst, a sex mark with "+" (have the species, not this sex), a green up arrow (better than yours), a down arrow, and "+-" (mixed). Legend (How to play) has a BUYING section. `tester-cr-r5-market.png` |
+| 2 | Projects: Start on top, no overlaps, no scroll | **Done** | Start boxes first, running projects below; no scroll with 2 running in my run and with 4 running in menus-fit; no overlapping text at 393x852 (`tester-cr-r5-projects-running.png`) |
+| 3 | Purple microphone | **Partly** | The word now sits beside the icon wherever it matters ("Hosting 13" in the choice, the key row on "Who turned up", the staff screen). The icon itself is still a purple head on a stick that reads as a microphone or a maraca |
+| 4 | Denser art sample | **Not tested** (asked not to) | |
+| 5 | Happenings: fewer, some setbacks, calm | **Done** | 7 in 96 weeks (one per 13.7 weeks); 14% setbacks in one sample and 29% in another (target one in three: a little low in small samples). Setbacks look calm: "Burst pipe, call a plumber $200 or patch it, shops -15% for 3 weeks" |
+| 6 | New trader design | **Done** | Friendly cap, shirt and carrier, no costume cues (`tester-cr-r5p-03-mo-caller-trader.png` style shot) |
+| 7 | Rarity crates, 5 per visit, sell/keep/where | **Done** | "Common x5 $700", "Rare 5/5 $5,100", "Uncommon 5/5 $1,850"; I opened all 5 (price rises, then the crate row disappears); each reveal then asks sell ($) or Keep, then where |
+| 8 | Trader fits without scrolling | **Done** | 4 animals plus the crate row, Not now, no scroll at 393x852 |
+| 9 | Use the whole screen | **Done in the test browser** | `#app` is exactly 393 x 852, floor runs to the bottom edge, the news line is a floating pill that hides under pop-ups; "Screen check" readout exists. Not tested on the real iPhone |
+| 10 | Habitat capacity 4, +2 per upgrade | **Done** | `habCap` 4, 6, 8, 10, 12; Animals shows "SAVANNA 1 2/4", after an upgrade the cap is 6 |
+| 11 | Timed hiring | **Done** | Advert, toast "Applicants arrive soon", applicants show up about 2 weeks later as a reveal pop-up then the list; advertising a second time while one is out is refused with that toast and no charge |
+| 12 | Expedition reveal: grade beside, Sell/Keep, where | **Done** | Grade rosette beside the name; buttons "$1,128" and "Keep"; then where: habitat rows (best has a check, room as a number) and Pen (holding upkeep $ per week and a clock, room 6); nothing auto-housed |
+| 13 | Animals screen compact, sorted by species | **Done / partly verified** | Fits without scrolling (a 2-animal zoo in my runs; 14 animals in 3 habitats in menus-fit). Species order checked by menus-fit only, I did not see a big mixed zoo myself |
+
+## B. Specific checks
+
+- **Projects:** Start boxes first ("Expedition Out", "Breeding 1 ready", "Event None" as grey sub-labels, no collision), Running below with a bar and the clock number.
+- **Animals:** fits at 393x852 with 2 animals in the Zoo tab; the Pen tab shows the weekly holding upkeep ("160 /wk" with 6 in the pen) above House all, and each row has a House button.
+- **Trader pop-up:** no scroll, new trader picture.
+- **Expedition reveal:** grade beside the picture, not over it.
+- **Hosting microphone and its word:** see item 3.
+- **Comparison marks on everything for sale:** trader pop-up, Market tab, crate result ("Spotless Giraffe, Rare variant, $3,144, Keep"), purchase card. The mark on the purchase card for an animal you own is the arrow.
+- **Habitat capacity 4 then 6:** done (item 10).
+- **Holding upkeep wherever the pen is offered:** shown on the where screen (Pen row), the Pen tab and as `holdUpkeep` in the weekly costs; $0 while the zoo is closed.
+- **Happenings:** rate and tone, item 5.
+
+## C. Edge cases (`tester-edge5.js`, Chromium)
+
+- **Reload in the middle of a multi-find reveal:** the reveal comes back (1 of 2, counting up again), both arrivals are still waiting, nothing lost or duplicated; deciding them afterwards works.
+- **Undecided 2+ weeks:** after 3 weeks the arrival is in the holding pen (Pen 1/6, $20 to $40 a week), no pop-up, no error.
+- **Full holding pen:** pen 6/6 with $160/week upkeep; buying another shows the "ARRIVED" card; I did not get to see an over-capacity pen choice (not fully tested).
+- **Sell every find:** money rises, no arrivals left, nothing stuck.
+- **Remove a habitat with animals:** animals go to the pen, "Its animals move out" is in the confirm text, zoo closes, pen upkeep goes to 0, news line empty (no stale "open" text).
+- **Advertise twice:** second tap refused with a toast, no charge.
+- **Open all 5 crates:** all five opened and decided; crate row disappears.
+- **Carried-over animal at the start of a new zoo (New zoo after a finished run, simulated with ZT):** the "Bring along" card offers staff and the animal; after Start the animal is a waiting arrival (`zebra:legacy`) **but no decision screen appears**: the floor is shown and the arrival only sits as a row at the top of the Animals screen (finding R5-1).
+
+## New findings by owner (round 5)
+
+**Moments / Menus**
+- **R5-1 (should fix). A carried-over animal has no decision screen.** Steps: finish or fake a run so `ZCore.legacy.carry` has an animal, New zoo, Next, No, pick the animal on "Bring along", Start. The game opens on bare land and nothing asks Sell or Keep for it (the owner decided every new animal goes through Moments); it shows only as a row at the top of Animals and, if ignored, goes to the pen after 2 weeks. Also: with bare land there is no habitat to put it in, so the first prompt should wait for the first habitat ("Move in?" would be the natural moment).
+- **R5-3 (polish). Crate row picture in the Market tab is a coin**, in the trader pop-up it is a chest; "5/5" has no explanation.
+
+**Rules**
+- **R5-2 (should fix, balance). Keeping everything and building nothing drives money negative.** Steps (`tester-years.js` from the classic start, expeditions every few weeks, every arrival kept, no second habitat built): $7k at year 2, -$5k at year 3, -$9k at year 4, with 14 animals in 1 habitat and a full pen costing double upkeep, income about $95 a week. The brief says you cannot lose; this is not a crash but a slow squeeze with no warning. Needs a visible signal (the pen upkeep is shown at the choice, but not that it is eating the income) or a softer pen cost early on.
+- **R5-4 (polish). Setback share looks a bit under one in three** in the two samples I took (14% and 29%, 7 happenings each), fine as a rate (one per 13.7 weeks).
+
+**Shell**
+- **R5-5 (polish). "Screen check" readout is confusing:** with `?standalone=1` it says "standalone: no (forced)" and "safe bottom 0px" even with `inset=34`. Say "yes (forced)" and show the inset in use.
+
+**Artist**
+- **R5-6 (polish). The Hosting icon** is better labelled but still not an unmistakable stage microphone (item 3).
+
+No new Renderer findings.
+
+## Round 4 findings: status
+
+| # | Finding | Status |
+|---|---|---|
+| R4-1 | 320x568 rows break | **Fixed** (menus-title: pen row keeps the name readable, skill chips inside the panel) |
+| R4-2 | "beside it" bench | **Fixed** ("Place a Bench next to the stand." completes Safari Picnic at 375x553 and 393x852, both engines) |
+| R4-3 | stale text after removing the only habitat | **Fixed** (news empty; tutorial steps back to the habitat step) |
+| R4-4 | waiting zebras invisible | **Fixed** (they stand at the gate with a crate) |
+| R4-5 | Advertise with no habitat | **Fixed** (greyed "No habitat") |
+
+## Still untested
+
+- A real iPhone 18 Pro (the whole-screen fix, Safari's bars, the home-screen app); real touch drag in WebKit.
+- A big mixed zoo (several habitats and biomes) to see the species sort with my own eyes; an over-capacity holding pen choice.
+- Years 2 to 4 from bare land with active building (my years run never built a second habitat; see R5-2); years 5 to 20; the final score screen; the carry-over card after a real finished run.
+- Style-D art and the denser-art sample (not to be tested).
+- `tester-edge5.js` on WebKit (Chromium only).
+
+---
+
+# ROUND 4 (previous section)
+
 # ROUND 4 (bare-land start and the placing tutorial)
 
 moments.js was unchanged for 12 minutes (last change 15:43, first pop-up-heavy run 15:55) before the full-year runs.

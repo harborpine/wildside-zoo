@@ -93,7 +93,7 @@ async function invariants(T, label, o) {
         if (!vis(e)) continue; const cs = getComputedStyle(e);
         if (e.children.length === 0 && e.textContent.trim() && e.scrollWidth > e.clientWidth + 2 && cs.overflow !== 'visible' && cs.display !== 'inline') out.overflow.push((e.textContent).trim().slice(0, 30) + ' sw' + e.scrollWidth + '>cw' + e.clientWidth);
         if (e.classList && e.classList.contains('chips')) { const kids = [...e.children].filter(vis); const tl = kids.map(k => k.getBoundingClientRect().top); if (tl.length && Math.max(...tl) - Math.min(...tl) > 12) out.wrapChips.push(e.innerText.replace(/\s+/g, ' ').slice(0, 40)); }
-        if (e.classList && e.classList.contains('chip') && e.textContent.trim()) { const r = e.getBoundingClientRect(); const lh = parseFloat(cs.lineHeight) || 16; if (r.height > lh * 1.9 + 6) out.wrapChips.push('chip wraps: ' + e.innerText.replace(/\s+/g, ' ').slice(0, 30)); }
+        if (e.classList && e.classList.contains('chip') && e.textContent.trim() && !e.querySelector('img')) { const r = e.getBoundingClientRect(); const lh = parseFloat(cs.lineHeight) || 16; if (r.height > lh * 1.9 + 6) out.wrapChips.push('chip wraps: ' + e.innerText.replace(/\s+/g, ' ').slice(0, 30)); }
         const r = e.getBoundingClientRect(); if (r.right > innerWidth + 2 && e.children.length === 0 && e.textContent.trim()) out.offscreen.push('text ' + e.textContent.trim().slice(0, 30) + ' R' + Math.round(r.right));
       } }
     for (const t of document.querySelectorAll('#toasts .toast')) { const r = t.getBoundingClientRect(); out.toasts.push({ text: t.textContent.slice(0, 50), top: Math.round(r.top), bottom: Math.round(r.bottom) }); }
@@ -133,4 +133,52 @@ module.exports.describe = async function (T) {
     const items = [...l.querySelectorAll('button, .btn, .gbox, .row.tappable, .opt, .tab')].filter(vis).map(e => (e.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 50));
     return { id: ZT.stack().join('>'), text: l.innerText.replace(/\n+/g, ' | ').slice(0, 400), items };
   });
+};
+
+/* Round 5: one drain for every pop-up flow, deciding every arrival by tapping the flow's own buttons (varied on purpose).
+   stats: sold, kept, toPen, toHab, bought, crates, hires, birthDecided, moveIn, notNow. */
+module.exports.makeDrain = function (T, o) {
+  o = o || {}; const page = T.page; const describe = module.exports.describe; const sleep = module.exports.sleep;
+  const stats = { sold: 0, kept: 0, toPen: 0, toHab: 0, bought: 0, crates: 0, hires: 0, birthDecided: 0, moveIn: 0, moveInNotNow: 0, popups: [], arrivalSrc: {} };
+  let n = 0, choiceN = 0, whereN = 0, lastPop = '', bought = false, crated = 0, hired = 0, moveN = 0;
+  const maxCrates = o.maxCrates === undefined ? 1 : o.maxCrates;
+  async function drain(opts) {
+    opts = opts || {};
+    for (let g = 0; g < 80; g++) {
+      const s = await T.state(); if (!s.stack.length) { if (!s.reports) return false; await sleep(300); if (!(await T.state()).stack.length) return false; continue; }
+      const id = s.stack.slice(-1)[0]; if ((s.stack[0] === 'menu' && !/^mo-|^movein$|staff-candidates/.test(id)) || s.stack[0] === 'title' || String(s.stack[0]).startsWith('newzoo')) return false; const d = await describe(T); const items = d.items || []; const txt = d.text || '';
+      if (id !== lastPop) { stats.popups.push(id + '@' + s.week); }
+      if (o.shot) await o.shot(id, txt, s.week);
+      await module.exports.invariants(T, 'popup ' + id);
+      // 1. where does it go? rows .mo-row.tap
+      const rows = await page.evaluate(() => { const l = [...document.querySelectorAll('#screens .layer:not([hidden])')].pop(); return [...l.querySelectorAll('.mo-row.tap')].map((e, i) => ({ i, t: e.innerText.replace(/\s+/g, ' ').trim() })); });
+      if (rows.length && /Pen/.test(rows.map(r => r.t).join('|'))) {
+        const penIdx = rows.findIndex(r => /^Pen/.test(r.t)); const k = whereN++; let pick;
+        if (k % 4 === 3 && penIdx >= 0) pick = penIdx; else if (rows.length > 1 && k % 4 === 2) pick = Math.min(1, rows.length - 1); else pick = 0; if (pick === penIdx) stats.toPen++; else stats.toHab++;
+        if (id === 'mo-birth' || /BIRTH|ARRIVAL/.test(txt)) stats.birthDecided++;
+        await T.tapText(/./, { sel: '.mo-row.tap', nth: pick, wait: 500 }); continue; }
+      // 2. sell or keep
+      const keep = items.find(t => /^Keep/.test(t)); const sellBtn = items.find(t => /^\$[\d,]+$/.test(t));
+      if (keep) { const k = choiceN++; if (sellBtn && (k % 3 === 0)) { stats.sold++; await T.tapText(sellBtn, { sel: 'button, .btn', wait: 500 }); } else { stats.kept++; await T.tapText(/^Keep/, { sel: 'button, .btn', wait: 500 }); } lastPop = lastPop; continue; }
+      // 3. callers
+      if (/^mo-caller-(trader|director)/.test(id)) {
+        if (!bought && s.money > 6000) { const buys = await page.evaluate(() => { const l = [...document.querySelectorAll('#screens .layer:not([hidden])')].pop(); return [...l.querySelectorAll('button, .btn')].map((e, i) => ({ t: e.innerText.replace(/\s+/g, ' ').trim() })).filter(b => /^\$[\d,]+$/.test(b.t)).map(b => +b.t.replace(/[$,]/g, '')); }); const cheap = buys.filter(p => p < s.money - 4000).sort((a, b) => a - b)[0]; if (cheap) { bought = true; stats.bought++; await T.tapText('$' + cheap.toLocaleString('en-US'), { sel: 'button, .btn', wait: 600 }); continue; } }
+        if (crated < maxCrates && s.money > 3000) { const op = items.find(t => /^Open/.test(t)); if (op) { crated++; stats.crates++; await T.tapText(/^Open/, { sel: 'button, .btn', wait: 800 }); continue; } }
+        await T.tapText(/Not now/i, { wait: 400 }); stats.notNow++; continue; }
+      if (/^mo-caller/.test(id) && /Not now/.test(items.join('|'))) { await T.tapText(/Not now/i, { wait: 400 }); continue; }
+      // 4. applicants pop-up (timed hire): pick one and Done
+      if (/mo-hire/.test(id) && items.some(t => /^Hire/.test(t))) { if (hired < 2 && !(opts.noHire)) { hired++; stats.hires++; await T.tapText(/^Hire/, { sel: 'button, .btn', nth: 0, wait: 600 }); } await T.tapText(/^Done/i, { sel: 'button, .btn', wait: 500 }); continue; }
+      if (/staff-candidates/.test(id)) { if (hired < 2 && !(opts.noHire) && items.some(t => /^Hire/.test(t))) { hired++; stats.hires++; await T.tapText(/^Hire/, { sel: 'button, .btn', nth: 0, wait: 600 }); } await T.tapText(/./, { sel: '.back', wait: 500 }); continue; }
+      // 5. move in
+      if (id === 'movein' || /Move in/.test(items.join('|'))) { if (moveN++ % 3 === 2) { stats.moveInNotNow++; await T.tapText(/^Not now/, { sel: 'button, .btn', wait: 400 }); } else { stats.moveIn++; await T.tapText(/^Move in/, { sel: 'button, .btn', wait: 500 }); } continue; }
+      if (/^mo-show$/.test(id) && /Not now/.test(items.join('|'))) { await T.tapText(/Not now/i, { wait: 400 }); continue; }
+      // 6. choices
+      const opt = await page.evaluate(() => { const l = [...document.querySelectorAll('#screens .layer:not([hidden])')].pop(); return [...l.querySelectorAll('.opt')].map((e, i) => ({ i, dis: e.classList.contains('disabled') })); });
+      if (opt.length) { const ok = opt.filter(x => !x.dis); const pk = ok.length ? ok[choiceN++ % ok.length] : opt[0]; await T.tapText(/./, { sel: '.opt', nth: pk.i, wait: 450 }); continue; }
+      const b = items.find(t => /^(Continue|Done|OK|Great|Keep playing|Close)/i.test(t)); if (b) { await T.tapText(b.split(' ')[0], { wait: 450 }); continue; }
+      lastPop = id; await T.tapXY(Math.round(T.vp.width / 2), Math.round(T.vp.height * 0.55), 650);
+    }
+    T.find('drain:loop:' + (await T.state()).stack.join('>'), 'drain gave up (stack ' + (await T.state()).stack.join('>') + ')'); await page.evaluate(() => ZT.popAll()); return true;
+  }
+  drain.stats = stats; return drain;
 };
