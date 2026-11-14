@@ -1,5 +1,70 @@
 # Wildside Zoo: test report (Tester)
 
+# ROUND 6 (style-D art switched on, density 2)
+
+moments.js was unchanged for 28 minutes (last change 23:10) before my first pop-up-heavy run; the carried-over animal's decision pop-up is in (see below).
+
+## Summary
+
+**Did the full bare-land opening plus a full first year play cleanly by touch with the density-2 art on both engines: YES.** Tutorial Yes, every arrival decided by tapping, real clock at speed 2, 393x852 with `?standalone=1&inset=34`: Chromium and WebKit both reached the year-end screen with 0 findings, 0 console errors, 0 game errors (about 425 and 435 s). Decisions by touch (Chromium / WebKit): sold 5 / 5, kept 9 / 10, to a habitat 8 / 10, to the pen 8 / 9, bought 1 / 1, crates 2 / 2, births decided 4 / 3, hired 1 / 1.
+
+**The art:** no blur, no half-size or double-size sprites, no plain placeholder shapes and no mis-sorting found in anything I looked at (floor at two sizes and both zoom levels, title, menus, trader, expedition, birth and crate reveals, Move in?, placement ghost, combo outline, the pen crate and zebras at the gate, callers at the gate). `ZRender.debug()` reports `realSprites: true`, empty `spriteErrors`, every sprite getter live, density 2, 60 fps (0.8 ms a frame).
+
+Suites, all pass: rules-check, bot 0.8, art-check, art-regress, render-shot both (bare land and classic, both engines), shell-shot, menus-shot, menus-title, menus-hire, menus-fit (both engines). My own scripts, 0 findings: tester-extra, tester-sizes (both), tester-fit (both), tester-symbols, tester-edge5, tester-years (3 years, from the classic start, money $14k, $18k, $58k at the start of years 2 to 4), tester-art6 (new).
+
+## A. Scripts and the old geometry
+
+None of my scripts used art-pixel geometry: taps come from `ZRender.hexToClient` / `clientToHex` (client pixels), all other taps are screen coordinates. Nothing needed changing. New this round: `tester-art6.js`.
+
+## C. Art in the real game (I looked at each; screenshots in `test/shots/`)
+
+- **Floor, 393x852 and 375x667, Close and Far zoom** (`tester-cr-art393-floor-zoom1.png`, `-floor-zoom0.png`, `tester-cr-art375-floor-zoom1.png`): crisp, same on-screen size as the approved look (about 4 hexes across at Close, 5.4 at Far), the fences, buildings, trees, flowers, gate bunting and planters, people with heads and hats, zebras and the flag and heart icons all sharp. The camera matches `docs/checkpoint-floor.png`. At Far zoom the flag and heart badge is small but readable.
+- **Placement ghost and combo outline** (`tester-cr-art393-placement-ghost.png`, `-combo-outline-floor.png`): the bench sits correctly inside the yellow combo outline beside the stand; nothing drawn over the front fence.
+- **Bare land** (`tester-cr-f5-393x852-04-bare-land.png`): the two pen zebras and a wooden crate stand near the gate, crisp.
+- **Title** (`...-01-title.png`): logo and the five animals and gate are sharp. (The 57 px dark band above the title is still there, see R3-10 below.)
+- **Menus with portraits** (Animals Zoo, Pen, Market, Staff, staff detail, animal detail, Book): portraits crisp at their CSS size, not half or double size (`tester-cr-art393-screen-*.png`).
+- **Trader** (`...-30-pop-mo-caller-trader-w2.png`): new trader portrait, rows and crate chest all sharp. **Expedition reveal** (warthog, `...-45-pop-mo-expedition-w6.png`), **crate reveal** (lion, `...-33-pop-mo-crate-w2.png`), **birth** (`...-63-pop-mo-birth-w10.png`), **Move in?** (`...-08-move-in-prompt.png`): sharp; the big reveal sprites look chunkier than the floor sprites but that is how they were drawn before and they keep their size.
+- **Year-end and review:** text and chips only, nothing to report.
+- Compared with `docs/art-review/` I see the same look, denser.
+
+## D. Taps
+
+- **Every owned hex** on a fresh classic zoo (80 hexes), at 393x852 and 375x667, Chromium and WebKit: the inverse mapping returns the same hex for every hex centre, and a real touch on each of the 80 opened the menu (80 of 80, no misses).
+- **Items:** the habitat (id 3, Savanna at -5,16) and the snack stand (id 4 at -3,16) are reported where `ZE.cells` says.
+- **Placement:** tapping 3 different hexes moved the ghost to exactly those hexes every time; the note followed ("Completes Safari Picnic!").
+- **Zoom:** a tap on the habitat at Far zoom still opens the menu.
+- **Drag:** the camera moved and the menu did not open on Chromium. On WebKit the script's synthetic touch events cannot drive the pointer drag (known limit of headless WebKit), so those two "drag did not move the camera" lines are a test limitation, not a game problem; the renderer's own WebKit mouse-drag test passes.
+
+## Findings
+
+None new for Renderer, Artist, Rules or Moments.
+
+- **Shell (polish, unchanged): the title and new-zoo screens still show a 57 px empty dark band at the top** (the strip has nothing to show). Steps: load `index.html`. `tester-cr-f5-393x852-01-title.png`. (Round 3 R3-10.)
+- **Artist (polish, unchanged): the Hosting icon** (staff chips, `tester-cr-art393-screen-Staff.png`) is still a purple racket shape rather than an unmistakable stage microphone.
+
+## Earlier findings: status
+
+| # | Finding | Status |
+|---|---|---|
+| R5-1 | carried-over animal has no decision screen | **Fixed.** After Start on a new zoo the "ARRIVED, Zebra, $397, Keep, Later" card shows at once. |
+| R5-2 | keeping everything drives money negative | **Not reproduced** this time (same script, money stayed positive and the zoo built 3 habitats and 14 facilities by year 4); not proven fixed |
+| R5-3 | crate row picture in Market | not re-checked |
+| R5-5 | Screen check wording | not re-checked |
+| R5-6 | Hosting icon | **Not fixed** (see above) |
+| R3-10 | blank title band | **Not fixed** |
+
+## Still untested
+
+- A real iPhone with the density-2 art (sharpness at 3x device pixel ratio, memory use on the phone); only a 2x screenshot DPR was used, 3x only in earlier sizing runs.
+- Real touch drag in WebKit.
+- A big mixed zoo (several habitats and biomes) to check the draw order of many animals against fences; I only saw two habitats' worth.
+- Years 4 to 20; the final score screen.
+- Fonts and the tutorial strip on the real device.
+
+---
+
+# ROUND 5 (previous section)
+
 # ROUND 5 (owner's iPhone feedback: arrivals flow, symbols, fit, timed hiring)
 
 moments.js, menus.js and engine.js were unchanged for over an hour before the pop-up-heavy runs (sprites.js changed 9 minutes before the suites started; art-check and art-regress pass). Style-D art not tested, as asked.
