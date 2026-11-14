@@ -671,7 +671,25 @@
   R.placing = () => !!P;
 
   // ---------------------------------------------------------------- drawing
-  const list = [], over = []; let penHidden = false;
+  const list = [], over = []; let penHidden = false, ovl = null;
+  const pixCache = new Map(); const pixOf = s => { let d = pixCache.get(s.c); if (!d) { d = s.c.getContext('2d').getImageData(0, 0, s.c.width, s.c.height).data; pixCache.set(s.c, d); } return d; };
+  // test hook (ZRender.checkAnimals): after the sprites and the faint outline layer, every opaque pixel of every animal that nothing
+  // drawn later covers must show the sprite's own colour exactly, i.e. the animal is fully opaque and nothing is laid over it
+  function verifyAnimals(c, cx, cy, bw, bh) {
+    const img = c.getImageData(0, 0, bw, bh).data, out = { animals: 0, checked: 0, bad: 0, worst: 0, minAlpha: stats.animalAlpha };
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i]; if (e.act !== 1) continue; out.animals++; if (e.a !== 1) out.minAlpha = Math.min(out.minAlpha, e.a);
+      const s = e.s, px = pixOf(s), x0 = Math.round(e.x - s.ax) - cx, y0 = Math.round(e.y - s.ay) - cy, W2 = s.c.width, H2 = s.c.height; let bad = 0, n = 0;
+      const later = []; for (let j = i + 1; j < list.length; j++) { const f = list[j], t = f.s, fx = Math.round(f.x - t.ax) - cx, fy = Math.round(f.y - t.ay) - cy; if (fx < x0 + W2 && fy < y0 + H2 && fx + t.c.width > x0 && fy + t.c.height > y0) later.push({ px: pixOf(t), x: fx, y: fy, w: t.c.width, h: t.c.height }); }
+      for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) {
+        const k = (y * W2 + x) * 4; if (px[k + 3] < 255) continue; const X = x0 + x, Y = y0 + y; if (X < 0 || Y < 0 || X >= bw || Y >= bh) continue;
+        if (later.some(l => { const lx = X - l.x, ly = Y - l.y; return lx >= 0 && ly >= 0 && lx < l.w && ly < l.h && l.px[(ly * l.w + lx) * 4 + 3] > 0; })) continue;
+        const b = (Y * bw + X) * 4; n++; if (Math.abs(img[b] - px[k]) > 2 || Math.abs(img[b + 1] - px[k + 1]) > 2 || Math.abs(img[b + 2] - px[k + 2]) > 2) bad++;
+      }
+      out.checked += n; out.bad += bad; if (n) out.worst = Math.max(out.worst, bad / n);
+    }
+    return out;
+  }
   function frame(t) {
     if (!started) return; root.requestAnimationFrame(frame);
     const t0 = now(), dt = clamp((t - lastT) / 1000 || 0, 0, 0.1); lastT = t;
@@ -732,12 +750,12 @@
     for (const id in animals) {
       const a = animals[id]; if (a.x < L || a.x > Rr || a.y < T || a.y > B) continue;
       const fr = a.moving && running && AF > 1 ? Math.floor(a.t * 6) % AF : 0;
-      list.push({ s: spr('animal', a.sp, { variant: a.variant, juv: a.juv, frame: fr, flip: a.flip }), x: a.x, y: a.y - (a.hop > 0 ? Math.round(Math.abs(Math.sin(a.hop * 9)) * 5) * K : 0), key: a.y + 0.1, a: 1 });
+      list.push({ s: spr('animal', a.sp, { variant: a.variant, juv: a.juv, frame: fr, flip: a.flip }), x: a.x, y: a.y - (a.hop > 0 ? Math.round(Math.abs(Math.sin(a.hop * 9)) * 5) * K : 0), key: a.y + 0.1, a: 1, act: 1 });
     }
     const person = w => {
       if (w.hidden || w.x < L || w.x > Rr || w.y < T || w.y > B) return;
       const fr = w.moving && running && PF > 1 ? Math.floor(w.t * 7) % PF : 0, s = spr('person', w.kind, { frame: fr, flip: w.flip, seed: w.seed });
-      list.push({ s: s, x: w.x, y: w.y, key: w.y + 0.15, a: 1 });
+      list.push({ s: s, x: w.x, y: w.y, key: w.y + 0.15, a: 1, act: 2 });
       if (w.mark) over.push({ s: spr('icon', w.mark), x: w.x, y: w.y - s.ay - 2 * K + (running ? Math.round(Math.sin(clock * 4)) * K : 0) });
     };
     for (let i = 0; i < walkers.length; i++) person(walkers[i]);
@@ -747,13 +765,26 @@
     if (penned.length && M.pen) {
       if (under && under[M.pen.k] === 1) penHidden = true;
       else { const pc = M.pen, cs = crateSprite(), SPOT = [[14 * K, -3 * K], [3 * K, 12 * K], [23 * K, 11 * K]]; list.push({ s: cs, x: pc.x - 13 * K, y: pc.y - 6 * K, key: pc.y - 6 * K + 0.05, a: 1 }); // crate at the back left, animals to its right and in front, never on it
-        penned.forEach((a, i) => { const sp = spr('animal', a.sp, { variant: a.variant, juv: a.juv, frame: 0, flip: i === 1 }), bob = running && Math.sin(clock * 2 + i * 2.1) > 0.92 ? K : 0; list.push({ s: sp, x: pc.x + SPOT[i][0], y: pc.y + SPOT[i][1] - bob, key: pc.y + SPOT[i][1] + 0.1, a: 1 }); }); }
+        penned.forEach((a, i) => { const sp = spr('animal', a.sp, { variant: a.variant, juv: a.juv, frame: 0, flip: i === 1 }), bob = running && Math.sin(clock * 2 + i * 2.1) > 0.92 ? K : 0; list.push({ s: sp, x: pc.x + SPOT[i][0], y: pc.y + SPOT[i][1] - bob, key: pc.y + SPOT[i][1] + 0.1, a: 1, act: 1 }); }); }
     }
     list.sort((a, b) => a.key - b.key);
-    for (let i = 0; i < list.length; i++) { const e = list[i], s = e.s; if (e.a !== 1) c.globalAlpha = e.a; c.drawImage(s.c, Math.round(e.x - s.ax) - cx, Math.round(e.y - s.ay) - cy); if (e.a !== 1) c.globalAlpha = 1; }
-    stats.sprites = list.length;
-    // the same combo outlines again, faintly, over the sprites, so a fence never hides which tiles belong together
-    c.globalAlpha = 0.28; for (let i = 0; i < M.combos.length; i++) { const o = M.combos[i]; if (o.x - cx < bw && o.y - cy < bh && o.x + o.w > cx && o.y + o.h > cy) c.drawImage(o.f[running ? ph : 0].c, o.x - cx, o.y - cy); } c.globalAlpha = 1;
+    let animalAlpha = 1;
+    for (let i = 0; i < list.length; i++) { const e = list[i], s = e.s; if (e.a !== 1) c.globalAlpha = e.a; if (e.act === 1 && c.globalAlpha < animalAlpha) animalAlpha = c.globalAlpha; c.drawImage(s.c, Math.round(e.x - s.ax) - cx, Math.round(e.y - s.ay) - cy); if (e.a !== 1) c.globalAlpha = 1; }
+    stats.sprites = list.length; stats.animalAlpha = animalAlpha;
+    // the same combo outlines again, faintly, over the sprites, so a fence never hides which tiles belong together. Animals and people
+    // are cut out of this faint layer first: an outline edge running behind an animal must never show through it (it made animals
+    // standing on a habitat's back edge look see-through)
+    let anyCombo = false; for (let i = 0; i < M.combos.length && !anyCombo; i++) { const o = M.combos[i]; if (o.x - cx < bw && o.y - cy < bh && o.x + o.w > cx && o.y + o.h > cy) anyCombo = true; }
+    if (anyCombo) {
+      if (!ovl) ovl = document.createElement('canvas'); if (ovl.width !== bw || ovl.height !== bh) { ovl.width = bw; ovl.height = bh; }
+      const o2 = ovl.getContext('2d'); o2.globalCompositeOperation = 'source-over'; o2.clearRect(0, 0, bw, bh);
+      for (let i = 0; i < M.combos.length; i++) { const o = M.combos[i]; if (o.x - cx < bw && o.y - cy < bh && o.x + o.w > cx && o.y + o.h > cy) o2.drawImage(o.f[running ? ph : 0].c, o.x - cx, o.y - cy); }
+      o2.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < list.length; i++) { const e = list[i], s = e.s; if (e.act) o2.drawImage(s.c, Math.round(e.x - s.ax) - cx, Math.round(e.y - s.ay) - cy); }
+      o2.globalCompositeOperation = 'source-over';
+      c.globalAlpha = 0.28; c.drawImage(ovl, 0, 0); c.globalAlpha = 1;
+    }
+    if (stats.verifyNext) { stats.verifyNext = false; stats.actorCheck = verifyAnimals(c, cx, cy, bw, bh); }
     // quiet on-floor icons and progress bars
     const bar = (x, y, p) => { c.fillStyle = '#1d1a22'; c.fillRect(x - 10 * K - cx, y - cy, 20 * K, 4 * K); c.fillStyle = '#4a4458'; c.fillRect(x - 9 * K - cx, y + K - cy, 18 * K, 2 * K); c.fillStyle = '#7be36a'; c.fillRect(x - 9 * K - cx, y + K - cy, Math.round(18 * K * clamp(p || 0, 0, 1)), 2 * K); };
     for (const id in M.habs) {
@@ -796,6 +827,7 @@
     return R;
   };
   R.setRunning = function (b) { running = !!b; };
+  R.checkAnimals = function () { stats.actorCheck = null; stats.verifyNext = true; }; // test hook: the next frame checks every animal is drawn solid (see verifyAnimals); read debug().animalCheck
   R.mapChanged = function () { mapDirty = true; };
   R.reset = function () { clearActors(); if (P) R.stopPlacement(); }; // a new or loaded game: forget every actor and re-aim the camera
   R.centerOn = function (q, r, instant) {
@@ -816,6 +848,7 @@
       pen: M && M.pen ? { q: M.pen.q, r: M.pen.r, crate: (() => { const c = crateSprite(); return c.c.width + 'x' + c.c.height; })(), count: penned.length, hidden: penHidden, onPath: !!M.path[M.pen.k] } : null,
       gate: Object.keys(gatePeople).length, gateKinds: Object.keys(gatePeople).map(k => gatePeople[k].kind), gateArrived: Object.keys(gatePeople).filter(k => !gatePeople[k].wp.length).length, gateMarks: Object.keys(gatePeople).filter(k => gatePeople[k].mark).map(k => gatePeople[k].kind),
       icons: (() => { const o = {}; for (const id in statuses) if (id !== '_exp') { const s2 = statuses[id]; o[id] = iconsOf(s2).concat(s2.busy && s2.progress != null ? ['bar'] : []); } return o; })(), moving: (() => { const o = {}; for (const id in animals) if (animals[id].moving) o[animals[id].hab] = (o[animals[id].hab] || 0) + 1; return o; })(), floaters: floaters.length, combos: M ? M.combos.length : 0, statics: M ? M.statics.length : 0, paths: M ? M.pathKeys.length : 0,
+      animalAlpha: stats.animalAlpha, animalCheck: stats.actorCheck || null,
       placement: P ? { q: P.q, r: P.r, rot: P.rot, ok: P.ok, state: P.state, msg: P.msg, makes: P.makes, breaks: P.breaks } : null };
   };
   root.ZRender = R;

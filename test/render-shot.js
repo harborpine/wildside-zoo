@@ -180,6 +180,34 @@ async function run(name) {
   await page.evaluate(() => { const S = RT.S; S.happening = null; S.headhunt = null; S.animals.forEach(a => { a.sick = 0; }); S.projects.forEach(p => { delete p.choice; }); }); await sleep(900);
   const after = await dbg(); ok(setup.hap && !after.gateKinds.includes(setup.hap.who) && !after.gateKinds.includes('headhunter'), 'gate people did not leave: ' + JSON.stringify(after.gateKinds)); ok(![].concat(...Object.values(after.icons)).some(n => n === 'sick' || n === 'choice'), 'sick/choice icons did not clear');
 
+  // --- animals are always drawn solid: in every habitat state, every opaque animal pixel that nothing in front covers shows the
+  // sprite's own colour (catches any fade, tint or faint layer laid over an animal, e.g. a combo outline showing through it)
+  {
+    const states = ['normal', 'event running', 'breeding', 'closed', 'sick', 'all at once'];
+    for (const stName of states) {
+      for (const hk of ['savanna', 'jungle', 'arctic']) {
+        const r = await page.evaluate(([stName, hk]) => {
+          const S = RT.S, h = RT.H[hk]; if (!h) return null;
+          S.projects = S.projects.filter(p => !p.__t); S.animals.forEach(a => { if (a.hab === h.id) a.sick = 0; }); h.closedUntil = 0;
+          const ev = () => S.projects.push({ __t: 1, id: 90000 + S.projects.length, type: 'event', hab: h.id, staff: [], start: S.week, end: S.week + 4, marks: [], choice: null });
+          const br = () => { const as = S.animals.filter(a => a.hab === h.id); S.projects.push({ __t: 1, id: 91000 + S.projects.length, type: 'breed', a: as[0].id, b: (as[1] || as[0]).id, hab: h.id, staff: [], start: S.week, end: S.week + 4, marks: [], choice: null }); };
+          if (stName === 'event running' || stName === 'all at once') ev();
+          if (stName === 'breeding') br();
+          if (stName === 'closed' || stName === 'all at once') h.closedUntil = S.week + 3;
+          if (stName === 'sick' || stName === 'all at once') S.animals.forEach(a => { if (a.hab === h.id) a.sick = S.week + 5; });
+          ZRender.centerOn(h.q, h.r, true); return true;
+        }, [stName, hk]);
+        if (!r) continue;
+        await sleep(450); await page.evaluate(() => ZRender.checkAnimals()); await sleep(250);
+        const chk = (await dbg()).animalCheck;
+        ok(chk && chk.animals > 0 && chk.checked > 50 && chk.bad === 0 && chk.minAlpha === 1, 'animals not drawn solid (' + stName + ', ' + hk + '): ' + JSON.stringify(chk));
+        if (stName === 'event running' && hk === 'savanna') { await shot('hab-event'); notes.push('solid animals, event running at the savanna: ' + JSON.stringify(chk)); }
+      }
+    }
+    await page.evaluate(() => { const S = RT.S; S.projects = S.projects.filter(p => !p.__t); S.animals.forEach(a => { a.sick = 0; }); S.items.forEach(i => { i.closedUntil = 0; }); });
+    notes.push('solid-animal check run for ' + states.join(', ') + ' (savanna, jungle, arctic)');
+  }
+
   // --- final state
   await sleep(300); const dEnd = await dbg(); notes.push('end: frame cost ' + dEnd.frameMs + ' ms, ' + dEnd.fps + ' fps, sprites ' + dEnd.sprites);
   const pageErrs = await page.evaluate(() => RT.errors);

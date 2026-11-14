@@ -70,6 +70,11 @@
       with a 6-pixel dark halo and dashes 8 long, so they keep their weight. Pop-up digits and the built-in fallback shapes are drawn
       at the old size and blown up K times with crisp pixels.
     - `debug().buffer` now has `density` and `artScale` (CSS px per OLD art pixel); `scale` and `deviceScale` are per buffer pixel.
+    - **Animals are always solid.** The faint copy of the combo outlines drawn over the sprites now has every animal and person cut
+      out of it first (it used to show through animals standing on a habitat's back edge, which looked see-through on the owner's
+      iPhone). `ZRender.checkAnimals()` makes the next frame verify that every opaque animal pixel nothing in front covers shows the
+      sprite's own colour; read `debug().animalCheck` (`{animals, checked, bad, worst, minAlpha}`); `debug().animalAlpha` is the lowest
+      alpha any animal was drawn with. `render-shot.js` asserts this in every habitat state (normal, event, breeding, closed, sick).
     - Frame cost at 393x852 DPR 3, mid-game zoo, headless: Chromium about 1.1 ms, WebKit about 1.9 ms per frame (old art: 0.8 / 0.7 ms).
 
 ## Functions
