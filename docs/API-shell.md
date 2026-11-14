@@ -261,3 +261,9 @@ Icon keys come from `ZSprites` (`stat-charm`, `stat-vigor`, `stat-wit`, `skill-c
 * The news line is still a band at the very bottom, padded by the bottom safe-area inset only.
 * Test flags: `?standalone=1` forces the installed branch, `?inset=34` pretends a 34 px bottom inset (sets `--safe-b`).
 * **`ZCore.screens.screenCheck()`** (only when `ZCore.devTools`; returns null otherwise): pushes a "Screen check" screen listing standalone yes/no, screen, inner size, visualViewport size and offsetTop, documentElement size, `#app` box, news line top and bottom, the four safe-area insets, pixel ratio and user agent. Menus: add a button in System that calls it.
+
+## Floor to the bottom edge, news overlay, type (round 5b)
+
+* The floor canvas now runs to the very bottom of the screen (under the home-indicator inset). `#news` is an overlay pill inside `#stage`, `bottom: 10px + safe-bottom`; it appears when a new news line arrives, fades out after `NEWS_MS` (4 s, constant in `core.js`), takes no taps when hidden, and a tap on it opens the menu. It is hidden while a screen is open, during placement and on the title. Panels and `.layer` pad the bottom inset so Back stays above it; `#placement-bar` and toasts already clear it.
+* Top strip: padding is `12px + safe-top` above the first line (clears the iOS status-bar blur), date is full white.
+* Type: `ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`; weights 600 labels, 700 titles and numbers, 500 small notes; tabular figures; no text shadows except the news overlay. Test flag `?insett=54` fakes a top inset.

@@ -159,8 +159,17 @@ async function run(name) {
     await c.close(); }
   for (const [w, h] of [[393, 852], [440, 956]]) {   // installed-app branch with a simulated 34 px home-indicator inset
     const { c, p } = await fresh({ width: w, height: h }, '?play=1&standalone=1&inset=34');
-    const g = await p.evaluate(() => { const a = document.getElementById('app').getBoundingClientRect(), n = document.getElementById('news'), nb = n.getBoundingClientRect(), cs = getComputedStyle(n); const probe = document.elementFromPoint(innerWidth / 2, innerHeight - 2); return { appBottom: Math.round(a.bottom), appTop: Math.round(a.top), h: innerHeight, newsBottom: Math.round(nb.bottom), padB: parseFloat(cs.paddingBottom), textBottom: Math.round(nb.bottom - parseFloat(cs.paddingBottom)), under: probe && (probe.id || probe.tagName), sa: document.documentElement.classList.contains('sa') }; });
-    check(g.sa && g.appTop === 0 && g.appBottom === g.h && g.newsBottom === g.h && g.padB >= 34 && g.textBottom <= g.h - 34 && g.under === 'news', 'installed-app mode at ' + w + 'x' + h + ': app fills to the very bottom, news text clears the inset, no band below (' + JSON.stringify(g) + ')');
+    await p.evaluate(() => { ZT.skipReports = true; ZT.S.news.unshift({ w: ZT.S.week, msg: 'A visitor left a nice note.', kind: 'good' }); ZCore.updateStrip(); }); await sleep(500);
+    const g = await p.evaluate(() => { const a = document.getElementById('app').getBoundingClientRect(), cv = document.getElementById('floor').getBoundingClientRect(), n = document.getElementById('news'), nb = n.getBoundingClientRect(), top = document.getElementById('strip');
+      const pt = document.elementFromPoint(innerWidth / 2, innerHeight - 2); return { appBottom: Math.round(a.bottom), canvasBottom: Math.round(cv.bottom), h: innerHeight, newsBottom: Math.round(nb.bottom), shown: n.classList.contains('show') && getComputedStyle(n).opacity === '1', under: pt && (pt.id || pt.tagName), stripPadTop: getComputedStyle(top).paddingTop, sa: document.documentElement.classList.contains('sa') }; });
+    check(g.sa && g.appBottom === g.h && g.canvasBottom === g.h && g.under === 'floor' && g.shown && g.newsBottom <= g.h - 34 && g.newsBottom >= g.h - 34 - 14, 'installed-app mode at ' + w + 'x' + h + ': canvas runs to the very bottom (floor under the inset), the news overlay sits just above the inset (' + JSON.stringify(g) + ')');
+    await shot('news-overlay-' + w, p); await sleep(4900);
+    check(await p.evaluate(() => getComputedStyle(document.getElementById('news')).opacity === '0' && getComputedStyle(document.getElementById('news')).pointerEvents === 'none'), 'the news overlay fades out and stops catching taps (' + w + ')');
+    await p.evaluate(() => { ZRender.startPlacement({ kind: 'hab', t: 'savanna', label: 'S' }, { onPlace: () => ({ ok: true }), onCancel: () => {} }); }); await sleep(400);
+    const pb = await p.evaluate(() => [...document.querySelectorAll('#placement-bar button')].map(b => Math.round(b.getBoundingClientRect().bottom)));
+    check(pb.length >= 2 && pb.every(v => v <= h - 34), 'placement buttons are fully above the inset (' + w + ': ' + pb + ')'); await p.evaluate(() => ZRender.stopPlacement());
+    await p.evaluate(() => ZCore.push({ id: 'bk', title: 'T', render() {} })); await sleep(300);
+    check(await p.evaluate(() => Math.round(document.querySelector('.layer:not([hidden]) .back').getBoundingClientRect().bottom) <= innerHeight - 34), 'Back button is fully above the inset (' + w + ')'); await shot('back-inset-' + w, p); await p.evaluate(() => ZT.popAll());
     await p.evaluate(() => ZCore.screens.screenCheck()); await sleep(300); await shot('screencheck-' + w, p);
     check(await p.evaluate(() => ZT.stack().join() === 'screencheck' && document.querySelector('.pbody').textContent.indexOf('safe top') >= 0), 'Screen check readout shows (' + w + ')');
     await c.close(); }

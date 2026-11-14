@@ -6,6 +6,7 @@
   const SAVE_KEY = 'wildside-zoo-v3', LEGACY_KEY = 'wildside-zoo-v3-legacy', PREV_LOG_KEY = 'wildside-zoo-v3-prevlog';
   const SAVE_V = 3, LOG_FORMAT = 1;
   const STANDALONE = navigator.standalone === true || /[?&]standalone=1/.test(location.search) || !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  const NEWS_MS = 4000;   // how long a news line stays on the floor
   const DEV_TOOLS = true;   // the one switch for developer-only features: Note for Claude, Copy log, Download log. Set false for a store build.
   const LANDSCAPE = window.matchMedia ? window.matchMedia('(orientation: landscape) and (max-height: 500px) and (pointer: coarse)') : null;
   const WEEK_MS = [0, 10000, 5000];          // real milliseconds per in-game week at speed 1 and 2 (about 6.7 real hours per 20 years at the owner's pace)
@@ -15,7 +16,7 @@
   let S = null, ghost = null, slot = null, speed = 1, acc = 0, lastT = 0, lastRunning = null, timer = 0;
   let busy = null;                          // the report currently on screen (or null)
   let busySince = 0, emptyStackSince = 0, token = 0;
-  let skipReports = false, dirtySave = false, saveTimer = 0, saveFailedToast = false;
+  let lastPl = false, newsKey = null, newsTimer = 0, skipReports = false, dirtySave = false, saveTimer = 0, saveFailedToast = false;
   let legacy = { runs: 0, best: 0, aff: {}, combos: {}, hall: [], carry: null };
   const errors = [];
   const handlers = {};
@@ -420,7 +421,7 @@
 
   // ------------------------------------------------------------------ new game, strip, ticks
   function afterNewState() {
-    popAll(); busy = null; token++;
+    popAll(); busy = null; token++; newsKey = null; $news && $news.classList.remove('show');
     const r = R(); if (r) { try { if (r.reset) r.reset(); if (r.mapChanged) r.mapChanged(); } catch (e) { recordError(e, 'ZRender.reset'); } }
     lastRunning = null; updateStrip(); syncRunning(); setTimeout(flushReports, 0);
   }
@@ -438,7 +439,11 @@
     $vis.textContent = fmt.num(S.visitorsLast || 0) + '/wk';
     const max = D.RANK_REP.length, rk = Math.max(1, E.rank(S)); const ex = $stars.getAttribute('data-n');
     if (ex !== String(rk)) { $stars.setAttribute('data-n', rk); $stars.innerHTML = ''; $stars.appendChild(stars(rk, max)); }
-    const n = S.news && S.news[0]; const txt = n ? n.msg : ''; if ($news.textContent !== txt) { $news.textContent = txt; $news.className = n ? (n.kind || '') : ''; }
+    const n = S.news && S.news[0], key = n ? n.w + '|' + n.msg : '';
+    if (key !== newsKey) {   // new news: show the overlay for a few seconds, then fade it out
+      const first = newsKey === null; newsKey = key;
+      if (n && !first && S === curView() && window.__keepNews !== 0) { $news.textContent = n.msg; $news.className = 'show ' + (n.kind || ''); clearTimeout(newsTimer); newsTimer = setTimeout(() => { $news.classList.remove('show'); }, NEWS_MS); }
+    }
   }
   function doTick() {
     if (!S) return;
@@ -469,6 +474,7 @@
     if (busy && !stack.length && now - emptyStackSince > 900 && emptyStackSince && now - busySince > 900) { log('report-released', { type: busy.type }); const b = busy; busy = null; token++; const i = S.reports.indexOf(b); if (i >= 0) S.reports.splice(i, 1); flushReports(); }
     if (run) { acc += dt; const ms = WEEK_MS[speed]; if (acc >= ms) { acc = acc > ms * 2 ? 0 : acc - ms; doTick(); } }
     if (run !== lastRunning) syncRunning();
+    const pl = placing(); if (pl !== lastPl) { lastPl = pl; document.body.classList.toggle('placing', pl); }
   }
 
   // ------------------------------------------------------------------ boot and hooks
@@ -490,12 +496,14 @@
   function build() {
     $strip = $('strip'); $date = $('s-date'); $stars = $('s-stars'); $money = $('s-money'); $vis = $('s-vis'); $floor = $('floor'); $news = $('news'); $screens = $('screens'); $toasts = $('toasts'); $stage = $('stage');
     if (!$strip || !$screens) throw new Error('Page markup missing (index.html)');
+    $news.addEventListener('click', () => onFloorTap({}));
     document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && stack.length && !stack[stack.length - 1].modal) pop(); });
     document.addEventListener('gesturestart', ev => ev.preventDefault());
     document.addEventListener('contextmenu', ev => { if (!/^(TEXTAREA|INPUT)$/.test(ev.target.tagName)) ev.preventDefault(); });
     // Screen fitting. Installed (home screen) app: always fill the WHOLE screen, never the visual viewport (iOS reports it short by the status-bar height there).
     // Safari with toolbars: follow the visible area as the bars show and hide.
     const app = $('app'), qs = location.search, forced = /[?&]standalone=1/.test(qs), ins = /[?&]inset=([0-9]+)/.exec(qs);
+    const it = /[?&]insett=([0-9]+)/.exec(qs); if (it) document.documentElement.style.setProperty('--safe-t', it[1] + 'px');   // test only
     if (ins) document.documentElement.style.setProperty('--safe-b', ins[1] + 'px');   // test only: pretend there is a bottom inset
     const fit = () => {
       if (!app) return;
