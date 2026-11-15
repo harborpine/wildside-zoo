@@ -75,6 +75,14 @@
       iPhone). `ZRender.checkAnimals()` makes the next frame verify that every opaque animal pixel nothing in front covers shows the
       sprite's own colour; read `debug().animalCheck` (`{animals, checked, bad, worst, minAlpha}`); `debug().animalAlpha` is the lowest
       alpha any animal was drawn with. `render-shot.js` asserts this in every habitat state (normal, event, breeding, closed, sick).
+    - **Nothing on the floor is see-through (owner's rule).** Every draw uses full alpha. The placement ghost (ground, fences, building) is
+      solid; fits / does not fit shows as a solid outline 2 art pixels wide that blinks green/white (fits), red/white (blocked),
+      gold/white (completes a combo) or orange/white (breaks one), plus a small solid red cross on each blocked hex. The item being
+      moved is hidden at its old spot (only the ghost shows). Combo outlines are drawn once, solid, on the ground; things in front cover
+      them. Icon backings are a solid dark pill with a lighter rim. Pop-ups blink twice at the end and vanish instead of fading.
+      Test hooks: `ZRender.watchAlpha(true)` then `ZRender.alphaReport()` -> `{minAlpha, draws, blendOps, ownPartialPixels}`;
+      `render-shot.js` asserts full alpha through play, drag, zoom, pop-ups and every placement. `node test/render-alphaprobe.js`
+      lists the Artist's sprites that still contain half-clear pixels.
     - Frame cost at 393x852 DPR 3, mid-game zoo, headless: Chromium about 1.1 ms, WebKit about 1.9 ms per frame (old art: 0.8 / 0.7 ms).
 
 ## Functions

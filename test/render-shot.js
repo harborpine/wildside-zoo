@@ -28,6 +28,7 @@ async function run(name) {
   const lastTap = () => page.evaluate(() => RT.taps[RT.taps.length - 1] || null);
   const tapCount = () => page.evaluate(() => RT.taps.length);
 
+  await page.evaluate(() => ZRender.watchAlpha(true)); // nothing on the floor may be drawn see-through (checked at the end)
   await sleep(3500);
   const d0 = await dbg(), K = await page.evaluate(() => ZGeo.DENSITY || 1); // K = buffer pixels per old art pixel (2 with the style-D art)
   notes.push('sprites: ' + (d0.realSprites ? 'REAL sprites.js' : 'built-in stub shapes') + (Object.keys(d0.spriteErrors).length ? ' (sprite errors: ' + JSON.stringify(d0.spriteErrors) + ')' : ''));
@@ -207,6 +208,11 @@ async function run(name) {
     await page.evaluate(() => { const S = RT.S; S.projects = S.projects.filter(p => !p.__t); S.animals.forEach(a => { a.sick = 0; }); S.items.forEach(i => { i.closedUntil = 0; }); });
     notes.push('solid-animal check run for ' + states.join(', ') + ' (savanna, jungle, arctic)');
   }
+
+  // --- nothing see-through: every floor draw during play, drag, zoom, pop-ups, every kind of placement and the habitat states above
+  // used full alpha and the normal blend, and the renderer's own baked pictures have no half-clear pixels
+  { const ar = await page.evaluate(() => ZRender.alphaReport()); notes.push('solid-pixels check: ' + JSON.stringify(ar));
+    ok(ar.draws > 5000 && ar.minAlpha === 1 && ar.blendOps === 0 && ar.ownPartialPixels === 0, 'something on the floor was drawn see-through: ' + JSON.stringify(ar)); }
 
   // --- final state
   await sleep(300); const dEnd = await dbg(); notes.push('end: frame cost ' + dEnd.frameMs + ' ms, ' + dEnd.fps + ' fps, sprites ' + dEnd.sprites);

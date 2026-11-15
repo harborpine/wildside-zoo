@@ -50,7 +50,7 @@
         let col = '#6cbf4b';
         if (kind === 'grass') col = ['#6cbf4b', '#66b947', '#72c450'][v]; else if (kind === 'path') col = '#dcc898'; else if (kind === 'locked') col = '#3c6a44';
         else if (kind === 'water') col = '#4a9ad6'; else if (kind.indexOf('hab:') === 0) { const b = D.BIOMES[kind.slice(4)]; col = b ? b.color : '#bbb'; }
-        hexFill(x, HW, HH + 3 * K, 'rgba(0,0,0,0.35)'); hexFill(x, HW, HH, col);
+        hexFill(x, HW, HH + 3 * K, '#2f3b2a'); hexFill(x, HW, HH, col);
       }));
     },
     fence: function (biome, edge) {
@@ -63,7 +63,7 @@
         s.sortDy = (a[1] + b[1]) / 2; return s;
       });
     },
-    building: function (id) { return fb('b:' + id, () => upK(mk(30, 34, 15, 26, x => { x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(2, 26, 28, 6); x.fillStyle = hue(id, 50, 62); x.fillRect(2, 10, 26, 20); x.fillStyle = hue(id, 50, 48); x.fillRect(16, 10, 12, 20); x.fillStyle = hue(id + 'r', 60, 45); x.fillRect(0, 2, 30, 9); x.fillStyle = '#3a2a22'; x.fillRect(7, 21, 5, 9); }))); },
+    building: function (id) { return fb('b:' + id, () => upK(mk(30, 34, 15, 26, x => { x.fillStyle = '#4a7a3a'; x.fillRect(2, 26, 28, 6); x.fillStyle = hue(id, 50, 62); x.fillRect(2, 10, 26, 20); x.fillStyle = hue(id, 50, 48); x.fillRect(16, 10, 12, 20); x.fillStyle = hue(id + 'r', 60, 45); x.fillRect(0, 2, 30, 9); x.fillStyle = '#3a2a22'; x.fillRect(7, 21, 5, 9); }))); },
     entrance: function () { return fb('gate', () => upK(mk(60, 36, 30, 32, x => { x.fillStyle = '#7a5a3c'; x.fillRect(2, 8, 6, 26); x.fillRect(52, 8, 6, 26); x.fillStyle = '#c0453a'; x.fillRect(0, 2, 60, 9); x.fillStyle = '#f2d36b'; x.fillRect(22, 4, 16, 5); }))); },
     animal: function (sp, o) { o = o || {}; const j = o.juv ? 1 : 0; return fb('a:' + sp + j + (o.variant ? 'v' : ''), () => { const w = j ? 10 : 16, h = j ? 8 : 12; return upK(mk(w, h, w / 2, h, x => { x.fillStyle = hue(sp + (o.variant ? 'v' : ''), 50, 55); x.fillRect(1, 1, w - 2, h - 4); x.fillRect(w - 5, 0, 5, 5); x.fillStyle = '#2b2520'; x.fillRect(2, h - 3, 2, 3); x.fillRect(w - 5, h - 3, 2, 3); x.fillRect(w - 2, 1, 1, 1); })); }); },
     person: function (kind, o) { o = o || {}; const k = kind === 'visitor' ? 'v' + ((o.seed || 0) % 8) : kind; return fb('p:' + k, () => upK(mk(8, 16, 4, 16, x => { x.fillStyle = '#f0c8a0'; x.fillRect(2, 0, 4, 5); x.fillStyle = hue(k, 65, 50); x.fillRect(1, 5, 6, 7); x.fillStyle = '#34405a'; x.fillRect(2, 12, 2, 4); x.fillRect(4, 12, 2, 4); }))); },
@@ -125,10 +125,14 @@
   const maskCache = {};
   const hexMask = col => maskCache[col] || (maskCache[col] = mk(W, HH * 2, HW, HH, x => hexFill(x, HW, HH, col)));
   // one shared outline around a set of cells, baked to a small canvas (two frames for a gentle shimmer)
-  function outlineSprite(cells, col, col2) {
+  // Everything here is solid pixels (no see-through anywhere on the floor): a bright line `lw` fine pixels wide on the hex edges with a
+  // solid dark rim one old art pixel wide each side. Combo outlines shimmer with dashes of col/col2; placement outlines (blink) show
+  // the whole outline in col, then in col2.
+  function outlineSprite(cells, col, col2, o) {
+    o = o || {}; const lw = o.lw || K, blink = !!o.blink, lo = Math.floor((lw - 1) / 2), m = lw + 2 * K;
     const set = {}; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     cells.forEach(c => { set[key(c[0], c[1])] = 1; const p = G.toScreen(c[0], c[1]); x0 = Math.min(x0, p.x - HW); x1 = Math.max(x1, p.x + HW); y0 = Math.min(y0, p.y - HH); y1 = Math.max(y1, p.y + HH); });
-    x0 -= 2 * K; y0 -= 2 * K; const w = x1 - x0 + 4 * K, h = y1 - y0 + 5 * K, out = [];
+    x0 -= m; y0 -= m; const w = x1 - x0 + 2 * m, h = y1 - y0 + 2 * m, out = [];
     for (let f = 0; f < 2; f++) out.push(mk(w, h, 0, 0, x => {
       for (let pass = 0; pass < 2; pass++) cells.forEach(c => {
         const p = G.toScreen(c[0], c[1]);
@@ -137,15 +141,19 @@
           const a = G.CORNERS[e[1]], b = G.CORNERS[e[2]], steps = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]));
           for (let i = 0; i <= steps; i++) {
             const px = clamp(Math.round(a[0] + (b[0] - a[0]) * i / steps), -HW, HW - K), py = clamp(Math.round(a[1] + (b[1] - a[1]) * i / steps), -HH, HH - K);
-            const X = p.x + px - x0, Y = p.y + py - y0;
-            if (pass === 0) { x.fillStyle = 'rgba(20,18,30,0.55)'; x.fillRect(X - K, Y - K, 3 * K, 3 * K); }
-            else { x.fillStyle = (Math.floor((i + p.x + py) / (4 * K)) + f) & 1 ? col : (col2 || col); x.fillRect(X, Y, K, K); }
+            const X = p.x + px - x0 - lo, Y = p.y + py - y0 - lo;
+            if (pass === 0) { x.fillStyle = '#1d1a22'; x.fillRect(X - K, Y - K, lw + 2 * K, lw + 2 * K); }
+            else { x.fillStyle = blink ? (f ? (col2 || col) : col) : (Math.floor((i + p.x + py) / (4 * K)) + f) & 1 ? col : (col2 || col); x.fillRect(X, Y, lw, lw); }
           }
         });
       });
     }));
     return { f: out, x: x0, y: y0, w: w, h: h };
   }
+  // a small solid red cross for blocked hexes under a placement ghost (old art pixels, blown up K times)
+  let crossS = null;
+  const crossSprite = () => crossS || (crossS = upK(mk(9, 9, 4, 4, x => { const P2 = [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [6, 0], [5, 1], [4, 2], [2, 4], [1, 5], [0, 6]];
+    x.fillStyle = '#1d1a22'; P2.forEach(q => x.fillRect(q[0], q[1], 3, 3)); x.fillStyle = '#ff4a3a'; P2.forEach(q => x.fillRect(q[0] + 1, q[1] + 1, 1, 1)); })));
 
   // ---------------------------------------------------------------- the map cache (floor, statics, walk graph)
   const toCol = (q, r) => Z.toCol ? Z.toCol(q, r) : q + (r - (r & 1)) / 2;
@@ -535,8 +543,11 @@
     const bw = Math.ceil(vw) + 2, bh = Math.ceil(vh) + 2;
     if (!buf) buf = document.createElement('canvas');
     if (buf.width !== bw || buf.height !== bh) { buf.width = bw; buf.height = bh; }
-    bctx = buf.getContext('2d'); bctx.imageSmoothingEnabled = false; ctx.imageSmoothingEnabled = false;
+    bctx = buf.getContext('2d'); bctx.imageSmoothingEnabled = false; watchCtx(bctx); ctx.imageSmoothingEnabled = false;
     if (had) { cam.x = cx - vw / 2; cam.y = cy - vh / 2; clampCam(); }
+  }
+  function watchCtx(x) { // test hook: every draw onto the floor buffer notes the alpha it was drawn with (see ZRender.alphaReport)
+    if (x.__zw) return; x.__zw = 1; ['drawImage', 'fillRect'].forEach(fn => { const f0 = x[fn]; x[fn] = function () { if (stats.alphaWatch) { stats.alphaDraws++; if (x.globalAlpha < stats.alphaMin) stats.alphaMin = x.globalAlpha; if (x.globalCompositeOperation !== 'source-over') stats.alphaOps++; } return f0.apply(x, arguments); }; });
   }
   function clientToWorld(x, y) { const rect = canvas.getBoundingClientRect(); return { x: cam.x + (x - rect.left) * (devW / rect.width) / N, y: cam.y + (y - rect.top) * (devH / rect.height) / N }; }
   R.clientToHex = function (x, y) { const w = clientToWorld(x, y); return G.toAxial(w.x, w.y); };
@@ -587,9 +598,9 @@
         ':where(#placement-bar.zr-on){display:flex}:where(#placement-bar[data-zr-made]){position:absolute;left:0;right:0;bottom:0;z-index:5}' +
         ':where(#placement-bar) :where(button){flex:1 1 0;min-height:56px;font:600 17px/1 system-ui,sans-serif;border-radius:10px;border:2px solid #2b2233;background:#fff7e0;color:#2b2233;touch-action:manipulation}' +
         ':where(#placement-bar) :where(button.zr-place){background:#8fd66a}:where(#placement-bar) :where(button:disabled){opacity:.45}' +
-        ':where(#placement-note){display:none;text-align:center;font:600 15px/1.25 system-ui,sans-serif;padding:6px 10px;color:#2b2233;background:rgba(255,247,224,.94)}' +
+        ':where(#placement-note){display:none;text-align:center;font:600 15px/1.25 system-ui,sans-serif;padding:6px 10px;color:#2b2233;background:#fff7e0}' +
         ':where(#placement-note.zr-on){display:block}:where(#placement-note[data-zr-made]){position:absolute;left:0;right:0;bottom:calc(74px + env(safe-area-inset-bottom,0px));z-index:5}' +
-        ':where(#placement-note[data-state=bad]){background:rgba(255,214,208,.96)}:where(#placement-note[data-state=combo]){background:rgba(255,236,150,.97)}:where(#placement-note[data-state=warn]){background:rgba(255,226,190,.97)}';
+        ':where(#placement-note[data-state=bad]){background:#ffd6d0}:where(#placement-note[data-state=combo]){background:#ffec96}:where(#placement-note[data-state=warn]){background:#ffe2be}';
       document.head.insertBefore(s, document.head.firstChild);
     }
     return { bar: bar, note: note };
@@ -634,7 +645,7 @@
     if (ok) { if (P.makes.length) msg = 'Completes ' + P.makes.join(', ') + '!'; if (P.breaks.length) msg += (msg ? ' ' : '') + 'Breaks ' + P.breaks.join(', ') + '.'; if (!msg) msg = 'Fits here.'; }
     if (P.fail) { msg = P.fail; P.state = 'bad'; P.fail = null; }
     P.msg = msg;
-    P.outline = outlineSprite(cs, P.state === 'bad' ? '#ff6a5c' : P.state === 'combo' ? '#ffd84a' : P.state === 'warn' ? '#ffb056' : '#ffffff');
+    P.outline = outlineSprite(cs, P.state === 'bad' ? '#ff4a3a' : P.state === 'combo' ? '#ffd84a' : P.state === 'warn' ? '#ffb056' : '#5ad65a', '#ffffff', { lw: 2 * K, blink: true });
     if (P.dom) { P.dom.note.textContent = (sp.label && (sp.label + msg).length <= 34 ? sp.label + ': ' : '') + msg; P.dom.note.setAttribute('data-state', P.state); if (P.dom.place) { P.dom.place.setAttribute('aria-disabled', ok ? 'false' : 'true'); paintButtons(ok); } }
   }
   R.startPlacement = function (spec, cbs) {
@@ -671,7 +682,7 @@
   R.placing = () => !!P;
 
   // ---------------------------------------------------------------- drawing
-  const list = [], over = []; let penHidden = false, ovl = null;
+  const list = [], over = []; let penHidden = false;
   const pixCache = new Map(); const pixOf = s => { let d = pixCache.get(s.c); if (!d) { d = s.c.getContext('2d').getImageData(0, 0, s.c.width, s.c.height).data; pixCache.set(s.c, d); } return d; };
   // test hook (ZRender.checkAnimals): after the sprites and the faint outline layer, every opaque pixel of every animal that nothing
   // drawn later covers must show the sprite's own colour exactly, i.e. the animal is fully opaque and nothing is laid over it
@@ -728,24 +739,20 @@
     const ph = Math.floor(clock * 2.5) & 1;
     for (let i = 0; i < M.combos.length; i++) { const o = M.combos[i]; if (o.x - cx < bw && o.y - cy < bh && o.x + o.w > cx && o.y + o.h > cy) c.drawImage(o.f[running ? ph : 0].c, o.x - cx, o.y - cy); }
     list.length = 0; over.length = 0;
-    if (P && P.cells) {
-      const sp = P.spec, pulse = 0.38 + 0.12 * Math.sin(P.t * 5);
-      P.cells.forEach(cell => {
-        const p = G.toScreen(cell.q, cell.r);
-        if (sp.kind === 'hab') { const tl = spr('tile', 'hab:' + sp.t, 0); c.globalAlpha = 0.8; c.drawImage(tl.c, Math.round(p.x - tl.ax) - cx, Math.round(p.y - tl.ay) - cy); }
-        const mk2 = hexMask(!cell.ok ? '#ff4a3a' : P.state === 'bad' ? '#ff9a8a' : P.state === 'combo' ? '#ffd84a' : '#6dff7a');
-        c.globalAlpha = cell.ok && P.state !== 'bad' ? pulse : pulse + 0.2; c.drawImage(mk2.c, p.x - HW - cx, p.y - HH - cy);
-      });
-      c.globalAlpha = 1; c.drawImage(P.outline.f[Math.floor(P.t * 3) & 1].c, P.outline.x - cx, P.outline.y - cy);
+    if (P && P.cells) { // the ghost is drawn solid; fits / does not fit shows only in the blinking outline (and red crosses)
+      const sp = P.spec;
+      if (sp.kind === 'hab') P.cells.forEach(cell => { const p = G.toScreen(cell.q, cell.r), tl = spr('tile', 'hab:' + sp.t, 0); c.drawImage(tl.c, Math.round(p.x - tl.ax) - cx, Math.round(p.y - tl.ay) - cy); });
+      c.drawImage(P.outline.f[Math.floor(P.t * 3) & 1].c, P.outline.x - cx, P.outline.y - cy);
+      P.cells.forEach(cell => { if (cell.ok) return; const p = G.toScreen(cell.q, cell.r); over.push({ s: crossSprite(), x: p.x, y: p.y }); }); // blocked hexes: a solid red cross on top
       if (sp.kind === 'hab') {
         const set = {}; P.cells.forEach(cell => { set[key(cell.q, cell.r)] = 1; });
-        P.cells.forEach(cell => { const p = G.toScreen(cell.q, cell.r); G.EDGES.forEach((e, ei) => { if (set[key(cell.q + e[0][0], cell.r + e[0][1])]) return; const s = spr('fence', sp.t, ei); list.push({ s: s, x: p.x, y: p.y, key: G.depth(cell.q, cell.r, M.fenceDy(s, ei)) + 0.01, a: 0.85 }); }); });
-      } else { const p = G.toScreen(P.q, P.r), s = spr('building', sp.t, {}); list.push({ s: s, x: p.x, y: p.y, key: G.depth(P.q, P.r, 0) + 0.21, a: 0.85 }); }
+        P.cells.forEach(cell => { const p = G.toScreen(cell.q, cell.r); G.EDGES.forEach((e, ei) => { if (set[key(cell.q + e[0][0], cell.r + e[0][1])]) return; const s = spr('fence', sp.t, ei); list.push({ s: s, x: p.x, y: p.y, key: G.depth(cell.q, cell.r, M.fenceDy(s, ei)) + 0.01, a: 1 }); }); });
+      } else { const p = G.toScreen(P.q, P.r), s = spr('building', sp.t, {}); list.push({ s: s, x: p.x, y: p.y, key: G.depth(P.q, P.r, 0) + 0.21, a: 1 }); }
     }
     // one depth-sorted list
     const L = cx - 40 * K, Rr = cx + bw + 40 * K, T = cy - 10 * K, B = cy + bh + 60 * K, moveId = P ? P.spec.moveId : null;
     let under = null; if (P && P.cells) { under = {}; P.cells.forEach(cell => { under[key(cell.q, cell.r)] = 1; }); P.cells.forEach(cell => DIR6.forEach(d => { const k2 = key(cell.q + d[0], cell.r + d[1]); if (G.toScreen(d[0], d[1]).y > 0 && !under[k2]) under[k2] = 2; })); } // (2 = the hex is just in front of the ghost: only tall things there are hidden) // decorations under the ghost are hidden so they never fight a placement
-    for (let i = 0; i < M.statics.length; i++) { const e = M.statics[i]; if (e.x < L || e.x > Rr || e.y < T || e.y > B) continue; if (under && e.ck && under[e.ck] && (under[e.ck] === 1 || e.tall)) continue; if (moveId != null && e.id === moveId) { list.push({ s: e.s, x: e.x, y: e.y, key: e.key, a: 0.35 }); continue; } list.push(e); }
+    for (let i = 0; i < M.statics.length; i++) { const e = M.statics[i]; if (e.x < L || e.x > Rr || e.y < T || e.y > B) continue; if (under && e.ck && under[e.ck] && (under[e.ck] === 1 || e.tall)) continue; if (moveId != null && e.id === moveId) continue; /* the item being moved is shown only as the ghost (nothing see-through) */ list.push(e); }
     const AF = frames('ANIMAL_FRAMES'), PF = frames('PERSON_FRAMES');
     for (const id in animals) {
       const a = animals[id]; if (a.x < L || a.x > Rr || a.y < T || a.y > B) continue;
@@ -769,28 +776,16 @@
     }
     list.sort((a, b) => a.key - b.key);
     let animalAlpha = 1;
-    for (let i = 0; i < list.length; i++) { const e = list[i], s = e.s; if (e.a !== 1) c.globalAlpha = e.a; if (e.act === 1 && c.globalAlpha < animalAlpha) animalAlpha = c.globalAlpha; c.drawImage(s.c, Math.round(e.x - s.ax) - cx, Math.round(e.y - s.ay) - cy); if (e.a !== 1) c.globalAlpha = 1; }
+    for (let i = 0; i < list.length; i++) { const e = list[i], s = e.s; if (e.act === 1 && c.globalAlpha < animalAlpha) animalAlpha = c.globalAlpha; c.drawImage(s.c, Math.round(e.x - s.ax) - cx, Math.round(e.y - s.ay) - cy); } // everything solid
     stats.sprites = list.length; stats.animalAlpha = animalAlpha;
-    // the same combo outlines again, faintly, over the sprites, so a fence never hides which tiles belong together. Animals and people
-    // are cut out of this faint layer first: an outline edge running behind an animal must never show through it (it made animals
-    // standing on a habitat's back edge look see-through)
-    let anyCombo = false; for (let i = 0; i < M.combos.length && !anyCombo; i++) { const o = M.combos[i]; if (o.x - cx < bw && o.y - cy < bh && o.x + o.w > cx && o.y + o.h > cy) anyCombo = true; }
-    if (anyCombo) {
-      if (!ovl) ovl = document.createElement('canvas'); if (ovl.width !== bw || ovl.height !== bh) { ovl.width = bw; ovl.height = bh; }
-      const o2 = ovl.getContext('2d'); o2.globalCompositeOperation = 'source-over'; o2.clearRect(0, 0, bw, bh);
-      for (let i = 0; i < M.combos.length; i++) { const o = M.combos[i]; if (o.x - cx < bw && o.y - cy < bh && o.x + o.w > cx && o.y + o.h > cy) o2.drawImage(o.f[running ? ph : 0].c, o.x - cx, o.y - cy); }
-      o2.globalCompositeOperation = 'destination-out';
-      for (let i = 0; i < list.length; i++) { const e = list[i], s = e.s; if (e.act) o2.drawImage(s.c, Math.round(e.x - s.ax) - cx, Math.round(e.y - s.ay) - cy); }
-      o2.globalCompositeOperation = 'source-over';
-      c.globalAlpha = 0.28; c.drawImage(ovl, 0, 0); c.globalAlpha = 1;
-    }
+    // (the combo outlines are drawn once, solid, on the ground layer; fences and sprites in front simply cover them)
     if (stats.verifyNext) { stats.verifyNext = false; stats.actorCheck = verifyAnimals(c, cx, cy, bw, bh); }
     // quiet on-floor icons and progress bars
     const bar = (x, y, p) => { c.fillStyle = '#1d1a22'; c.fillRect(x - 10 * K - cx, y - cy, 20 * K, 4 * K); c.fillStyle = '#4a4458'; c.fillRect(x - 9 * K - cx, y + K - cy, 18 * K, 2 * K); c.fillStyle = '#7be36a'; c.fillRect(x - 9 * K - cx, y + K - cy, Math.round(18 * K * clamp(p || 0, 0, 1)), 2 * K); };
     for (const id in M.habs) {
       const h = M.habs[id], s = statuses[id]; if (!s) continue; if (h.top.x < L || h.top.x > Rr || h.top.y < T || h.top.y > B + 40 * K) continue;
       const ic = iconsOf(s), mk3 = h.mark || h.top, bx = mk3.x, by = mk3.y - HH - 9 * K;
-      if (ic.length) { const w2 = (ic.length * 12 + 2) * K; c.globalAlpha = 0.5; c.fillStyle = '#1d1a22'; c.fillRect(Math.round(bx - w2 / 2) - cx, by - 13 * K - cy, w2, 13 * K); c.fillRect(Math.round(bx - w2 / 2) + K - cx, by - 14 * K - cy, w2 - 2 * K, 15 * K); c.globalAlpha = 1; }
+      if (ic.length) { const w2 = (ic.length * 12 + 2) * K, X0 = Math.round(bx - w2 / 2) - cx, T0 = by - 14 * K - cy, H0 = 15 * K; c.fillStyle = '#5a5268'; c.fillRect(X0, T0 + K, w2, H0 - 2 * K); c.fillRect(X0 + K, T0, w2 - 2 * K, H0); c.fillStyle = '#1d1a22'; c.fillRect(X0 + K, T0 + 2 * K, w2 - 2 * K, H0 - 4 * K); c.fillRect(X0 + 2 * K, T0 + K, w2 - 4 * K, H0 - 2 * K); } // solid pill, lighter rim
       ic.forEach((n, i) => { const sp = spr('icon', n), bob = running ? Math.round(Math.sin(clock * (n === 'choice' ? 5 : 2.2) + h.top.x / K)) * K : 0; c.drawImage(sp.c, Math.round(bx + (i - (ic.length - 1) / 2) * 12 * K - sp.ax) - cx, by - K + bob - Math.round(sp.ay) - cy); });
       if (s.busy && s.progress != null) bar(bx, by + K, s.progress);
     }
@@ -799,12 +794,11 @@
     // floating pop-ups
     for (let i = 0; i < floaters.length; i++) {
       const f = floaters[i]; if (f.t < 0) continue; const k = f.t / 1.7, y = f.y - Math.round(20 * (1 - (1 - k) * (1 - k))) * K - cy; let x = f.x - cx;
-      c.globalAlpha = k > 0.7 ? Math.max(0, 1 - (k - 0.7) / 0.3) : 1;
+      if (k > 0.7 && Math.floor((k - 0.7) / 0.3 * 4) % 2 === 1) continue; // the end: on, off, on, off, gone (no fading)
       const tw = (f.icon ? f.icon.c.width + K : 0) + (f.txt ? f.txt.w : 0); x -= Math.round(tw / 2 / K) * K;
       if (f.icon) { c.drawImage(f.icon.c, x, y - f.icon.c.height); x += f.icon.c.width + K; }
       if (f.txt) c.drawImage(f.txt.c, x, y - f.txt.h - K);
     }
-    c.globalAlpha = 1;
     // crisp integer scale-up, with the camera's sub-pixel remainder applied in device pixels so scrolling stays smooth
     const ox = Math.round((cam.x - cx) * N), oy = Math.round((cam.y - cy) * N);
     ctx.imageSmoothingEnabled = false; ctx.drawImage(buf, 0, 0, bw, bh, -ox, -oy, bw * N, bh * N);
@@ -827,6 +821,15 @@
     return R;
   };
   R.setRunning = function (b) { running = !!b; };
+  // test hooks for the "nothing see-through" rule: watchAlpha(true) starts counting, alphaReport() gives the lowest globalAlpha any
+  // floor draw used, how many draws were seen, draws with an unusual blend mode, and pixels that are neither clear nor solid in the
+  // renderer's own baked pictures (combo and placement outlines, pop-up digits, the red cross)
+  R.watchAlpha = function (on) { stats.alphaWatch = !!on; if (on) { stats.alphaMin = 1; stats.alphaDraws = 0; stats.alphaOps = 0; } };
+  R.alphaReport = function () {
+    const own = []; if (M) M.combos.forEach(o => o.f.forEach(f => own.push(f))); if (P && P.outline) P.outline.f.forEach(f => own.push(f)); for (const k in textCache) own.push(textCache[k]); if (crossS) own.push(crossS);
+    let partial = 0; own.forEach(sp => { const d = sp.c.getContext('2d').getImageData(0, 0, sp.c.width, sp.c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i] > 0 && d[i] < 255) partial++; });
+    return { minAlpha: stats.alphaMin, draws: stats.alphaDraws, blendOps: stats.alphaOps, ownPartialPixels: partial, ownPictures: own.length };
+  };
   R.checkAnimals = function () { stats.actorCheck = null; stats.verifyNext = true; }; // test hook: the next frame checks every animal is drawn solid (see verifyAnimals); read debug().animalCheck
   R.mapChanged = function () { mapDirty = true; };
   R.reset = function () { clearActors(); if (P) R.stopPlacement(); }; // a new or loaded game: forget every actor and re-aim the camera
