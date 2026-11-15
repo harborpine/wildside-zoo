@@ -17,7 +17,7 @@ button { font: inherit; color: inherit; }
 
 /* ---------- page column ---------- */
 #app { position: fixed; top: 0; left: 0; right: 0; bottom: 0; margin: 0 auto; width: 100%; max-width: none; display: flex; flex-direction: column; background: var(--ink); overflow: hidden; box-shadow: 0 0 0 3px #0e170e; }
-#strip { flex: none; background: var(--ink); color: var(--cream); padding: calc(30px + var(--safe-t)) calc(10px + var(--safe-r)) 6px calc(10px + var(--safe-l)); border-bottom: 3px solid #000; }
+#strip { flex: none; background: var(--ink); color: var(--cream); padding: calc(16px + var(--safe-t)) calc(10px + var(--safe-r)) 6px calc(10px + var(--safe-l)); border-bottom: 3px solid #000; }
 .srow { display: flex; align-items: center; justify-content: space-between; min-height: 22px; gap: 8px; }
 .srow .date { font-size: 14px; letter-spacing: .02em; }
 .chipm { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; }
@@ -210,9 +210,11 @@ button, input, textarea { font-family: inherit; }
 #news { font-weight: 600; text-shadow: 1px 1px 0 #000; }   /* the only shadow left: text over the busy floor */
 
 /* installed app: nothing may clip the page; #app is a fixed box at least as tall as the screen (core.js sets the pixel height) */
-html.sa, html.sa body { height: auto; min-height: 0; overflow: visible; overscroll-behavior: none; }
-html.sa body { position: static; }
-html.sa #app { height: max(100vh, 100lvh); }
+/* iOS lays a home-screen app out SHORT by the status-bar height and clips anything "fixed" to that short box (the dark band at the bottom).
+   The cure is a real, in-flow page that is taller than that box: the page itself, not a fixed layer, must reach the bottom of the screen. */
+html.sa { height: auto; min-height: calc(100% + env(safe-area-inset-top, 0px)); overflow: visible; overscroll-behavior: none; }
+html.sa body { position: static; inset: auto; height: auto; min-height: calc(100vh + env(safe-area-inset-top, 0px)); overflow: visible; overscroll-behavior: none; }
+html.sa #app { position: relative; top: auto; bottom: auto; left: auto; right: auto; height: calc(100vh + env(safe-area-inset-top, 0px)); }
 /* the top strip: first line sits well below the status-bar fade; date as crisp as the money */
 .srow .date { color: #fff; font-weight: 700; opacity: 1; filter: none; }
 .chipm .v { color: #fff; }

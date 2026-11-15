@@ -515,7 +515,9 @@
         document.documentElement.classList.add('sa');
         const de = document.documentElement, vv = window.visualViewport;
         const h = Math.max(innerHeight, de.clientHeight, (vv && vv.height) || 0, iosApp ? Math.max(screen.height, screen.width) : 0);
-        app.style.height = h + 'px'; app.style.minHeight = h + 'px'; app.style.top = '0px'; app.classList.remove('vv');
+        // the page itself (html, body, #app all in normal flow) is made as tall as the screen: iOS clips fixed layers to its short layout box, never the page
+        app.style.height = h + 'px'; app.style.minHeight = h + 'px'; app.style.top = ''; app.classList.remove('vv');
+        de.style.minHeight = h + 'px'; document.body.style.minHeight = h + 'px';
         if (window.scrollY) window.scrollTo(0, 0);
       } else if (window.visualViewport) {
         const v = visualViewport; app.style.setProperty('--app-h', Math.round(v.height) + 'px'); app.style.setProperty('--app-top', Math.round(v.offsetTop) + 'px'); app.classList.add('vv');
@@ -523,6 +525,7 @@
     };
     window.addEventListener('resize', fit); window.addEventListener('orientationchange', () => setTimeout(fit, 150)); window.addEventListener('pageshow', fit); window.addEventListener('focus', fit);
     if (window.visualViewport && !STANDALONE) { visualViewport.addEventListener('resize', fit); visualViewport.addEventListener('scroll', fit); }
+    if (STANDALONE) window.addEventListener('scroll', () => { if (window.scrollY) window.scrollTo(0, 0); }, { passive: true });   // the tall page must never sit scrolled
     fit(); [150, 500, 1200, 3000].forEach(t => setTimeout(fit, t));
     document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else lastT = performance.now(); });
     window.addEventListener('pagehide', () => save());
