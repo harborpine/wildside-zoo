@@ -199,6 +199,17 @@ async function run(name) {
   console.log(' -- reveals');
   if (want('reveals')) {
   await fresh();
+  {
+    const f5 = await mkFound(1, 5);
+    await pushReport({ type: 'expedition', region: 'savanna', found: f5, rp: 1, fragment: 0, notes: [], ups: [], staff: [] });
+    await waitStack(s => s.stack.length > 0, 3000); await sleep(40);
+    const early = await ev(() => !!document.querySelector('.layer:not([hidden]) .mo-card.mo-rare'));
+    await sleep(1300);
+    const late = await ev(() => !!document.querySelector('.layer:not([hidden]) .mo-card.mo-rare'));
+    check(!early && late, 'a rare find does not show its gold frame before the stars pop (early ' + early + ', later ' + late + ')');
+    for (let g = 0; g < 4 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); }
+    await ev(() => ZT.popAll()); await sleep(150);
+  }
   for (const n of [1, 3, 5]) {
     const found = await mkFound(n);
     await pushReport({ type: 'expedition', region: 'savanna', found, rp: 14, fragment: n === 3 ? 2 : 0, notes: ['Field notes: +14 research.'], ups: n === 5 ? ['Ada', 'Ben'] : [], staff: [] });
@@ -478,6 +489,14 @@ async function run(name) {
       await waitStack(s => s.stack.length > 0, 3000); await sleep(500); await shot('choice-' + key + '-icons');
       const info = await ev(() => { const t = [...document.querySelectorAll('.layer:not([hidden]) .choices .btn.opt')].map(b => b.textContent); return { txt: t.join(' | '), imgs: document.querySelectorAll('.layer:not([hidden]) .choices .mo-det img').length }; });
       check(!/Charm|Energy|Smarts|Vigor|Wit/.test(info.txt) && info.imgs > 0, key + ' options show stat/skill symbols, no stat words (' + info.txt.slice(0, 120) + ' / ' + info.imgs + ' icons)');
+      if (key === 'boost') {   // suspense beat must not give the outcome away: neutral heading, neutral band, no result words
+        await page.locator('.layer:not([hidden]) .choices .btn.opt').first().tap(); await sleep(260);
+        const sus = await ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); const p = l.querySelector('.panel'); return { txt: l.textContent, title: (l.querySelector('.ptitle') || {}).textContent, bad: p.classList.contains('bad') || p.classList.contains('calm'), dots: !!l.querySelector('.mo-dots') }; });
+        check(sus.dots && !/worked|No luck|Good call|Setback/i.test(sus.txt) && !sus.bad, 'suspense beat shows no outcome (heading "' + sus.title + '", neutral band, dots)'); await shot('choice-suspense-neutral');
+        await sleep(1200);
+        const res = await ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); return (l.querySelector('.ptitle') || {}).textContent; });
+        check(/worked|No luck/.test(res), 'then heading, band and text switch together (' + res + ')');
+      }
       await ev(() => ZT.popAll()); await sleep(200);
     }
   }

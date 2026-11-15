@@ -74,14 +74,14 @@
 .mo-big { font-size: 42px; line-height: 1; }
 .mo-big small { font-size: 20px; color: var(--ink2); }
 .mo-good .mo-big, .mo-good.mo-big { color: var(--good); } .mo-bad .mo-big, .mo-bad.mo-big { color: var(--bad); } .mo-gold .mo-big, .mo-gold.mo-big { color: var(--gold-d); }
-.mo-hint { margin-top: 4px; font-size: 13px; color: var(--ink2); animation: blink 1.1s steps(2) infinite; }
+.mo-hint { margin-top: 4px; font-size: 13px; color: var(--ink2); animation: mo-blink 1.1s steps(2) infinite; }
 .mo-hint::after { content: " \\25BC"; font-size: 10px; }
 .mo-pic { height: 140px; display: flex; align-items: flex-end; justify-content: center; position: relative; }
 .mo-pic img { max-height: 100%; max-width: 100%; image-rendering: pixelated; }
 .mo-pic.small { height: 84px; } .mo-pic.tiny { height: 56px; }
 .mo-nopic { display: inline-block; width: 60px; height: 60px; background: var(--cream2); }
 .mo-in { animation: mo-pop .3s steps(5) both; animation-delay: var(--d, 0ms); }
-@keyframes mo-pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes mo-pop { from { transform: scale(.6); visibility: hidden; } to { transform: scale(1); visibility: visible; } }
 .mo-unveil { animation: mo-unveil var(--dur, .9s) steps(9) both; }
 @keyframes mo-unveil { 0%, 55% { filter: brightness(0); transform: scale(.82); } 75% { filter: brightness(2.2); transform: scale(1.14); } 100% { filter: none; transform: scale(1); } }
 .mo-shake { animation: mo-shake .4s steps(4) infinite; } @keyframes mo-shake { 25% { transform: translateX(-4px) rotate(-3deg); } 75% { transform: translateX(4px) rotate(3deg); } }
@@ -117,7 +117,7 @@
 .mo-row.compact .btn { min-height: 44px; min-width: 76px; font-size: 14px; }
 .mo-arrows { display: flex; gap: 12px; } .mo-arrows .up { color: var(--good); } .mo-arrows .dn { color: var(--bad); }
 .mo-fee { display: inline-flex; align-items: center; gap: 2px; font-size: 14px; color: var(--ink2); margin-right: 8px; } .mo-fee .mo-symg { height: 16px; }
-.mo-room { display: inline-flex; align-items: center; gap: 4px; font-size: 18px; min-width: 56px; justify-content: flex-end; } .mo-row.off { opacity: .45; } .mo-row.sel { background: #fff3b8; }
+.mo-room { display: inline-flex; align-items: center; gap: 4px; font-size: 18px; min-width: 56px; justify-content: flex-end; } .mo-row.off { background: #d9d0bc; color: #8a7f68; } .mo-row.off img { filter: grayscale(1); } .mo-row.sel { background: #fff3b8; }
 .mo-det {display: flex; align-items: center; gap: 4px; font-size: 15px; } .mo-det .mo-symg { height: 20px; }
 .mo-optbody .lbl { font-size: 17px; } .mo-optbody .meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .mo-optbody .sub { font-size: 13px; color: var(--ink2); }
 .mo-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
@@ -148,8 +148,9 @@
 .mo-optpic img { height: 52px; width: auto; max-width: 64px; image-rendering: pixelated; flex: none; }
 .mo-dots { font-size: 44px; letter-spacing: 8px; line-height: 1; color: var(--ink2); }
 .mo-dots i { font-style: normal; display: inline-block; animation: mo-dot .6s steps(2) infinite; } .mo-dots i:nth-child(2) { animation-delay: .15s; } .mo-dots i:nth-child(3) { animation-delay: .3s; }
-@keyframes mo-dot { 50% { transform: translateY(-8px); opacity: .4; } }
-.mo-crate { width: 110px; height: 90px; background: #b9803f; position: relative; box-shadow: 0 0 0 3px var(--bd), inset 0 -8px 0 rgba(0,0,0,.2), inset 0 6px 0 rgba(255,255,255,.2); margin-top: 16px; }
+@keyframes mo-blink { 50% { color: #c4b48a; } }
+@keyframes mo-dot { 50% { transform: translateY(-8px); } }
+.mo-crate { width: 110px; height: 90px; background: #b9803f; position: relative; box-shadow: 0 0 0 3px var(--bd), inset 0 -8px 0 #9a6a30, inset 0 6px 0 #cfa066; margin-top: 16px; }
 .mo-crate::before { content: "?"; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 56px; color: var(--gold); text-shadow: 1px 1px 0 var(--bd); }
 .mo-crate::after { content: ""; position: absolute; left: -3px; right: -3px; top: 20px; height: 8px; background: #7a5226; box-shadow: 0 0 0 2px var(--bd); }
 .mo-row { display: flex; align-items: center; gap: 8px; width: 100%; background: var(--paper); box-shadow: 0 0 0 2px var(--line); padding: 5px 8px 5px 5px; min-height: 56px; text-align: left; }
@@ -172,7 +173,7 @@
 .mo-awards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
 .mo-award { background: var(--paper); box-shadow: 0 0 0 2px var(--bd); padding: 8px 6px; min-height: 76px; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
 .mo-award i { font-style: normal; font-size: 13px; } .mo-award b { font-size: 16px; color: #9a8a70; } .mo-award small { font-size: 11px; color: var(--ink2); }
-.mo-award.won { background: #fff3b8; box-shadow: 0 0 0 3px var(--gold-d); } .mo-award.won b { color: var(--gold-d); } .mo-award.lost { opacity: .75; }
+.mo-award.won { background: #fff3b8; box-shadow: 0 0 0 3px var(--gold-d); } .mo-award.won b { color: var(--gold-d); } .mo-award.lost { background: #e8dfca; }
 .mo-award.mo-hid { visibility: hidden; }
 .mo-award:last-child { grid-column: 1 / -1; }
 .mo-score { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 6px 10px; background: var(--paper); box-shadow: 0 0 0 2px var(--line); font-size: 15px; }
@@ -346,7 +347,7 @@
       render(card, st) {
         const T = ms => ms * scale;
         st.t = T;
-        card.classList.toggle('mo-rare', r >= 4);
+        if (r >= 4) st.at(T(120 + r * 110), () => card.classList.add('mo-rare'));
         if (o.kicker) card.appendChild(el('div', { cls: 'mo-kicker' }, o.kicker));
         const stars = ui.stars(r, r); stars.classList.add('big'); const sw = el('div', { cls: 'mo-stars' }, stars);
         [].forEach.call(stars.children, (c, k) => st.anim(c, T(120 + k * 110)));
@@ -482,10 +483,13 @@
     return open(spec.id, (body, M, api) => {
       if (M.result) {
         const r = M.result, odds = M.optOdds != null, tone = r.good ? 'good' : 'bad';
-        M.tone(r.good ? 'good' : (spec.bad ? 'calm' : 'bad')); api.setTitle(r.good ? (odds ? 'It worked!' : 'Good call') : (odds ? 'No luck' : 'Setback'));
+        const revealTone = r.good ? 'good' : (spec.bad ? 'calm' : 'bad'), revealTitle = r.good ? (odds ? 'It worked!' : 'Good call') : (odds ? 'No luck' : 'Setback');
+        if (odds) { M.tone(''); api.setTitle(M.optLabel || spec.title || ''); } else { M.tone(revealTone); api.setTitle(revealTitle); }
         const steps = [];
         if (odds) steps.push({ ms: 750, anim: 650, render(card, st) { card.appendChild(el('div', { cls: 'mo-line hi' }, M.optLabel || '')); card.appendChild(el('div', { cls: 'mo-dots' }, el('i', '.'), el('i', '.'), el('i', '.'))); } });
-        steps.push(cardStep({ tone: tone, img: iUrl(r.good ? 'star' : 'sick', 8), imgCls: 'small', lines: [r.text || ''], anim: 400 }));
+        const rs = cardStep({ tone: tone, img: iUrl(r.good ? 'star' : 'sick', 8), imgCls: 'small', lines: [r.text || ''], anim: 400 }), r0 = rs.render;
+        rs.render = function (card, st, i) { M.tone(revealTone); api.setTitle(revealTitle); r0.call(this, card, st, i); };   // title, band and text change together
+        steps.push(rs);
         sequence(M, body, steps); return;
       }
       if (spec.valid && !spec.valid()) { M.end(); return; }
@@ -1005,7 +1009,7 @@
     const steps = candidates.map((c, k) => {
       const R = D.ROLES[c.role] || { name: c.role, main: 'care' };
       return { ms: ms, anim: ms * 0.92, render(card, st) {
-        const T = x => x * f; card.classList.toggle('mo-rare', !!c.star);
+        const T = x => x * f; if (c.star) st.at(T(750), () => card.classList.add('mo-rare'));
         card.appendChild(el('div', { cls: 'mo-kicker' }, 'Applicant ' + (k + 1) + ' of ' + n));
         const p = pic(pUrl(c.role, 5), 'mo-unveil'); p.style.setProperty('--dur', (T(800) / 1000) + 's'); card.appendChild(el('div', { cls: 'mo-pic small' }, p));
         card.appendChild(st.anim(el('div', { cls: 'mo-title' }, c.name), T(550)));
