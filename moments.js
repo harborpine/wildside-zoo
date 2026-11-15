@@ -319,7 +319,7 @@
           const r = Z.act('upgrade', c.hab);
           if (r && r.ok) { const k = Z.act('keepArrival', id, c.hab); if (k && k.ok) { ui.toast(animalName(f) + ' joins ' + label, 'good'); afterDecision(); } else whereList(card, st, f, afterDecision); }
         }, { cls: 'blue', disabled: !!why, sub: why || (newCap ? '→ ' + newCap : null), onDisabled: () => ui.toast(why, 'bad') });
-        const rowF = el('div', { cls: 'mo-row compact' }, left, el('div', { cls: 'mid' }, el('span', { cls: 't' }, label, ' ', 'Full')), el('span', { cls: 'mo-room' }, sym('habitat', '', 'room', 3), el('b', '0')), up);
+        const rowF = el('div', { cls: 'mo-row compact' }, left, el('div', { cls: 'mid' }, el('span', { cls: 't' }, label)), el('span', { cls: 'mo-room', style: { minWidth: '0' } }, sym('habitat', '', 'room', 3), el('b', '0')), up);
         rows.appendChild(rowF); return;
       }
       const row = el('div', { cls: 'mo-row compact tap' + (c.fit ? '' : ' off') + (c.best ? ' sel' : '') }, left,

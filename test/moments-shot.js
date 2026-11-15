@@ -681,7 +681,7 @@ async function run(name) {
         ZMoments.showArrival(9499);
       });
       await sleep(2400); await page.locator('.mo-foot .btn.primary').tap(); await sleep(450); await shot('where-upgrade');
-      check(await ev(() => !!document.querySelector('.layer:not([hidden]) .mo-row .btn.blue') && /Full/.test(document.querySelector('.layer:not([hidden])').textContent)), 'a full habitat shows Full and an inline Upgrade button');
+      check(await ev(() => [...document.querySelectorAll('.layer:not([hidden]) .mo-row')].some(r => r.querySelector('.btn.blue') && (r.querySelector('.mo-room b') || {}).textContent === '0')), 'a full habitat shows room 0 and an inline Upgrade button');
       await page.locator('.layer:not([hidden]) .mo-row .btn.blue').first().tap(); await sleep(700);
       check(await ev(() => { const h = ZE.item(ZT.S, window.__hab); return h.lvl === 2 && ZE.habCap(h) > window.__cap0 && ZT.S.arrivals.length === 0 && ZT.S.animals.some(a => a.id === 9499 && a.hab === window.__hab) && ZT.stack().length === 0; }), 'Upgrade, then the animal is placed there in the same tap (capacity went up)');
       // not possible: max level shows a short reason and stays greyed

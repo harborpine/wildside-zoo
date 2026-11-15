@@ -41,7 +41,9 @@ const engine = process.argv[2] === 'webkit' ? 'webkit' : 'chromium';
   say('== leave the land bare... (actually with the stand only) and let 20 weeks pass at speed 2');
   await menu(); await T.tapText('System'); await T.tapText('2x'); await toFloor();
   const w0 = await page.evaluate(() => ZT.S.week), mm0 = await money(); const t0 = Date.now(); const pops = [];
-  while (Date.now() - t0 < 130000) { const s = await st(); if (s.week - w0 >= 20) break; if (s.stack.length) { pops.push(s.stack.join('>') + '@' + s.week); await look('unexpected-screen-w' + s.week); await T.tapText(/./, { sel: '.back' }) || await T.tapXY(195, 440); } await sleep(1000); }
+  while (Date.now() - t0 < 130000) { const s = await st(); if (s.week - w0 >= 20) break; if (s.stack.length) { const top = s.stack[s.stack.length - 1], own = /^(mo-hire|staff-candidates|mo-choice|mo-expedition|mo-animal)$/.test(top); // results of the expedition and the job advert this script started itself are expected (hiring is timed; finds must be sold or kept, so sell them)
+      if (own) { await look('own-job-result-w' + s.week); if (!(await T.tapText(/^\$/, { sel: 'button, .btn', wait: 400 }))) if (!(await T.tapText(/^(Tap to continue|Play safe)$/, { wait: 400 }))) await T.tapText(/./, { sel: '.back' }) || await T.tapXY(195, 440); }
+      else { pops.push(s.stack.join('>') + '@' + s.week); await look('unexpected-screen-w' + s.week); await T.tapText(/./, { sel: '.back' }) || await T.tapXY(195, 440); } } await sleep(1000); }
   const w1 = await page.evaluate(() => ZT.S.week); say('   weeks passed:', w1 - w0, 'money', mm0, '->', await money(), 'pop-ups while waiting:', JSON.stringify(pops), 'visitors/strip:', await page.evaluate(() => document.getElementById('strip').innerText.replace(/\n/g, ' ')));
   if (pops.length) T.find('wait:popups', 'something opened while the land had no habitat: ' + pops.join(', ')); await snap('after-20-weeks'); await inv('after waiting', { expectClosed: true });
   say('== now build the habitat');
