@@ -114,7 +114,7 @@
     if (!noOutline) this.outline();
     var w = this.w, h = this.h, d = this.d, x, y, sd = null, a0 = 0, sc = [24, 44, 24];
     if (shadow) {
-      sd = new Uint8Array(w * h); a0 = Math.round((shadow[3] || 0.24) * 255); if (shadow[2]) sc = shadow[2];
+      sd = new Uint8Array(w * h); var ss = solidShade(shadow); sc = ss.c; a0 = ss.dith ? 1 : 0;
       for (y = -shadow[1]; y <= shadow[1]; y++) for (x = -shadow[0]; x <= shadow[0]; x++) {
         var ex = x / (shadow[0] + 0.4), ey = y / (shadow[1] + 0.4);
         if (ex * ex + ey * ey <= 1) { var px = x + this.ox + (shadow[4] || 0), py = y + this.oy - 1 + (shadow[5] || 0); if (px >= 0 && py >= 0 && px < w && py < h) sd[py * w + px] = 1; }
@@ -129,11 +129,18 @@
       var v = d[(y + y0) * w + x + x0], j = (y * cw + x) * 4, col = null;
       if (v > 0) col = this.cols[(v - 1) >> 2][(v - 1) & 3]; else if (v < 0) col = o;
       if (col) { q[j] = col[0]; q[j + 1] = col[1]; q[j + 2] = col[2]; q[j + 3] = 255; }
-      else if (sd && sd[(y + y0) * w + x + x0]) { q[j] = sc[0]; q[j + 1] = sc[1]; q[j + 2] = sc[2]; q[j + 3] = a0; }
+      else if (sd && sd[(y + y0) * w + x + x0] && (!a0 || ((x + x0 - this.ox + y + y0 - this.oy) & 1) === 0)) { q[j] = sc[0]; q[j + 1] = sc[1]; q[j + 2] = sc[2]; q[j + 3] = 255; }
     }
     g.putImageData(im, 0, 0);
     return { c: c, w: cw, h: ch, ax: this.ox - x0, ay: this.oy + 1 - y0 };
   };
+  // nothing in the game is see-through: a ground shadow is solid pixels, dithered in a checkerboard when it should read as light.
+  // The colour is what the old soft shadow looked like over grass (or over water, for a coloured water shadow).
+  function solidShade(shadow) {
+    var a = shadow[3] || 0.24, sc = shadow[2] || [24, 44, 24], bg = shadow[2] ? [74, 163, 216] : [134, 201, 78];
+    if (a >= 0.6) return { c: sc, dith: false };
+    var f = Math.min(0.85, a * 2); return { c: [0, 1, 2].map(function (i) { return Math.round(bg[i] + (sc[i] - bg[i]) * f); }), dith: true };
+  }
   function flipSprite(s) {
     var c = document.createElement('canvas'); c.width = s.w; c.height = s.h;
     var g = c.getContext('2d'); g.translate(s.w, 0); g.scale(-1, 1); g.drawImage(s.c, 0, 0);
@@ -1756,7 +1763,7 @@
       for (ii = 0; ii < ring.length; ii++) d2[ring[ii]] = -1; } }
     var W = this.W, H = this.H, d = this.d, K = this.K, sd = null, a0 = 0, sc = [24, 44, 24], x, y;
     if (shadow) {
-      sd = new Uint8Array(W * H); a0 = Math.round((shadow[3] || 0.24) * 255); if (shadow[2]) sc = shadow[2];
+      sd = new Uint8Array(W * H); var ss = solidShade(shadow); sc = ss.c; a0 = ss.dith ? 1 : 0;
       var e = 0.5 - 0.5 / K, Rx = shadow[0] + 0.4 + e, Ry = shadow[1] + 0.4 + e, cx = (shadow[4] || 0), cy = -1 + (shadow[5] || 0);
       for (y = 0; y < H; y++) for (x = 0; x < W; x++) { var ex = (this.fx(x) - cx) / Rx, ey = (this.fy(y) - cy) / Ry; if (ex * ex + ey * ey <= 1) sd[y * W + x] = 1; }
     }
@@ -1769,7 +1776,7 @@
       var v = d[(y + y0) * W + x + x0], j = (y * cw + x) * 4, col = null;
       if (v > 0) col = this.cols[(v - 1) >> 2][(v - 1) & 3]; else if (v < 0) col = o;
       if (col) { q[j] = col[0]; q[j + 1] = col[1]; q[j + 2] = col[2]; q[j + 3] = 255; }
-      else if (sd && sd[(y + y0) * W + x + x0]) { q[j] = sc[0]; q[j + 1] = sc[1]; q[j + 2] = sc[2]; q[j + 3] = a0; }
+      else if (sd && sd[(y + y0) * W + x + x0] && (!a0 || ((x + y + y0 + x0) & 1) === 0)) { q[j] = sc[0]; q[j + 1] = sc[1]; q[j + 2] = sc[2]; q[j + 3] = 255; }
     }
     g.putImageData(im, 0, 0);
     return { c: cv, w: cw, h: ch, ax: this.X(0) - x0, ay: this.Y(1) - y0, K: K };

@@ -18,7 +18,8 @@ function check(dens) { // runs in the page
   }
   const G = window.ZGeo, G1 = window.__G1 || G;
   const one = fn => { if (dens !== 2) return null; window.ZGeo = G1; S.setDensity(1); const r = fn(); window.ZGeo = G; S.setDensity(2); return r; };
-  const ok = s => s && s.c && s.w > 0 && s.h > 0 && typeof s.ax === 'number' && typeof s.ay === 'number' && s.d === dens;
+  let half = 0; const RB = document.createElement('canvas'), RG = RB.getContext('2d', { willReadFrequently: true }); const solid = s => { RB.width = s.c.width; RB.height = s.c.height; RG.drawImage(s.c, 0, 0); const d = RG.getImageData(0, 0, s.c.width, s.c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i] > 0 && d[i] < 255) return false; return true; };
+  const ok = s => s && s.c && (solid(s) || (half++, false)) && s.w > 0 && s.h > 0 && typeof s.ax === 'number' && typeof s.ay === 'number' && s.d === dens;
   const about = (a, b, name) => { if (!b) return; const r = a / b; if (r < 1.5 || r > 2.5) bad.push(name + ' is not about twice the density-1 size (' + a + ' vs ' + b + ')'); };
   const fb = S.animal('no-such-animal', {});
   const same = (a, b) => a.w === b.w && a.h === b.h && a.c.toDataURL() === b.c.toDataURL();
@@ -56,6 +57,7 @@ function check(dens) { // runs in the page
   if (dens === 2) { const lion = S.animal('lion', {}); window.__urlCheck = [S.animalUrl('lion', {}, 4), lion.w * 2, lion.h * 2]; }
   if (!S.PALETTE || !S.PALETTE.ink) bad.push('PALETTE');
   const sizes = D.SPECIES_LIST.map(sp => { const a = S.animal(sp.id, {}); return sp.id + ' ' + a.w + 'x' + a.h; });
+  if (half) bad.push(half + ' sprites have half see-through pixels (nothing may be see-through)');
   return { bad, species: D.SPECIES_LIST.length, ms: Math.round(performance.now() - t0), sizes };
 }
 (async () => {
