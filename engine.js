@@ -125,6 +125,7 @@
     return s;
   }
   const BASIC = Object.keys(D.ROLES).filter(r => !D.ROLES[r].adv);
+  const hireRole = () => pick(D.HIRE_ROLES); // keepers twice: the share of animal carers the old keeper + vet mix had
   function oppositeIfLonely(S, a) { // make pairs easier to find
     const own = S.animals.filter(x => x.sp === a.sp);
     if (own.length && own.every(x => x.sex === own[0].sex)) a.sex = own[0].sex === 'M' ? 'F' : 'M';
@@ -156,7 +157,7 @@
   }
   function callerArrive(S) {
     const n = S.callerN = (S.callerN || 0) + 1, kind = n % 4 === 2 ? 'headhunter' : n % 4 === 0 ? 'director' : 'trader';
-    if (kind === 'headhunter') { S.headhunt = makeStaff(S, pick(BASIC), 22 + Z.rank(S) * 5); S.headhuntAt = S.week; } else rollOffers(S, kind);
+    if (kind === 'headhunter') { S.headhunt = makeStaff(S, hireRole(), 22 + Z.rank(S) * 5); S.headhuntAt = S.week; } else rollOffers(S, kind);
     ev(S, 'caller', { kind: kind }); report(S, { type: 'caller', kind: kind });
   }
   // Callers standing at the gate right now (they stay 5 weeks; their offers stay open until the next one of that kind arrives).
@@ -557,7 +558,7 @@
   };
   function finishHiring(S) {
     const H = S.hiring, T = D.HIRE_TIERS.find(t => t.key === H.tier) || D.HIRE_TIERS[0];
-    const q = 8 + Z.rank(S) * 5 + T.q, roles = BASIC.slice().sort(() => Math.random() - 0.5);
+    const q = 8 + Z.rank(S) * 5 + T.q, roles = D.HIRE_ROLES.slice().sort(() => Math.random() - 0.5);
     S.hiring = null; S.candidates = []; S.candAt = S.week;
     for (let n = 0; n < T.n; n++) {
       const star = Math.random() < T.star, s = makeStaff(S, roles[n % roles.length], q + ri(-3, 6) + (star ? 12 : 0));
@@ -800,7 +801,7 @@
       const key = pick(keys);
       if (key === 'tracks') return Object.assign(base, { key: key, title: 'Fresh tracks', text: 'Something rare passed this way.', def: 1, options: [{ label: 'Follow them', note: 'Rarer find, or 1 week late', odds: 0.65 }, { label: 'Play safe' }] });
       if (key === 'guide') return Object.assign(base, { key: key, title: 'Local guide', text: 'A guide offers to help.', def: 1, options: [{ label: 'Hire the guide', note: 'Stronger team', cost: price(p.cost * 0.3) }, { label: 'No thanks' }] });
-      if (key === 'camp') return Object.assign(base, { key: key, title: 'One more camp?', text: 'The team could stay longer.', def: 1, options: [{ label: 'Stay a week', note: '1 week late, 1 extra find' }, { label: 'Head home' }] });
+      if (key === 'camp') return Object.assign(base, { key: key, title: 'One more camp?', text: 'The team could stay longer.', def: 1, options: [{ label: 'Stay a week', note: '1 week late, rarer find' }, { label: 'Head home' }] });
       return Object.assign(base, { key: key, title: 'River crossing', text: 'A shortcut across the river.', def: 1, options: [{ label: 'Cross', note: 'Home 1 week sooner, or 1 week late', odds: 0.7 }, { label: 'Go around' }] });
     }
     if (p.type === 'breed') {
@@ -836,7 +837,7 @@
     const k = c.key;
     if (k === 'tracks' && i === 0) { if (win) { p.luck = 1; p.power *= 1.25; text = 'The trail is warm. Something rare is close.'; } else { p.end++; good = false; text = 'The trail went cold. 1 week lost.'; } }
     else if (k === 'guide' && i === 0) { p.power *= 1.3; text = 'The guide knows every path.'; }
-    else if (k === 'camp' && i === 0) { p.end++; p.extra = (p.extra || 0) + 1; text = 'One more week in the field.'; }
+    else if (k === 'camp' && i === 0) { p.end++; p.power *= 1.3; text = 'One more week in the field.'; } // better rarity odds, never an extra animal
     else if (k === 'river' && i === 0) { if (win) { p.end = Math.max(S.week + 1, p.end - 1); text = 'Across safely. Home a week sooner.'; } else { p.end++; good = false; text = 'The water was too high. 1 week lost.'; } }
     else if (k === 'vet' && i === 0) { p.chance += 0.15; p.bonus += 2; text = 'The vet is pleased with them.'; }
     else if (k === 'diet' && i === 0) { p.pv += 0.08; text = 'They love the new feed.'; }
@@ -881,7 +882,7 @@
     const B = D.BIOMES[p.region], ratio = p.power / B.diff;
     const found = [], notes = [];
     const pool = D.SPECIES_LIST.filter(s => s.biome === p.region);
-    const n = 1 + (Math.random() < Math.min(0.5, 0.15 * ratio) ? 1 : 0) + (p.extra || 0);
+    const n = Math.random() < D.EXP_TWO ? 2 : 1; // 1 animal 80% of the time, 2 animals 20%, whatever the team, budget or region
     for (let i = 0; i < n; i++) {
       let sp = rollFind(S, pool, ratio);
       if (p.luck && i === 0) { const sp2 = rollFind(S, pool, ratio); if (sp2.rarity > sp.rarity) sp = sp2; }
@@ -916,7 +917,7 @@
     }
     const kids = [], n = Math.random() < 0.18 ? 2 : 1;
     const bonus = Z.breedBonus(S, lead) + (p.bonus || 0);
-    let pv = 0.03 + Z.genBonus(S) * 0.02 + (lead.role === 'vet' || lead.role === 'zoologist' ? 0.03 : 0);
+    let pv = 0.03 + Z.genBonus(S) * 0.02 + (lead.role === 'zoologist' ? 0.03 : lead.role === 'keeper' ? D.KEEPER_VARIANT : 0);
     if (a.variant && b.variant) pv = 0.85; else if (a.variant || b.variant) pv = 0.4;
     pv = Math.min(0.95, pv + (p.pv || 0));
     const firstBred = !S.book[a.sp].bred;
@@ -1092,7 +1093,7 @@
   // For tests and for building the pop-up screens: force a moment to happen right now.
   Z.debug = {
     happening: (S, key) => { S.happening = null; const ok = rollHappening(S, key); Z.refresh(S); return ok; },
-    caller: (S, kind) => { if (kind === 'headhunter') { S.headhunt = makeStaff(S, pick(BASIC), 22 + Z.rank(S) * 5); S.headhuntAt = S.week; } else rollOffers(S, kind); report(S, { type: 'caller', kind: kind }); return true; },
+    caller: (S, kind) => { if (kind === 'headhunter') { S.headhunt = makeStaff(S, hireRole(), 22 + Z.rank(S) * 5); S.headhuntAt = S.week; } else rollOffers(S, kind); report(S, { type: 'caller', kind: kind }); return true; },
     yearly: (S, id) => { if (id === 'show') openShow(S); else yearlyPlan(S, id); return true; }
   };
   function applyHappening(S, i, auto) {
@@ -1338,6 +1339,10 @@
     if (!Array.isArray(S.candidates)) S.candidates = [];
     if (S.offers && S.offers.kind === 'trader' && S.offers.crateRarity == null) { S.offers.crateRarity = rollCrateRarity(S); if (S.offers.crates) S.offers.crates = D.CRATES_PER_VISIT; }
     if (S.offers && S.offers.crateRarity === undefined) S.offers.crateRarity = null;
+    // the Vet staff role was merged into the Keeper: same person, level, xp and skills
+    const unVet = s => { if (!s) return; if (s.role === 'vet') s.role = 'keeper'; if (Array.isArray(s.mastered)) s.mastered = s.mastered.map(r => r === 'vet' ? 'keeper' : r).filter((r, i, l) => l.indexOf(r) === i); };
+    (S.staff || []).forEach(unVet); S.candidates.forEach(unVet); unVet(S.headhunt);
+    (S.projects || []).forEach(p => { if (p.choice && p.choice.who === 'vet') p.choice.who = 'keeper'; });
     // an arrival left undecided when the app closed stays pending (the screens can offer it again from S.arrivals);
     // the tick houses it the classic way D.ARRIVAL_WEEKS after it came, so nothing waits forever
     Z.refresh(S); return S;

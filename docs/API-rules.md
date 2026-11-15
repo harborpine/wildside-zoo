@@ -131,6 +131,32 @@ rank, `D.CRATE_VISIT` by rank band 1-2, 3-4, 5-6, 7-8, 9-10, rarities 1..5). The
 
 `S.arrivals` (`[]`), `S.hiring` (`null`), `S.offers.crateRarity`, habitat `closedUntil` (missing = 0).
 
+### R5.8 The Vet staff role is merged into the Keeper
+
+- **Gone:** the staff role key `'vet'` (`ZD.ROLES.vet`). No staff member, applicant, headhunter offer or job option is ever a
+  vet now, so no screen or art needs a `vet` staff role name or portrait any more.
+- **Keeper** (`ZD.ROLES.keeper`) is the one animal-care role: `main: 'care'`, **`second: 'sci'`** (new), and its own perk:
+  when a keeper leads a breeding pair the rare-variant chance rises by `D.KEEPER_VARIANT` (0.01; the old vet perk, retuned so
+  rare variants per run stay where they were). New short description. Head Zoologist keeps its own bigger perk (0.03).
+- **Advanced roles:** Head Zoologist `req: [['keeper'], ['researcher']]` (was keeper and vet-or-researcher); Expedition Leader
+  `req: [['explorer'], ['keeper']]` (was explorer and keeper-or-vet); Showrunner unchanged (`[['guide'], ['researcher', 'keeper']]`).
+  `ZE.jobOptions` lists only roles that exist.
+- **Hiring:** adverts and the headhunter roll from `D.HIRE_ROLES` (keeper listed twice), so about the same share of new staff
+  are animal carers as when keepers and vets were separate.
+- **Old saves:** `deserialize` turns every staff member, applicant (`S.candidates`) and headhunter offer (`S.headhunt`) with
+  role `'vet'` into a keeper, keeping level, xp and every skill; `'vet'` in a `mastered` list becomes `'keeper'` (no duplicates).
+  A waiting project choice whose `who` was `'vet'` shows a keeper. `S.v` stays 3.
+- **Not changed** (these are not the staff role): the Vet Clinic facility (`fac:vet`, `ZD.FAC.vet`, `ZE.c(S).vet`), the breeding
+  choice key `vet` ("Call the vet?"), and the happening person kind `'vet'` (`ZD.WHO`, the visitor in the `cold` happening).
+
+### R5.9 Expeditions bring back 1 animal, sometimes 2
+
+- `expedition` report `found[]` has **1 entry 80% of the time and 2 entries 20%** (`D.EXP_TWO` = 0.2), whatever the team,
+  budget or region. Team strength and budget still shape rarity and stats; map pieces and secret regions are unchanged.
+  (Before: about 55% one, 40% two, 5% three.) A `found` list is never empty and never longer than 2.
+- The mid-expedition `camp` choice no longer adds a find: "Stay a week" now means 1 week late, **rarer find** (team strength
+  x1.3); its note reads `'1 week late, rarer find'`. `tracks` (rarer find) is unchanged.
+
 ## 0. Ground rules
 
 - One state object `S`. `ZE.tick(S)` advances one week. Never change `S` directly from the interface (except emptying
@@ -386,7 +412,7 @@ a `choice` report, check `ZE.project(S, pid)` still exists and still has `.choic
 |---|---|---|---|
 | Expedition | half way | `tracks` | Follow them (odds; rarer find, or 1 week late) / Play safe |
 | | | `guide` | Hire the guide (cost; stronger team) / No thanks |
-| | | `camp` | Stay a week (1 week late, 1 extra find) / Head home |
+| | | `camp` | Stay a week (1 week late, rarer find: team strength x1.3) / Head home |
 | | | `river` | Cross (odds; 1 week sooner, or 1 week late) / Go around |
 | Breeding | half way | `vet` | Call the vet (cost; better odds, stronger baby) / Wait and see |
 | | | `diet` | Try it (costRp; rare variant more likely) / Skip it |
@@ -403,7 +429,7 @@ a `choice` report, check `ZE.project(S, pid)` still exists and still has `.choic
 | `caller` | `kind: 'trader'|'director'|'headhunter'`. Then read `S.offers` (and `ZE.crateInfo(S)`) or `S.headhunt`. Dismissing needs no engine call |
 | `choice` | `pid` (section 5) |
 | `happening` | `key, title, text, bad:boolean, who?, hab?, animal?, newAnimal?, options?` (section 7) |
-| `expedition` | `region, found:[{id, sp, sex, rarity, isNew, variant, charm, vigor, wit, hab:null, pending:true, price}], rp, fragment, notes:[...], ups:[names who levelled up], staff:[ids]`. **Reveal order:** for each entry of `found` in order: rarity (and `isNew`), then species and variant, then the three stats, then Sell (`price`) / Keep and where (R5.2); `hab` is always `null` now. Then `rp` (research from field notes) and, if `fragment > 0`, "map piece `fragment` of 4" |
+| `expedition` | `region, found:[{id, sp, sex, rarity, isNew, variant, charm, vigor, wit, hab:null, pending:true, price}], rp, fragment, notes:[...], ups:[names who levelled up], staff:[ids]`. `found` has 1 entry (80%) or 2 (20%), see R5.9. **Reveal order:** for each entry of `found` in order: rarity (and `isNew`), then species and variant, then the three stats, then Sell (`price`) / Keep and where (R5.2); `hab` is always `null` now. Then `rp` (research from field notes) and, if `fragment > 0`, "map piece `fragment` of 4" |
 | `secret` | `region: 'paleo'|'mythic'` (a secret region opened; comes right after the expedition report for paleo) |
 | `birth` | `fail:boolean, a, b` (parent ids), `lead` (staff id), `sp, chance` (success chance that applied), `kids:[...]`, and when it worked `twins, firstBred`. Each kid: `{id, sp, sex, name, hab, rolls:[{stat, parents, value, delta, lucky}], variantChance, variant}`. **Reveal order:** for each kid: the three `rolls` in order (charm, vigor, wit): show `parents` (the parents' average), count to `value`, flag `lucky` (a lucky jump of 6 to 10); then the variant roll: show `variantChance`, then `variant`. Each kid also has `hab: null, pending: true, suggest` (the parents' habitat) and `price`: after the reveal, run Sell / Keep / where for it (R5.2) |
 | `review` | `hab, biome, theme, aff 0..3, fitWord, firstTime` (first time this theme met this biome), `sc:{animals, habitat, fun, learning}`, `critics:[{key, name, score}]`, `total, hof, repeat, fired, star, boost, money, rep, rp, lead`. **Reveal order:** the four `critics` in array order, one at a time, each out of 10; then `total` out of 40; then the Hall of Fame moment if `hof` (34 or more); then rewards `money, rep, rp`. `star` is `null` or `{animal, stat, score, gain}` (that animal may have been sold since: guard the lookup); `boost` is `null` or `{good, score, amt, big}` |

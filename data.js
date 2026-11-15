@@ -149,16 +149,18 @@
   D.TECH_ORDER = ['hab3', 'mkt1', 'gen1', 'gear1', 'pen', 'incub', 'hab4', 'jeep', 'mkt2', 'gen2', 'gear2', 'hab5', 'mkt3', 'gen3'];
 
   D.ROLES = {
-    keeper:     { name: 'Keeper',     main: 'care',  desc: 'Best at breeding and animal care.' },
-    vet:        { name: 'Vet',        main: 'care',  second: 'sci', desc: 'Raises the chance of rare variants when leading a breeding pair.' },
+    keeper:     { name: 'Keeper',     main: 'care',  second: 'sci', desc: 'Animal care and breeding. Rare variants a bit likelier when leading a pair.' },
     researcher: { name: 'Researcher', main: 'sci',   desc: 'Produces 50% more research on zoo duty.' },
     explorer:   { name: 'Explorer',   main: 'exp',   desc: 'Expeditions with an explorer finish a week sooner.' },
     guide:      { name: 'Guide',      main: 'charm', desc: 'Best at leading exhibit events.' },
-    zoologist:  { name: 'Head Zoologist',   main: 'care',  second: 'sci',  adv: true, req: [['keeper'], ['vet', 'researcher']], desc: 'Breeding succeeds more often and babies come out stronger.' },
-    leader:     { name: 'Expedition Leader', main: 'exp',  second: 'care', adv: true, req: [['explorer'], ['keeper', 'vet']], desc: 'Expedition teams are 15% stronger and a week faster.' },
+    zoologist:  { name: 'Head Zoologist',   main: 'care',  second: 'sci',  adv: true, req: [['keeper'], ['researcher']], desc: 'Breeding succeeds more often and babies come out stronger.' },
+    leader:     { name: 'Expedition Leader', main: 'exp',  second: 'care', adv: true, req: [['explorer'], ['keeper']], desc: 'Expedition teams are 15% stronger and a week faster.' },
     showrunner: { name: 'Showrunner',       main: 'charm', second: 'sci',  adv: true, req: [['guide'], ['researcher', 'keeper']], desc: 'Events gain a point of Fun and a point of Learning.' }
   };
   D.JOB_LEVEL = 8; // level needed before someone can change jobs
+  D.KEEPER_VARIANT = 0.01; // rare-variant chance added when a keeper leads a breeding pair (the old Vet perk, merged into the Keeper)
+  // Hiring mix: the keeper is listed twice so animal carers are as common as when keepers and vets were separate roles.
+  D.HIRE_ROLES = ['keeper', 'keeper', 'researcher', 'explorer', 'guide'];
   // Display names and icon names. The state keeps the short keys (staff: care/sci/exp/charm, animals: charm/vigor/wit).
   D.SKILL = { care: { name: 'Care', icon: 'skill-care' }, sci: { name: 'Science', icon: 'skill-sci' }, exp: { name: 'Scouting', icon: 'skill-exp' }, charm: { name: 'Hosting', icon: 'skill-charm' } };
   D.SKILL_ORDER = ['care', 'sci', 'exp', 'charm'];
@@ -231,6 +233,7 @@
   D.CRATE_ODDS = D.CRATE_VISIT;
   D.CRATES_PER_VISIT = 5;
   D.CRATE_RANK_K = 0.12; // crate price = expected animal value x 1.3 + this x the rank money scale x rarity
+  D.EXP_TWO = 0.2;      // chance an expedition brings back 2 animals instead of 1
   D.ARRIVAL_WEEKS = 2;   // an arrival left undecided this long goes to the holding pen (never a habitat)
   D.HOLD_UPKEEP = 1.0;   // extra upkeep in the holding pen, as a share of the animal's normal upkeep (1.0 = the pen costs double)
   D.HOLD_PROFIT_SHARE = 0.9; // safety: the pen's whole cost never takes more than this share of the zoo's weekly profit without it
@@ -263,7 +266,7 @@
     rival:      { title: 'Rival opening',      w: 8,  bad: true }
   };
   D.HAP_GAP = [10, 14]; // weeks between happenings (about 12 on average)
-  // Person kinds used by happenings ('vet' and 'keeper' are also staff roles).
+  // Person kinds used by happenings ('keeper' is also a staff role; 'vet' here is a visiting vet, not a staff role).
   D.WHO = ['teacher', 'donor', 'reporter', 'photographer', 'kid', 'professor', 'builder', 'volunteer', 'elder', 'vet', 'keeper'];
   // Habitat footprints on the hex grid, as axial [q, r] offsets from the anchor. They can be rotated in 60 degree steps.
   D.SHAPES = {

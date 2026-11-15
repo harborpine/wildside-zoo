@@ -479,6 +479,59 @@ check('movableTo and moveIn after building; remove sends animals to the pen', ()
   S.regions.jungle = true; const jp = firstSpot(S, 'hab', 'jungle'); const j = Z.build(S, 'hab', 'jungle', jp[0], jp[1], jp[2]); eq(j.movable, [], 'nothing fits a rainforest');
 });
 
+check('vet role merged into keeper: no vet role anywhere, hiring rolls keepers in its place', () => {
+  ok(!D.ROLES.vet, 'no vet role'); eq(D.ROLES.keeper.main, 'care'); eq(D.ROLES.keeper.second, 'sci'); ok(D.KEEPER_VARIANT > 0);
+  Object.values(D.ROLES).forEach(R => (R.req || []).forEach(g => g.forEach(x => ok(D.ROLES[x], 'requirement names a missing role ' + x))));
+  ok(D.FAC.vet && D.WHO.indexOf('vet') >= 0, 'Vet Clinic and the visiting vet are untouched');
+  const roles = {}; let n = 0;
+  for (let i = 0; i < 400; i++) { const S = NG(); S.staff.pop(); S.money = 1e6; Z.advertise(S, 1); tickN(S, 2); S.candidates.forEach(c => { roles[c.role] = (roles[c.role] || 0) + 1; n++; }); Z.debug.caller(S, 'headhunter'); roles[S.headhunt.role] = (roles[S.headhunt.role] || 0) + 1; n++; }
+  ok(!roles.vet, 'an applicant was a vet'); const share = roles.keeper / n; ok(share > 0.3 && share < 0.5, 'keeper share ' + share.toFixed(2) + ' (old keeper + vet share was 0.40)');
+  const S = NG(); Object.keys(D.ROLES).forEach(r => { if (r !== 'keeper') ok(Z.jobOptions(S, S.staff[0]).some(o => o.role === r)); }); ok(!Z.jobOptions(S, S.staff[0]).some(o => o.role === 'vet'));
+  return 'keepers ' + Math.round(100 * share) + '% of applicants';
+});
+
+check('old save with a vet staffer loads as a keeper with the same skills, level and xp', () => {
+  const S = NG(); S.money = 1e6; const s = S.staff[0];
+  Object.assign(s, { role: 'vet', lvl: 9, xp: 77, care: 41, sci: 33, exp: 12, charm: 15, mastered: ['vet', 'keeper', 'researcher'] });
+  S.staff[1].mastered = ['vet']; S.candidates = [Object.assign(JSON.parse(JSON.stringify(s)), { id: S.nextId++, mastered: undefined })]; S.headhunt = Object.assign(JSON.parse(JSON.stringify(s)), { id: S.nextId++ });
+  const pid = Z.startBreeding(S, S.animals[0].id, S.animals[1].id, s.id).pid; tickN(S, 3); const p = Z.project(S, pid); if (p && p.choice) p.choice.who = 'vet';
+  const L = Z.deserialize(Z.serialize(S)); ok(L, 'loads'); eq(L.v, 3); const t = Z.staffer(L, s.id);
+  eq([t.role, t.lvl, t.xp, t.care, t.sci, t.exp, t.charm], ['keeper', 9, 77, 41, 33, 12, 15]); eq(t.mastered, ['keeper', 'researcher']); eq(Z.staffer(L, S.staff[1].id).mastered, ['keeper']);
+  eq(L.candidates[0].role, 'keeper'); eq(L.headhunt.role, 'keeper'); ok(!L.projects.some(q => q.choice && q.choice.who === 'vet'));
+  ok(Z.jobOptions(L, t).find(o => o.role === 'zoologist').lock === '', 'a mastered vet + researcher can still become Head Zoologist');
+  tickN(L, 50); eq(L.week, S.week + 50); ok(L.staff.every(x => D.ROLES[x.role]));
+  ok(Z.salary(t) > 0 && isFinite(Z.breedChance(L, t)));
+});
+
+check('advanced role requirements after the merge', () => {
+  const S = NG(); S.money = 1e7; const k = S.staff[0], x = S.staff[1]; k.lvl = 8; x.lvl = 8;
+  ok(Z.jobOptions(S, k).find(o => o.role === 'zoologist').lock, 'keeper alone cannot be Head Zoologist');
+  k.mastered = ['researcher']; eq(Z.jobOptions(S, k).find(o => o.role === 'zoologist').lock, '', 'keeper + researcher = Head Zoologist');
+  ok(Z.jobOptions(S, x).find(o => o.role === 'leader').lock, 'explorer alone cannot be Expedition Leader');
+  x.mastered = ['keeper']; eq(Z.jobOptions(S, x).find(o => o.role === 'leader').lock, '', 'explorer + keeper = Expedition Leader');
+  ok(Z.changeJob(S, k.id, 'zoologist').ok && k.role === 'zoologist' && k.mastered.indexOf('keeper') >= 0); ok(Z.changeJob(S, x.id, 'leader').ok && x.role === 'leader');
+  const g = Object.assign({}, k, { id: S.nextId++, role: 'guide', lvl: 8, mastered: ['keeper'] }); S.staff.push(g); eq(Z.jobOptions(S, g).find(o => o.role === 'showrunner').lock, '', 'guide + keeper = Showrunner');
+});
+
+check('rare variants per run stay close to before the merge (8 bot runs)', () => {
+  const BEFORE = 28.40; // species with a rare variant per run, bot skill 0.8, average of 120 runs on the rules before the merge
+  let t = 0; for (let i = 0; i < 8; i++) t += Z.variantCount(bot(0.8, false).S);
+  const avg = t / 8; ok(Math.abs(avg - BEFORE) / BEFORE < 0.15, 'variants per run ' + avg.toFixed(1) + ' against ' + BEFORE);
+  return avg.toFixed(1) + ' per run (before ' + BEFORE + ')';
+});
+
+check('expeditions bring back 1 animal 80% of the time and 2 animals 20%', () => {
+  const c = { 1: 0, 2: 0 }; let n = 0;
+  for (let i = 0; i < 1500; i++) {
+    const S = NG(); S.money = 1e7; S.regions.jungle = true; const region = i % 2 ? 'savanna' : 'jungle';
+    ok(Z.startExpedition(S, region, [S.staff[1].id, S.staff[0].id].slice(0, 1 + i % 2), i % 3).ok);
+    let rep = null; for (let w = 0; w < 14 && !rep; w++) { S.reports = []; Z.tick(S); const p = S.projects[0]; if (p && p.choice) Z.resolveChoice(S, p.id, i % p.choice.options.length); rep = S.reports.find(r => r.type === 'expedition'); }
+    ok(rep, 'expedition came back'); ok(rep.found.length === 1 || rep.found.length === 2, 'found ' + rep.found.length); c[rep.found.length]++; n++;
+  }
+  const two = c[2] / n; ok(Math.abs(two - D.EXP_TWO) < 0.03, 'share of 2 animals ' + two.toFixed(3));
+  return Math.round(100 * c[1] / n) + '% one, ' + Math.round(100 * two) + '% two over ' + n + ' expeditions';
+});
+
 check('short labels', () => {
   const long = [];
   const see = (s, max, where) => { if (s && s.length > max) long.push(where + ': ' + s); };

@@ -80,6 +80,23 @@ spending everything on crates and purchases). The "pen costs more than you earn"
 Normal play unchanged: bot skill 0.8, 16 runs: Y1 $18,347 r3.1 | Y5 $267,219 r6.0 place 7.1 | Y10 $841,670 r8.0 place 2.6 |
 Y20 $5,306,048 r10 place 1.0 | final score 300,902 (R5.5: 292,975, within noise).
 
+== R5.7 Vet merged into Keeper (D.KEEPER_VARIANT 0.01), then expeditions 1 animal 80% / 2 animals 20% ==
+Rare variants per run, bot skill 0.8: BEFORE the merge (120 runs) 28.40 species with a variant, 85.4 variant babies (48.5% of
+births). AFTER the merge with the keeper perk at 0.01 (80 runs) 28.74 and 84.95 (48.8%). Tried: 0.02 -> 28.80 / 94.4 (51.6%),
+0.015 -> 28.61 / 90.0 (51.5%), 0.005 -> 28.48 / 81.1 (46.2%). 0.01 is closest on both measures.
+Animals per expedition in bot runs: before 55.0% one, 39.6% two, 5.4% three (1,632 expeditions); after 80.0% / 20.0% (1,697).
+16 runs at skill 0.8      |  merge only (expeditions as before)        |  merge + 80/20 expeditions
+  Y1                      |  $19,813  rank 3.1  place 11.8  sp 12.4    |  $16,661  rank 3.0  place 11.7  sp 12.4
+  Y2                      |  $39,899  rank 4.1  place 10.1  sp 20.3    |  $42,376  rank 4.0  place 10.1  sp 20.6
+  Y3                      |  $63,183  rank 5.0  place  9.1  sp 26.1    |  $73,024  rank 5.0  place  9.1  sp 26.6
+  Y5                      | $218,916  rank 5.9  place  7.2  sp 35.9    | $198,137  rank 6.0  place  7.1  sp 35.6
+  Y10                     | $936,882  rank 7.9  place  2.7  sp 46.4    | $704,887  rank 7.9  place  2.7  sp 46.4
+  Y15                     |$1,742,710 rank 9.6  place  1.0  sp 58.0    |$1,734,586 rank 9.6  place  1.1  sp 57.4
+  Y20                     |$5,388,795 rank 10   place  1.0  sp 62.9    |$5,188,145 rank 10   place  1.0  sp 62.9
+final score                 298,317                                         295,408
+No rebalance needed: species, rank timing and score held (crates, the trader and births fill the collection; an expedition's
+second animal was rarely a new species).
+
 == R5.3 One run, bot skill 0.8 (node test/bot.js 0.8), latest rules ==
 Y1 place 11 rating 468 (top 5081) $17877 idle 2.7wk inc/wk 3300 cost/wk 978 spent/wk 1200 vis/wk 357 rep 1070 r4 sp 16 best 18 rev 13-18 avg 15.0 ev 5 exp 8 births 5 awards exhibit/rarest/breeder/explorer | staff 4 avgAnimal 30 bestBaby 30 prest 110 rp 38 rows 10 habs savanna2,savanna1,jungle1
 Y2 place 10 rating 1029 (top 5328) $38277 idle 2.7wk inc/wk 13429 cost/wk 2875 spent/wk 4628 vis/wk 1021 rep 2051 r4 sp 23 best 22 rev 14-22 avg 18.1 ev 11 exp 10 births 9 awards exhibit/rarest/breeder/explorer | staff 5 avgAnimal 33 bestBaby 43 prest 123 rp 195 rows 12 habs savanna3,savanna3,jungle2,desert1
