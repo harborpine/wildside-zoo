@@ -204,7 +204,7 @@ async function run(name) {
   check(await S(() => ZT.S.items.length) === nItems - 1, 'removed a facility after a confirm');
   await tap('Back');
   await tap('Upgrade'); await screen('build-upgrade');
-  await tap('Savanna'); await tap('Upgrade', { wait: 500 });
+  { const q = await ev(() => { const b = document.querySelector('.layer:not([hidden]) .mn-up'); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await page.touchscreen.tap(q.x, q.y); await sleep(600); }
   check(await S(() => ZT.S.items.find(i => i.t === 'savanna').lvl) >= 2, 'upgraded a habitat');
   await back(); await tap('Buy land'); await screen('build-land');
   const rows0 = await S(() => ZT.S.rows); await tap('Buy', { wait: 500 });

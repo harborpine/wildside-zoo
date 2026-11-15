@@ -61,6 +61,12 @@
     if (c.better === 'no') return w(pixIcon('down', '#e0584a', 2));
     return span('mn-cmp', '+-');
   }
+  // How many people against the staff cap, big and plain; solid orange-red when full. Next rank's cap beside it when it grows.
+  function staffCapChip() {
+    const s = S(), cap = E.staffCap(s), n = s.staff.length, full = n >= cap, rk = E.rank(s), nx = D.STAFF_CAP && D.STAFF_CAP[rk + 1];
+    return el('div', { cls: 'mn-staffcap' + (full ? ' full' : ''), role: 'status', 'aria-label': 'Staff ' + n + ' of ' + cap }, imgEl(iUrl('m-staff', 3)), span('', n + ' / ' + cap), full ? span('tag', 'Full') : null,
+      nx && nx > cap ? span('nx', 'Rank ' + (rk + 1) + ': ' + nx) : null);
+  }
   const pn = (a, one, many) => a + ' ' + (a === 1 ? one : many);
 
   // A short, fixed set of boxes fills the panel and never scrolls: rows share the height, icons shrink a little on short screens.
@@ -115,14 +121,14 @@
 .mn-title .pbody{justify-content:flex-start;gap:6px}
 .mn-logo{display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:2px}.mn-logo img{image-rendering:pixelated;display:block;width:auto;height:auto}.mn-logo .lg1{max-width:94%;max-height:clamp(30px,8.5vh,80px)}.mn-logo .lg2{max-width:48%;max-height:clamp(36px,10.5vh,100px)}
 @media (max-height:700px){.mn-cont{display:none}.mn-scene{display:none}.mn-logo .lg1{max-height:5vh}.mn-logo .lg2{max-height:7.5vh}.mn-slot,.mn-slothit{min-height:52px!important}.mn-sinfo .mn-sline:nth-child(3){display:none}.mn-sname{font-size:16px}.mn-del{width:44px;height:44px}.mn-title .pbody{gap:4px}.mn-slots{gap:8px}}
-.mn-ports{flex:none;display:flex;align-items:flex-end}.mn-port{height:clamp(30px,5.5vh,44px);width:auto;max-width:56px;image-rendering:pixelated}.mn-cont{margin-left:8px;font-size:11px;background:var(--green);color:#fff;padding:1px 6px;vertical-align:middle}.mn-slot.recent{box-shadow:0 0 0 3px var(--green-d),0 5px 0 3px rgba(0,0,0,.25)}
+.mn-ports{flex:none;display:flex;align-items:flex-end}.mn-port{height:clamp(30px,5.5vh,44px);width:auto;max-width:56px;image-rendering:pixelated}.mn-cont{flex:none;margin-left:8px;font-size:11px;background:var(--green);color:#fff;padding:1px 6px;vertical-align:middle}.mn-slot.recent{box-shadow:0 0 0 3px var(--green-d),0 5px 0 3px #8d7a52}
 .mn-scene{display:flex;align-items:flex-end;justify-content:center;gap:0;min-height:30px;border-bottom:6px solid #3f7d34}.mn-scene img{image-rendering:pixelated;max-height:clamp(30px,7vh,70px);max-width:21%;width:auto;height:auto}
 .mn-slots{display:flex;flex-direction:column;gap:clamp(6px,1.6vh,12px);margin-top:clamp(2px,1vh,8px)}
-.mn-slot{display:flex;align-items:center;background:var(--paper);box-shadow:0 0 0 3px var(--bd),0 5px 0 3px rgba(0,0,0,.25);min-height:clamp(58px,10.5vh,78px);border:0;padding:0;font:inherit;color:var(--ink)}
+.mn-slot{display:flex;align-items:center;background:var(--paper);box-shadow:0 0 0 3px var(--bd),0 5px 0 3px #8d7a52;min-height:clamp(58px,10.5vh,78px);border:0;padding:0;font:inherit;color:var(--ink)}
 button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream2);cursor:pointer;font-weight:700;font-size:18px;text-align:left}
 .mn-slothit{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:clamp(58px,10.5vh,78px);padding:6px 8px;border:0;background:none;font:inherit;font-weight:700;color:inherit;text-align:left;cursor:pointer}
 .mn-sn{flex:none;width:34px;height:34px;line-height:34px;text-align:center;background:var(--gold);color:var(--ink);font-weight:700;font-size:18px;box-shadow:0 0 0 2px var(--bd)}
-.mn-sinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.mn-sname{font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mn-sline{font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.mn-sinfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.mn-sname{display:flex;align-items:center;font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mn-sline{font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .mn-del{flex:none;width:44px;height:44px;margin:0 8px 0 14px;border:0;background:var(--cream2);box-shadow:0 0 0 2px var(--line);display:flex;align-items:center;justify-content:center;cursor:pointer}
 .mn-name{font-size:18px;text-align:center;min-height:52px}
 .mn-coach{display:flex;align-items:center;gap:6px;min-height:44px;padding:0 0 0 10px;background:#ffe27a;box-shadow:0 0 0 3px var(--bd);font-size:14px;font-weight:700;color:var(--ink);position:absolute;top:6px;left:6px;right:6px;z-index:15;pointer-events:none}
@@ -139,15 +145,32 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
 .mn-at .pt{flex:none;width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:#bfe0a0}.mn-at .pt img{max-width:30px;max-height:30px;image-rendering:pixelated}
 .mn-at .inf{display:flex;flex-direction:column;gap:2px;min-width:0}.mn-at .c3,.mn-at .c2{display:flex;align-items:center;gap:2px;white-space:nowrap}
 .mn-at .chip.iconchip{padding:0 2px 0 1px;gap:1px}.pbody.mn-tight .sec{margin-top:0;padding:2px 8px}.mn-at .chip{margin:0;font-size:11px}.mn-at .chip .v{padding:1px 2px;min-width:12px;font-size:11px}.mn-at .chip img.sym{height:12px;width:auto;margin:0 1px}.mn-at .sym{height:13px;width:auto}
-.mn-run .bar{height:6px;min-width:0;box-shadow:0 0 0 1px var(--bd)}.mn-run .main{gap:4px}.mn-runtop{display:flex;align-items:center;justify-content:space-between;gap:8px}.mn-runtop .t{flex:1;min-width:0}
+.mn-runlist{overflow-y:auto;min-height:0;flex:1 1 0}.mn-run .bar{height:6px;min-width:0;box-shadow:0 0 0 1px var(--bd)}.mn-run .main{gap:4px}.mn-runtop{display:flex;align-items:center;justify-content:space-between;gap:8px}.mn-runtop .t{flex:1;min-width:0}
 @media (max-width:360px){.row.mn-split{flex-wrap:wrap}.row.mn-split .mn-hit{flex:1 1 100%}.row.mn-split>.btn{flex:1 0 100%;margin:2px 0 4px}.mn-cl{flex-wrap:wrap}.mn-cl .chip{max-width:100%}}
 .mn-key{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink2);justify-content:center}.mn-cap{font-size:11px;padding:0 4px;color:var(--ink2);display:flex;align-items:center}.mn-capchip{align-items:center}.mn-legend .lg2{display:flex;align-items:center;gap:8px;min-height:34px}
 .mn-pool{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}.mn-pool img{height:34px;width:auto;image-rendering:pixelated;background:#bfe0a0;box-shadow:0 0 0 2px var(--bd);padding:2px}.mn-cmp{display:inline-flex;align-items:center;gap:1px;font-weight:700;font-size:12px}.mn-cmp img{height:14px;width:auto}
+.mn-staffcap{display:flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:4px 12px;background:var(--paper);box-shadow:0 0 0 3px var(--bd);font-size:24px;font-weight:700}.mn-staffcap img{height:30px;width:auto;image-rendering:pixelated}.mn-staffcap .nx{font-size:12px;font-weight:600;color:var(--ink2)}.mn-staffcap.full{background:#e0703a;color:#fff;box-shadow:0 0 0 3px #8a3b12}.mn-staffcap.full .nx{color:#ffe3d0}.mn-staffcap .tag{font-size:13px;background:#8a3b12;color:#fff;padding:2px 8px}
+.mn-hh{display:flex;align-items:center;gap:6px}.mn-hh .sec{flex:1;margin:0;min-width:0}
+.mn-up{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:44px;min-width:92px;padding:2px 8px;border:0;font:inherit;font-weight:700;font-size:14px;color:var(--ink);background:var(--paper);box-shadow:0 0 0 3px var(--bd);cursor:pointer;white-space:nowrap}
+.mn-up img{height:16px;width:auto;image-rendering:pixelated}.mn-up.gold{background:#ffcf33;box-shadow:0 0 0 3px #8a6a00}.mn-up.off{background:#cfc3a6;color:#6b5a3c;box-shadow:0 0 0 3px #8d7a52;font-size:12px}
+.mn-hsec{position:relative;padding:3px;display:flex;flex-direction:column;gap:4px}
+.mn-hsec.drop-ok{box-shadow:0 0 0 3px #2f8a3a;background:#e2f3d3}.mn-hsec.drop-ok.hover{background:#b9e39a}.mn-hsec.drop-no{box-shadow:0 0 0 3px #8d7a52;background:#ddd4bd}.mn-hsec.drop-no.hover{background:#c9bfa3}
+.mn-hsec[data-tag]::after{content:attr(data-tag);position:absolute;right:6px;bottom:4px;background:#2f8a3a;color:#fff;font-size:12px;padding:1px 6px}
+.mn-at.mn-lifted{background:#bdb08c;box-shadow:0 0 0 2px #8d7a52}.mn-at.mn-lifted *{visibility:hidden}
+.mn-ghost{position:fixed;z-index:80;pointer-events:none;margin:0;background:var(--paper);box-shadow:0 0 0 3px var(--bd),4px 8px 0 0 #6b5a3c;transform:scale(1.08);animation:mnpop .18s steps(3)}
+@keyframes mnpop{0%{transform:scale(1)}50%{transform:scale(1.16)}100%{transform:scale(1.08)}}
+.mn-gtag{position:absolute;left:0;top:100%;margin-top:4px;background:#3b2a1a;color:#fff;font-size:12px;padding:2px 8px;white-space:nowrap;display:none}
+.mn-dropbar{position:absolute;left:0;right:0;z-index:40;background:var(--cream2);box-shadow:0 -3px 0 0 var(--bd);padding:6px;display:flex;flex-direction:column;gap:6px}
+.mn-dtrow{display:flex;gap:8px}.mn-dhabs{display:flex;gap:6px;flex-wrap:wrap}
+.mn-dt{flex:1;min-height:56px;display:flex;align-items:center;justify-content:center;gap:8px;padding:4px 8px;font-weight:700;font-size:15px;background:#e2f3d3;box-shadow:0 0 0 3px #2f8a3a}.mn-dt img{height:26px;width:auto;image-rendering:pixelated}
+.mn-dt.sell{background:#ffe0a8;box-shadow:0 0 0 3px #b56f10}.mn-dt.drop-no{background:#ddd4bd;box-shadow:0 0 0 3px #8d7a52;color:#6b5a3c}.mn-dt.hover{background:#b9e39a}.mn-dt.sell.hover{background:#ffcf6a}.mn-dt.hab{flex:1 1 40%;min-height:44px;font-size:13px}
+@keyframes mnshake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.mn-shake{animation:mnshake .35s steps(4)}
 .mn-cnt{display:inline-flex;align-items:center;gap:2px}.mn-legend{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 10px}.mn-legend .lg{display:flex;align-items:center;gap:8px;min-height:34px;font-size:14px}.mn-legend .lg .sym{height:26px;width:auto}.mn-legend .lg img.sym{height:26px}
 .mn-hit{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:56px;padding:0;margin:0;border:0;background:none;text-align:left;font:inherit;font-weight:700;color:inherit;cursor:pointer}
 .row.mn-split{padding-right:4px}.row.mn-split>.btn{flex:none;margin:0;min-width:84px}
 .mn-stars{filter:none}
-.mn-hot{box-shadow:0 0 0 3px var(--gold-d),inset 0 -3px 0 rgba(0,0,0,.06)!important;background:#fff3b8}
+.mn-hot{box-shadow:0 0 0 3px var(--gold-d),inset 0 -3px 0 #ece0bd!important;background:#fff3b8}
 .mn-on{box-shadow:0 0 0 3px var(--blue)!important;background:#e6f4ff}
 .mn-why{font-size:12px;color:var(--red-d);font-weight:700}
 .mn-grade{font-size:15px;font-weight:700;color:var(--ink2)}
@@ -169,7 +192,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
 .mn-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;min-height:92px;padding:4px 2px;border:0;background:var(--paper);box-shadow:0 0 0 2px var(--line);font:inherit;font-weight:700;color:var(--ink);cursor:pointer}
 .mn-cell .im{height:50px;display:flex;align-items:center}.mn-cell img{max-height:50px;max-width:76px;image-rendering:pixelated}
 .mn-cell .nm{font-size:11px;line-height:1.1;text-align:center;word-break:break-word}
-.mn-cell.new{background:#fff3b8}.mn-sil{filter:brightness(0);opacity:.28}
+.mn-cell.new{background:#fff3b8}.mn-sil{filter:brightness(0) invert(.38)}
 .mn-fit{display:grid;gap:4px;align-items:center}.mn-fit .h{display:flex;justify-content:center}.mn-fit .h img{height:22px;max-width:100%;image-rendering:pixelated}
 .mn-fit .tn{font-size:12px;line-height:1.1}.mn-fit .c{display:flex;justify-content:center;min-height:30px;align-items:center}
 .mn-fit .sg{min-width:0;padding:2px 2px;font-size:12px}
@@ -198,7 +221,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
         { icon: iUrl('m-projects', 6), label: 'Projects', badge: waiting || false, onTap: projectsScreen },
         { icon: iUrl('m-build', 6), label: 'Build', onTap: buildScreen },
         { icon: iUrl('m-animals', 6), label: 'Animals', badge: pen || false, onTap: () => animalsScreen(!habs().length && pen ? 'pen' : 'zoo') },
-        { icon: iUrl('m-staff', 6), label: 'Staff', badge: (s.candidates && s.candidates.length) || s.headhunt ? true : false, onTap: staffScreen },
+        { icon: iUrl('m-staff', 6), label: 'Staff', sub: s.staff.length + '/' + E.staffCap(s), badge: (s.candidates && s.candidates.length) || s.headhunt ? true : false, onTap: staffScreen },
         { icon: iUrl('m-research', 6), label: 'Research', onTap: researchScreen },
         { icon: iUrl('m-info', 6), label: 'Info', onTap: infoScreen },
         { icon: iUrl('m-system', 6), label: 'System', cls: 'mn-wide', onTap: systemScreen }
@@ -252,20 +275,21 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
 
   const shortRegion = r => (D.BIOMES[r] && D.BIOMES[r].name) || r;
   function runRow(p) {
-    const s = S(), info = p.type === 'hire' ? p : E.projectInfo(s, p), lead = p.staff && p.staff.length ? E.staffer(s, p.staff[0]) : null;
+    const s = S(), info = (p.type === 'hire' || p.type === 'campaign') ? p : E.projectInfo(s, p), lead = p.staff && p.staff.length ? E.staffer(s, p.staff[0]) : null;
     let img = null, name = info.detail;
     if (p.type === 'hire') { img = pUrl('headhunter', 2); name = info.detail || 'Hiring'; }
+    else if (p.type === 'campaign') { img = iUrl('rep', 3); name = p.name; }
     else if (p.type === 'expedition') { img = pUrl(lead ? lead.role : 'explorer', 2); name = shortRegion(p.region); }
     else if (p.type === 'breed') { const a = E.animal(s, p.a); img = a ? aUrl(a, 2) : null; name = a ? E.sp(a).name : info.detail; }
     else { img = iUrl('ready-event', 3); name = D.THEMES[p.theme] ? D.THEMES[p.theme].name : info.detail; }
     const b = el('button', { type: 'button', cls: 'row mn-r mn-run tappable' + (info.choice ? ' mn-hot' : '') },
       el('span', { cls: 'portrait' }, imgEl(img)),
       el('span', { cls: 'main' }, el('span', { cls: 'mn-runtop' }, span('t', name), info.choice ? imgEl(iUrl('choice', 3), 'mn-mini') : wkc(info.weeksLeft)), ui.bar(info.progress)));
-    b.addEventListener('click', guard(() => (p.type === 'hire' ? staffScreen() : info.choice ? showChoice(p.id) : projectScreen(p.id))));
+    b.addEventListener('click', guard(() => (p.type === 'hire' ? staffScreen() : p.type === 'campaign' ? campaignScreen() : info.choice ? showChoice(p.id) : projectScreen(p.id))));
     return b;
   }
   function projectsScreen() {
-    push({ id: 'projects', title: 'Projects', render(body) { body.classList.add('mn-tight');
+    push({ id: 'projects', title: 'Projects', render(body) { body.classList.add('mn-tight'); body.style.overflowY = 'hidden';
       const s = S(), open = E.isOpen ? E.isOpen(s) : true;
       const ex = expStatus(), pairs = pairList().filter(x => !x.why), free = E.freeStaff(s).length;
       const evs = eventHabs().filter(x => !x.why), cost = E.eventCost(s);
@@ -283,7 +307,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       if (s.yearly) hot.push(row({ img: iUrl('star', 4), title: s.yearly.name, sub: 'Plan it', cls: 'mn-hot', tap: yearlyScreen }));
       if (s.show) hot.push(row({ img: iUrl('star', 4), title: 'Animal Show', sub: 'Pick an entry', cls: 'mn-hot', tap: showScreen }));
       if (hot.length) body.appendChild(el('div', { cls: 'list' }, hot));
-      const runs = s.projects.slice().concat(s.hiring && E.hiringInfo && E.hiringInfo(s) ? [E.hiringInfo(s)] : []);
+      const runs = s.projects.slice().concat(s.hiring && E.hiringInfo && E.hiringInfo(s) ? [E.hiringInfo(s)] : [], E.campaigns(s).filter(c => c.weeksLeft > 0).map(c => ({ id: 'camp-' + c.key, type: 'campaign', name: c.name, weeksLeft: c.weeksLeft, progress: Math.max(0, Math.min(1, 1 - c.weeksLeft / Math.max(1, c.weeks))), choice: false, staff: [] })));
       if (s.arrivals && s.arrivals.length) body.appendChild(el('div', { cls: 'list' }, [row({ img: iUrl('choice', 4), title: s.arrivals.length === 1 ? E.animalLabel(s.arrivals[0].a) : s.arrivals.length + '', sub: 'New arrival', cls: 'mn-hot', tap: () => animalsScreen('zoo') })]));
       if (runs.length) body.appendChild(el('div', { cls: 'list mn-runlist' }, runs.map(runRow)));
     } });
@@ -468,7 +492,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
         { icon: bUrl('snack', 3), label: 'Facilities', onTap: facilityList },
         { icon: pixIcon('move', '#4aa3df', 4), label: 'Move', onTap: moveList },
         { icon: pixIcon('remove', '#e0584a', 4), label: 'Remove', onTap: removeList },
-        { icon: iUrl('star', 6), label: 'Upgrade', onTap: upgradeList },
+        { icon: pixIcon('up', '#58b84a', 5), label: 'Upgrade', onTap: upgradeList },
         { icon: tUrl('locked', 2), label: 'Buy land', sub: nl ? money(nl.cost) : 'All owned', onTap: landScreen }
       ], 2));
     } });
@@ -482,17 +506,35 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       }), 'No habitats yet.'));
     } });
   }
+  // The upgrade button: up arrow, the new capacity and the price; grey with a short reason when it cannot be done; gold when the habitat is full.
+  function upgInfo(h) {
+    const s = S(), c = E.habUpgradeCost(h, s), nx = E.habCap(Object.assign({}, h, { lvl: h.lvl + 1 }));
+    const reason = h.lvl >= 5 ? 'Max level' : h.lvl >= E.habLevelCap(s) ? 'Needs research' : s.money < c ? needMoney(c) : '';
+    return { c, nx, reason };
+  }
+  function upgBtn(h, after) {
+    const s = S(), u = upgInfo(h), full = E.inHab(s, h.id).length >= E.habCap(h);
+    const b = el('button', { type: 'button', cls: 'mn-up' + (u.reason ? ' off' : full ? ' gold' : ''), 'aria-label': 'Upgrade ' + E.habName(s, h) },
+      u.reason ? [imgEl(pixIcon('up', '#6b5a3c', 2)), u.reason] : [imgEl(pixIcon('up', '#2f8a3a', 2)), String(u.nx), ' ', mny(u.c)]);
+    b.addEventListener('click', guard(() => {
+      if (u.reason) { ui.toast(u.reason, 'bad'); return; }
+      const r = Core.act('upgrade', h.id);
+      if (r && r.ok) { ui.toast('Room for ' + u.nx, 'good'); if (after) after(r); else { try { Core.rerender(); } catch (e) { /* ignore */ } } if (movableIds(h.id).length) moveInPrompt(h.id, true); }
+    }));
+    return b;
+  }
   // After a habitat is built (or upgraded) the engine no longer moves anyone in: one tap asks.
   let moveInHandled = false;
   function movableIds(habId) { try { return E.movableTo ? E.movableTo(S(), habId) : []; } catch (e) { return []; } }
-  function moveInPrompt(habId) {
+  function moveInPrompt(habId, force) {
     const ids = movableIds(habId); if (!ids.length) return;
     setTimeout(() => {
-      if (Core.stack().length) return;
+      if (Core.stack().length && !force) return;
       push({ id: 'movein', modal: true, title: 'Move in?', render(body, api) {
         const s = S(), animals = ids.map(id => E.animal(s, id)).filter(Boolean); if (!animals.length) { api.pop(); return; }
         body.appendChild(el('div', { cls: 'mn-pool' }, animals.slice(0, 8).map(a => imgEl(aUrl(a, 3)))));
         const h = E.item(s, habId); if (h) body.appendChild(el('div', { cls: 'center' }, E.habName(s, h)));
+        if (h && animals.length > E.habCap(h) - E.inHab(s, habId).length) body.appendChild(el('div', { cls: 'center' }, why('Full'), ' ', upgBtn(h, () => api.rerender())));
         body.appendChild(el('div', { cls: 'btnrow' }, ui.btn('Not now', () => { moveInHandled = true; api.pop(); }, { cls: 'ghost big' }),
           ui.btn('Move in', guard(() => { const r = Core.act('moveIn', habId, ids); moveInHandled = true; if (r && r.ok) { ui.toast('Moved in', 'good'); later(() => api.pop()); } }), { cls: 'primary big', sub: String(animals.length) })));
       } });
@@ -545,13 +587,8 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   }
   function upgradeList() {
     push({ id: 'build-upgrade', title: 'Upgrade', render(body, api) {
-      const s = S(), cap = E.habLevelCap(s);
-      body.appendChild(rows(habs().map(h => {
-        const c = E.habUpgradeCost(h, s), room = E.habCap(h), next = E.habCap(Object.assign({}, h, { lvl: h.lvl + 1 }));
-        const reason = h.lvl >= 5 ? 'Top level' : h.lvl >= cap ? 'Research needed' : s.money < c ? needMoney(c) : '';
-        return row({ img: itemUrl(h), title: E.habName(s, h), sub: 'Level ' + h.lvl + (h.lvl < 5 ? ' to ' + (h.lvl + 1) : '') + ' · Room ' + room + (h.lvl < 5 ? ' to ' + next : ''), extra: reason ? why(reason) : null, right: h.lvl < 5 ? money(c) : null, off: !!reason,
-          tap: () => ui.confirm('Upgrade ' + E.habName(s, h) + ' for ' + money(c) + '?', () => { const r = Core.act('upgrade', h.id); if (r.ok) { ui.toast('Level ' + r.lvl, 'good'); api.rerender(); if (movableIds(h.id).length) { Core.popAll(); moveInPrompt(h.id); } } }, { yes: 'Upgrade' }) });
-      }), 'No habitats yet.'));
+      const s = S();
+      body.appendChild(rows(habs().map(h => row({ img: itemUrl(h), title: E.habName(s, h), sub: [cnt('m-animals', E.inHab(s, h.id).length + '/' + E.habCap(h)), ' · Lv ' + h.lvl], act: upgBtn(h, () => api.rerender()) })), 'No habitats yet.'));
     } });
   }
   function landScreen() {
@@ -570,14 +607,14 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   const ageSym = a => { const s = S(); if (E.isJuv(s, a)) return [' ', ui.sym('juv', { scale: 2, label: 'Baby', text: 'baby' })]; if (a.born == null) return null; const y = Math.floor((s.week - a.born) / D.WPY); return y >= 1 ? ' ' + y + 'y' : null; };
   function animalTile(a) {
     const s = S(), sick = E.isSick(s, a) ? imgEl(iUrl('sick', 2), 'mn-mini') : null;
-    return el('button', { type: 'button', cls: 'mn-at', tap: guard(() => animalScreen(a.id)), 'aria-label': (a.name || '') + ' ' + E.animalLabel(a) },
+    return el('button', { type: 'button', cls: 'mn-at', 'data-aid': a.id, tap: guard(() => animalScreen(a.id)), 'aria-label': (a.name || '') + ' ' + E.animalLabel(a) },
       el('span', { cls: 'pt' }, imgEl(aUrl(a, 2))),
       el('span', { cls: 'inf' }, el('span', { cls: 'c3' }, [A('charm', a.charm), A('vigor', a.vigor), A('wit', a.wit)]), el('span', { cls: 'c2' }, sexSym(a), ageSym(a), ui.grade(E.grade(E.avg(a))), sick)));
   }
   function animalRow(a, o) {
     const s = S();
     const sick = E.isSick(s, a) ? imgEl(iUrl('sick', 3), 'mn-mini') : null;
-    if (o && o.act) return row({ img: aUrl(a, 2), title: [E.animalLabel(a), ' ', sexSym(a), ageSym(a)], line: animalChips(a), tap: () => animalScreen(a.id), act: o.act });
+    if (o && o.act) { const rw = row({ img: aUrl(a, 2), title: [E.animalLabel(a), ' ', sexSym(a), ageSym(a)], line: animalChips(a), tap: () => animalScreen(a.id), act: o.act }); rw.setAttribute('data-aid', a.id); return rw; }
     return row({ img: aUrl(a, 2), title: [E.animalLabel(a), ' ', sexSym(a), ageSym(a), sick], right: animalChips(a), tap: () => animalScreen(a.id) });
   }
   // ---- arrivals waiting for a sell-or-keep decision (engine S.arrivals)
@@ -601,10 +638,83 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     push({ id: 'arrival-where', title: 'Where?', render(body, api) {
       const s = S(), en = E.arrival ? E.arrival(s, id) : null; if (!en) { api.pop(); return; }
       body.appendChild(rows(E.arrivalChoices(s, id).map(c => { const h = c.hab != null ? E.item(s, c.hab) : null;
+        if (h && !c.fit) return row({ img: itemUrl(h), title: E.habName(s, h), extra: why('Full'), line: null, act: upgBtn(h, () => { const r = Core.act('keepArrival', id, c.hab); if (r && r.ok) { ui.toast('Kept', 'good'); later(() => { Core.pop(); if (Core.stack().slice(-1)[0] === 'arrival') Core.pop(); }); } else api.rerender(); }) });
         return row({ img: h ? itemUrl(h) : iUrl('pen', 4), title: h ? E.habName(s, h) : 'Holding pen', sub: h ? (c.room != null ? cnt('m-animals', Math.max(0, c.room)) : null) : (E.holdFee ? [mny(E.holdFee(s, en.a)), '/wk'] : null), extra: c.fit ? null : why('Full'), right: c.best ? ui.sym('ok', { scale: 3, label: 'Best' }) : null, off: !c.fit,
           tap: () => { const r = Core.act('keepArrival', id, c.hab); if (r.ok) { ui.toast('Kept', 'good'); later(() => { Core.pop(); if (Core.stack().slice(-1)[0] === 'arrival') Core.pop(); }); } } }); })));
     } });
   }
+  // ------------------------------------------------------------------ press, hold and drag an animal (Animals > Zoo and Pen)
+  const habCheck = (a, h) => {
+    const s = S();
+    if (a.hab === h.id) return { ok: false, reason: 'Lives here' };
+    if (h.t !== E.sp(a).biome) return { ok: false, reason: 'Wrong biome' };
+    const room = E.habCap(h) - E.inHab(s, h.id).length;
+    if (room <= 0) return { ok: false, reason: 'Habitat full' };
+    return { ok: true, room };
+  };
+  function dragHint() { try { if (localStorage.getItem('wildside-drag-hint')) return null; localStorage.setItem('wildside-drag-hint', '1'); } catch (e) { return null; } return ui.note('Hold and drag to move.'); }
+  function enableDrag(body) {
+    if (body.__mnDrag) return; body.__mnDrag = true;
+    let pend = null, drag = null, suppress = 0, scrollTimer = 0;
+    const panelOf = () => body.closest('.panel');
+    body.addEventListener('click', ev => { if (Date.now() < suppress) { ev.stopPropagation(); ev.preventDefault(); } }, true);
+    body.addEventListener('touchmove', ev => { if (drag && ev.cancelable) ev.preventDefault(); }, { passive: false });
+    body.addEventListener('contextmenu', ev => { if (ev.target.closest('[data-aid]')) ev.preventDefault(); });
+    body.addEventListener('pointerdown', ev => {
+      if (ev.button > 0 || drag || pend) return;
+      const el0 = ev.target.closest && ev.target.closest('[data-aid]'); if (!el0 || ev.target.closest('.btn, .mn-up')) return;
+      pend = { id: +el0.dataset.aid, el: el0, x: ev.clientX, y: ev.clientY, pid: ev.pointerId, timer: setTimeout(startDrag, 350) };
+      window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp); window.addEventListener('pointercancel', onCancel);
+    });
+    function cleanupListeners() { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onCancel); }
+    function startDrag() {
+      if (!pend) return; const s = S(), a = E.animal(s, pend.id), tile = pend.el;
+      if (!a) { pend = null; cleanupListeners(); return; }
+      if (E.busyAnimals(s)[a.id]) { tile.classList.add('mn-shake'); setTimeout(() => tile.classList.remove('mn-shake'), 450); ui.toast('In a project', 'bad'); suppress = Date.now() + 500; pend = null; cleanupListeners(); return; }
+      const r = tile.getBoundingClientRect(), ghost = tile.cloneNode(true); ghost.removeAttribute('data-aid'); ghost.classList.add('mn-ghost'); ghost.style.width = r.width + 'px'; ghost.style.height = r.height + 'px';
+      document.body.appendChild(ghost);
+      const tag = el('span', { cls: 'mn-gtag' }); ghost.appendChild(tag);
+      tile.classList.add('mn-lifted');
+      const targets = [];
+      body.querySelectorAll('.mn-hsec[data-hab]').forEach(sec => { const h = E.item(s, +sec.dataset.hab), c = h ? habCheck(a, h) : { ok: false, reason: 'Gone' }; sec.classList.add(c.ok ? 'drop-ok' : 'drop-no'); if (c.ok) sec.dataset.tag = 'Room ' + c.room; targets.push({ el: sec, kind: 'hab', hab: h && h.id, ok: c.ok, reason: c.reason }); });
+      const panel = panelOf(), foot = panel.querySelector('.pfoot'), bar = el('div', { cls: 'mn-dropbar', style: { bottom: (foot ? foot.offsetHeight : 70) + 'px' } });
+      const inPen = a.hab == null;
+      const penT = el('div', { cls: 'mn-dt pen' + (inPen ? ' drop-no' : ' drop-ok') }, imgEl(iUrl('pen', 3)), span('', 'Pen'), E.holdFee ? span('', mny(E.holdFee(s, a)), '/wk') : null);
+      const sellT = el('div', { cls: 'mn-dt sell drop-ok' }, imgEl(iUrl('coin', 3)), span('', 'Sell'), span('', mny(E.animalValue(a))));
+      if (animalTab === 'pen') { const hb = el('div', { cls: 'mn-dhabs' }); habs().forEach(h => { const c = habCheck(a, h), d = el('div', { cls: 'mn-dt hab ' + (c.ok ? 'drop-ok' : 'drop-no') }, imgEl(itemUrl(h)), span('', E.habName(s, h)), c.ok ? span('', 'Room ' + c.room) : null); hb.appendChild(d); targets.push({ el: d, kind: 'hab', hab: h.id, ok: c.ok, reason: c.reason }); }); bar.appendChild(hb); }
+      bar.appendChild(el('div', { cls: 'mn-dtrow' }, penT, sellT)); panel.appendChild(bar);
+      targets.push({ el: penT, kind: 'pen', ok: !inPen, reason: 'Already here' }, { el: sellT, kind: 'sell', ok: true });
+      drag = { a, tile, ghost, tag, targets, bar, ox: pend.x - r.left, oy: pend.y - r.top, x: pend.x, y: pend.y, hover: null };
+      suppress = Date.now() + 5000; pend = null; place(); hover();
+      scrollTimer = setInterval(() => { if (!drag) return; const br = body.getBoundingClientRect(), zone = 56; if (drag.y < br.top + zone) body.scrollTop -= 10; else if (drag.y > br.bottom - zone - 70) body.scrollTop += 10; else return; hover(); }, 16);
+    }
+    function place() { drag.ghost.style.left = (drag.x - drag.ox) + 'px'; drag.ghost.style.top = (drag.y - drag.oy) + 'px'; }
+    function hover() {
+      let hit = null;
+      for (let i = drag.targets.length - 1; i >= 0; i--) { const t = drag.targets[i], r = t.el.getBoundingClientRect(); if (drag.x >= r.left && drag.x <= r.right && drag.y >= r.top && drag.y <= r.bottom) { hit = t; break; } }
+      if (drag.hover !== hit) { if (drag.hover) drag.hover.el.classList.remove('hover'); if (hit) hit.el.classList.add('hover'); drag.hover = hit; }
+      drag.tag.textContent = hit && !hit.ok ? hit.reason : ''; drag.tag.style.display = hit && !hit.ok ? 'block' : 'none';
+    }
+    function onMove(ev) {
+      if (pend) { if (Math.abs(ev.clientX - pend.x) > 10 || Math.abs(ev.clientY - pend.y) > 10) { clearTimeout(pend.timer); pend = null; cleanupListeners(); } return; }
+      if (!drag) return; drag.x = ev.clientX; drag.y = ev.clientY; place(); hover(); if (ev.cancelable) ev.preventDefault();
+    }
+    function finish(drop) {
+      clearTimeout(pend && pend.timer); pend = null; cleanupListeners(); clearInterval(scrollTimer);
+      if (!drag) return; const d = drag; drag = null;
+      d.ghost.remove(); d.bar.remove(); d.tile.classList.remove('mn-lifted'); body.querySelectorAll('.mn-hsec').forEach(x => { x.classList.remove('drop-ok', 'drop-no', 'hover'); delete x.dataset.tag; });
+      suppress = Date.now() + 450;
+      const t = drop ? d.hover : null; if (!t || !t.ok) return;
+      const a = d.a;
+      if (t.kind === 'hab') { const r = Core.act('moveAnimal', a.id, t.hab); if (r && r.ok) ui.toast('Moved', 'good'); }
+      else if (t.kind === 'pen') { const r = Core.act('moveAnimal', a.id, null); if (r && r.ok) ui.toast('In the pen'); }
+      else if (t.kind === 'sell') { const v = E.animalValue(a); ui.confirm('Sell ' + (a.name || 'it') + ' for ' + money(v) + '?', () => { const r = Core.act('sellAnimal', a.id); if (r && r.ok) { ui.toast('Sold for ' + money(r.price), 'good'); try { Core.rerender(); } catch (e) { /* ignore */ } } }, { danger: true, yes: 'Sell' }); }
+      try { Core.rerender(); } catch (e) { /* ignore */ }
+    }
+    function onUp() { finish(true); }
+    function onCancel() { finish(false); }
+  }
+
   function animalsScreen(tab) {
     if (tab) animalTab = tab;
     push({ id: 'animals', title: 'Animals', render(body, api) {
@@ -612,12 +722,15 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       const s = S(), pen = E.holding(s), offers = s.offers, mk = offers ? offers.list.length + (E.crateInfo(s) ? 1 : 0) : 0;
       if (s.arrivals && s.arrivals.length) body.appendChild(el('div', { cls: 'list' }, s.arrivals.map(arrivalRow)));
       body.appendChild(ui.tabs([{ id: 'zoo', label: 'Zoo' }, { id: 'pen', label: 'Pen ' + pen.length + '/' + E.holdCap(s) }, { id: 'market', label: mk ? 'Market ' + mk : 'Market' }], animalTab, t => { animalTab = t; api.rerender(); }));
+      if ((animalTab === 'zoo' && s.animals.length) || (animalTab === 'pen' && pen.length)) { enableDrag(body); const hint = dragHint(); if (hint) body.appendChild(hint); }
       if (animalTab === 'zoo') {
         let any = false;
         habs().forEach(h => {
-          const an = E.inHab(s, h.id).sort((a, b) => (a.sp < b.sp ? -1 : a.sp > b.sp ? 1 : E.avg(b) - E.avg(a))); if (!an.length) return; any = true;
-          body.appendChild(ui.section(E.habName(s, h) + '  ' + an.length + '/' + E.habCap(h)));
-          body.appendChild(el('div', { cls: 'mn-ag' }, an.map(animalTile)));
+          const an = E.inHab(s, h.id).sort((a, b) => (a.sp < b.sp ? -1 : a.sp > b.sp ? 1 : E.avg(b) - E.avg(a))); any = true;
+          const sec = el('div', { cls: 'mn-hsec', 'data-hab': h.id });
+          sec.appendChild(el('div', { cls: 'mn-hh' }, ui.section(E.habName(s, h) + '  ' + an.length + '/' + E.habCap(h)), upgBtn(h)));
+          if (an.length) sec.appendChild(el('div', { cls: 'mn-ag' }, an.map(animalTile)));
+          body.appendChild(sec);
         });
         if (!any) body.appendChild(el('div', { cls: 'empty' }, 'No animals in habitats.'));
       } else if (animalTab === 'pen') {
@@ -711,12 +824,12 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   function staffScreen() {
     push({ id: 'staff', title: 'Staff', render(body, api) {
       const s = S(), busy = E.busyStaff(s), cap = E.staffCap(s);
-      body.appendChild(ui.section('Hire  ' + s.staff.length + '/' + cap)); body.appendChild(hireOptions(api));
+      body.appendChild(staffCapChip()); body.appendChild(hireOptions(api));
       if (s.candidates && s.candidates.length) body.appendChild(ui.btn('Who turned up', candidatesScreen, { cls: 'blue', sub: s.candidates.length + ' waiting' }));
       if (s.headhunt) {
         const h = s.headhunt, fee = E.headhuntFee(h);
         body.appendChild(ui.section('Headhunter'));
-        body.appendChild(row({ img: pUrl(h.role, 3), title: h.name, sub: D.ROLES[h.role].name + ' · Lv ' + h.lvl, line: staffChips(h), act: ui.btn('Hire', guard(() => { const r = Core.act('hireHeadhunt'); if (r.ok) { ui.toast(h.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', sub: money(fee), disabled: s.money < fee || s.staff.length >= cap }) }));
+        body.appendChild(row({ img: pUrl(h.role, 3), title: h.name, sub: D.ROLES[h.role].name + ' · Lv ' + h.lvl, line: staffChips(h), act: ui.btn('Hire', guard(() => { const r = Core.act('hireHeadhunt'); if (r.ok) { ui.toast(h.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', sub: money(fee), disabled: s.money < fee || s.staff.length >= cap, sub: s.staff.length >= cap ? 'Staff full' : mny(fee) }) }));
       }
       body.appendChild(ui.section('Team')); body.appendChild(keyRow('s'));
       body.appendChild(el('div', { cls: 'list' }, s.staff.map(st => row({ img: pUrl(st.role, 3), title: st.name, sub: D.ROLES[st.role].name + ' · Lv ' + st.lvl + ' · ' + money(E.salary(st)) + '/wk', extra: staffChips(st), right: busy[st.id] ? imgEl(iUrl('busy', 3), 'mn-mini') : null, tap: () => staffDetail(st.id) }))));
@@ -777,6 +890,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   function hireScreen() {
     push({ id: 'staff-hire', title: 'Advertise', render(body, api) {
       const s = S(), full = s.staff.length >= E.staffCap(s);
+      body.appendChild(staffCapChip());
       body.appendChild(ui.choices(E.hireTiers(s).map(t => ({ label: t.name, note: full ? 'Staff room full' : t.lock ? 'Needs ' + t.lock : t.note + (t.star >= 0.1 ? ' · stars likely' : ''), cost: t.cost, disabled: full || !!t.lock })), i => {
         const r = Core.act('advertise', i); if (!r.ok) return;
         api.replace(candidatesDef());
@@ -786,9 +900,9 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   }
   function candidatesDef() {
     return { id: 'staff-candidates', title: 'Who turned up', render(body, api) {
-      const s = S(), full = s.staff.length >= E.staffCap(s); body.appendChild(keyRow('s'));
+      const s = S(), full = s.staff.length >= E.staffCap(s); body.appendChild(staffCapChip()); body.appendChild(keyRow('s'));
       body.appendChild(rows((s.candidates || []).map((c, i) => row({ img: pUrl(c.role, 3), title: c.name, sub: D.ROLES[c.role].name + ' · Lv ' + c.lvl, line: el('span', { cls: 'mn-cl' }, [c.star ? ui.sym('star', { scale: 2, label: 'Standout', text: '*' }) : null].concat(SKILLS.map(k => K(k, c[k])))),
-        act: ui.btn('Hire', guard(() => { const r = Core.act('hireCandidate', i); if (r.ok) { ui.toast(c.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', disabled: full, sub: full ? 'Full' : money(E.salary(c)) + '/wk' }) })), 'Nobody left.'));
+        act: ui.btn('Hire', guard(() => { const r = Core.act('hireCandidate', i); if (r.ok) { ui.toast(c.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', disabled: full, sub: full ? 'Staff full' : money(E.salary(c)) + '/wk' }) })), 'Nobody left.'));
     } };
   }
   function candidatesScreen() { push(candidatesDef()); }
