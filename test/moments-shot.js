@@ -672,6 +672,23 @@ async function run(name) {
       check(await ev(() => !!document.querySelector('.mo-foot .btn.warn')), 'stray taken in: keep or let go is offered');
       await page.locator('.mo-foot .btn.primary').tap(); await sleep(400); await page.locator('.layer:not([hidden]) .mo-row.tap').last().tap(); await sleep(600);
       await settled('stray'); check(await ev(() => ZT.S.arrivals.length === 0 && ZT.S.animals.length >= 3), 'stray kept');
+      // a full habitat offers an inline upgrade from the where list; the animal is placed in the same sequence
+      await ev(() => {
+        ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; S.arrivals = [];
+        const hab = S.items.find(i => i.k === 'hab'); const z = S.animals.find(a => a.hab === hab.id);
+        while (S.animals.filter(a => a.hab === hab.id).length < ZE.habCap(hab)) S.animals.push(Object.assign({}, z, { id: 9400 + S.animals.length, name: 'Fill' }));
+        S.arrivals.push({ a: Object.assign({}, z, { id: 9499, hab: null, name: 'Upg' }), src: 'expedition', at: S.week }); window.__hab = hab.id; window.__cap0 = ZE.habCap(hab);
+        ZMoments.showArrival(9499);
+      });
+      await sleep(2400); await page.locator('.mo-foot .btn.primary').tap(); await sleep(450); await shot('where-upgrade');
+      check(await ev(() => !!document.querySelector('.layer:not([hidden]) .mo-row .btn.blue') && /Full/.test(document.querySelector('.layer:not([hidden])').textContent)), 'a full habitat shows Full and an inline Upgrade button');
+      await page.locator('.layer:not([hidden]) .mo-row .btn.blue').first().tap(); await sleep(700);
+      check(await ev(() => { const h = ZE.item(ZT.S, window.__hab); return h.lvl === 2 && ZE.habCap(h) > window.__cap0 && ZT.S.arrivals.length === 0 && ZT.S.animals.some(a => a.id === 9499 && a.hab === window.__hab) && ZT.stack().length === 0; }), 'Upgrade, then the animal is placed there in the same tap (capacity went up)');
+      // not possible: max level shows a short reason and stays greyed
+      await ev(() => { const S = ZT.S; S.arrivals = []; const hab = ZE.item(S, window.__hab); hab.lvl = 5; const z = S.animals.find(a => a.hab === hab.id); while (S.animals.filter(a => a.hab === hab.id).length < ZE.habCap(hab)) S.animals.push(Object.assign({}, z, { id: 9600 + S.animals.length })); S.arrivals.push({ a: Object.assign({}, z, { id: 9598, hab: null }), src: 'expedition', at: S.week }); ZMoments.showArrival(9598); });
+      await sleep(2400); await page.locator('.mo-foot .btn.primary').tap(); await sleep(450);
+      check(await ev(() => { const b = document.querySelector('.layer:not([hidden]) .mo-row .btn.blue'); return !!b && b.classList.contains('disabled') && /Max/.test(b.textContent); }), 'at the top level the upgrade is greyed with "Max level"');
+      await ev(() => ZT.popAll()); await sleep(200);
       // the carried-over animal ("Bring along") is offered once on a new bare zoo
       const legacyAnimal = await ev(() => { ZT.newGame({}); return JSON.parse(JSON.stringify(ZT.S.animals[0])); });
       await ev(a => { ZT.newGame({ starter: false, animal: a }); }, legacyAnimal);

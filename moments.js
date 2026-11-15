@@ -117,6 +117,7 @@
 .mo-row.compact .btn { min-height: 44px; min-width: 76px; font-size: 14px; }
 .mo-arrows { display: flex; gap: 12px; } .mo-arrows .up { color: var(--good); } .mo-arrows .dn { color: var(--bad); }
 .mo-fee { display: inline-flex; align-items: center; gap: 2px; font-size: 14px; color: var(--ink2); margin-right: 8px; } .mo-fee .mo-symg { height: 16px; }
+.mo-row.compact .btn.blue { min-width: 96px; padding: 2px 6px; } .mo-row.compact .btn .sub { font-size: 11px; }
 .mo-room { display: inline-flex; align-items: center; gap: 4px; font-size: 18px; min-width: 56px; justify-content: flex-end; } .mo-row.off { background: #d9d0bc; color: #8a7f68; } .mo-row.off img { filter: grayscale(1); } .mo-row.sel { background: #fff3b8; }
 .mo-det {display: flex; align-items: center; gap: 4px; font-size: 15px; } .mo-det .mo-symg { height: 20px; }
 .mo-optbody .lbl { font-size: 17px; } .mo-optbody .meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .mo-optbody .sub { font-size: 13px; color: var(--ink2); }
@@ -310,6 +311,17 @@
       const right = [];
       if (c.hab == null && fee != null) right.push(el('span', { cls: 'mo-fee' }, sym('coin', '$', 'upkeep'), el('b', String(fee)), sym('time', '', 'per week', 2)));
       right.push(el('span', { cls: 'mo-room' }, sym(c.hab == null ? 'pen' : 'habitat', '', 'room', 3), el('b', String(Math.max(0, c.room)))));
+      // a full habitat offers an inline upgrade (then the animal is placed there in the same tap sequence)
+      if (!c.fit && it && it.k === 'hab' && E.habUpgradeCost) {
+        const st0 = S(), cost = E.habUpgradeCost(it, st0), cap = E.habLevelCap ? E.habLevelCap(st0) : 5, newCap = E.habCap ? E.habCap({ lvl: it.lvl + 1 }) : null;
+        const why = it.lvl >= 5 ? 'Max level' : it.lvl >= cap ? 'Needs research' : st0.money < cost ? 'Need ' + fmt.money(cost) : null;
+        const up = ui.btn('▲ ' + fmt.money(cost), () => {
+          const r = Z.act('upgrade', c.hab);
+          if (r && r.ok) { const k = Z.act('keepArrival', id, c.hab); if (k && k.ok) { ui.toast(animalName(f) + ' joins ' + label, 'good'); afterDecision(); } else whereList(card, st, f, afterDecision); }
+        }, { cls: 'blue', disabled: !!why, sub: why || (newCap ? '→ ' + newCap : null), onDisabled: () => ui.toast(why, 'bad') });
+        const rowF = el('div', { cls: 'mo-row compact' }, left, el('div', { cls: 'mid' }, el('span', { cls: 't' }, label, ' ', 'Full')), el('span', { cls: 'mo-room' }, sym('habitat', '', 'room', 3), el('b', '0')), up);
+        rows.appendChild(rowF); return;
+      }
       const row = el('div', { cls: 'mo-row compact tap' + (c.fit ? '' : ' off') + (c.best ? ' sel' : '') }, left,
         el('div', { cls: 'mid' }, el('span', { cls: 't' }, label, ' ', c.best ? sym('ok', 'o', 'best place') : null)), right);
       if (c.fit) row.addEventListener('click', () => { const r = Z.act('keepArrival', id, c.hab); if (r && r.ok) { ui.toast(animalName(f) + (c.hab == null ? ' is in the pen' : ' joins ' + label), 'good'); afterDecision(); } });
