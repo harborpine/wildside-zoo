@@ -33,3 +33,4 @@ Harrison is sending notes while he tests (from 2026-11-15). Save each one here i
 - Notes 2 and 3: replace red number boxes with a gold glowing (pulsing) frame on the button itself; nothing overlapping.
 - Note 6: ONE Edit mode replaces the Build menu and the Move screen: Build opens the map in Edit mode; a sideways-scrolling strip along the bottom lists what you can add, grouped; tap anything on the map to move or sell it.
 - He asked the Lead for suggestions of additions, removals or changes for this update.
+- Symbols (note 11): flat 2D style APPROVED 2026-11-15 ("b and the other stuff looks great"); Hosting = idea B, the purple smiling speech bubble. Samples in `docs/art-review/symbols-v2/`.

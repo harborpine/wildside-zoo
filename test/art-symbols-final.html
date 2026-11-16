@@ -1,0 +1,60 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Symbols v2, all</title>
+<style>
+  html, body { margin: 0; background: #fbeccb; font-family: system-ui, "Segoe UI", sans-serif; color: #3a2a33; }
+  #page { width: 390px; padding: 10px 10px 12px; box-sizing: border-box; background: #fbeccb; }
+  h1 { font-size: 16px; margin: 0 0 2px; } .note { font-size: 11px; color: #7a6a66; margin: 0 0 6px; line-height: 1.3; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+  .item { border-top: 2px solid #d9bf8a; padding: 4px 0 6px; }
+  .name { font-size: 13px; font-weight: 800; } .id { font-size: 10px; color: #7a6a66; font-weight: 400; }
+  .cell { display: flex; align-items: center; gap: 6px; min-height: 100px; }
+  .big { width: 104px; height: 100px; display: flex; align-items: center; justify-content: center; flex: none; }
+  img { image-rendering: pixelated; image-rendering: crisp-edges; image-rendering: pixelated; display: block; }
+  .real { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .chip { display: inline-flex; align-items: center; gap: 3px; background: #fff8e6; border: 2px solid #3a2a33; padding: 1px 5px 1px 3px; font-weight: 800; font-size: 14px; }
+  .chip.sm { font-size: 11px; padding: 0 2px 0 1px; gap: 1px; } .chip.sm img { height: 13px; width: auto; }
+  .dark { background: #4a3526; padding: 3px; } .grass { background: #86c94e; padding: 3px; } .duo { display: flex; gap: 4px; }
+</style></head><body>
+<div id="page"></div>
+<script src="../geo.js"></script>
+<script src="../data.js"></script>
+<script src="../sprites.js"></script>
+<script>
+'use strict';
+/* Artist: review sheets of EVERY symbol as the game draws it at density 2 (ZSprites.icon). Rendered by test/art-symbols-final.js. */
+window.__err = []; window.onerror = function (m) { window.__err.push(String(m)); };
+ZSprites.setDensity(2);
+var NAMES = { 'ready-event': 'Event ready', 'ready-breed': 'Pair can breed', busy: 'Busy', sick: 'Sick', choice: 'Choice waiting', star: 'Star', flame: 'On fire', coin: 'Money', rp: 'Research points', heart: 'Heart', rep: 'Reputation',
+  'm-projects': 'Menu: Projects', 'm-build': 'Menu: Build', 'm-animals': 'Menu: Animals', 'm-staff': 'Menu: Staff', 'm-research': 'Menu: Research', 'm-info': 'Menu: Info', 'm-system': 'Menu: System',
+  'stat-charm': 'Charm', 'stat-vigor': 'Energy', 'stat-wit': 'Smarts', 'skill-care': 'Care', 'skill-sci': 'Science', 'skill-exp': 'Scouting', 'skill-charm': 'Hosting', 'sex-m': 'Male', 'sex-f': 'Female', juv: 'Young', time: 'Time',
+  visitors: 'Visitors', odds: 'Chance', lock: 'Locked', 'new': 'New', ok: 'Yes / best', no: 'No', habitat: 'Habitat', pen: 'Holding pen', land: 'Land', trophy: 'Trophy', 'medal-gold': 'Gold medal', 'medal-silver': 'Silver medal', 'medal-bronze': 'Bronze medal',
+  'grade-ss': 'Grade SS', 'grade-s': 'Grade S', 'grade-a': 'Grade A', 'grade-b': 'Grade B', 'grade-c': 'Grade C', 'grade-d': 'Grade D',
+  best: 'NEW: Best of its kind', edit: 'NEW: Build and edit', move: 'NEW: Move', sell: 'NEW: Sell', goal: 'NEW: Goal', level: 'NEW: Challenge level', path: 'NEW: Walkway', 'star-on': 'NEW: Star lit', 'star-off': 'NEW: Star unlit' };
+var ORDER = ['stat-charm', 'stat-vigor', 'stat-wit', 'skill-care', 'skill-sci', 'skill-exp', 'skill-charm', 'coin', 'rp', 'time', 'visitors', 'habitat', 'pen', 'land',
+  'sex-m', 'sex-f', 'juv', 'heart', 'star', 'flame', 'rep', 'odds', 'lock', 'new', 'ok', 'no', 'trophy', 'medal-gold', 'medal-silver', 'medal-bronze',
+  'grade-ss', 'grade-s', 'grade-a', 'grade-b', 'grade-c', 'grade-d', 'm-projects', 'm-build', 'm-animals', 'm-staff', 'm-research', 'm-info', 'm-system',
+  'ready-event', 'ready-breed', 'busy', 'sick', 'choice', 'best', 'edit', 'move', 'sell', 'goal', 'level', 'path', 'star-on', 'star-off'];
+var PER = 16;
+window.__sheets = Math.ceil(ORDER.length / PER);
+window.__missing = ZSprites.ICONS.filter(function (n) { return ORDER.indexOf(n) < 0 && n !== 'cost-rp'; });
+function el(t, c, txt) { var e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; }
+function im(src, w, h) { var i = new Image(); i.src = src; if (w) { i.width = w; i.height = h; } return i; }
+window.__build = function (n) {
+  var page = document.getElementById('page'); page.innerHTML = '';
+  page.appendChild(el('h1', '', 'All symbols, new flat style, sheet ' + n + ' of ' + window.__sheets));
+  page.appendChild(el('p', 'note', 'Big = enlarged. Beside it: the real sizes used in the game (in a number chip, in the tight chip, and on dark and grass).'));
+  var grid = el('div', 'grid');
+  ORDER.slice((n - 1) * PER, n * PER).forEach(function (id) {
+    var s = ZSprites.icon(id), src = ZSprites.iconUrl(id, 2), it = el('div', 'item'), nm = el('div', 'name', NAMES[id] || id);
+    nm.appendChild(el('span', 'id', '  ' + id + ' ' + s.w + 'x' + s.h)); it.appendChild(nm);
+    var c = el('div', 'cell'), big = el('div', 'big'), k = Math.max(1, Math.floor(100 / Math.max(s.w, s.h))); big.appendChild(im(src, s.w * k, s.h * k)); c.appendChild(big);
+    var real = el('div', 'real'), a = el('span', 'chip'); a.appendChild(im(src, s.w, s.h)); a.appendChild(el('span', '', '42')); real.appendChild(a);
+    var b = el('span', 'chip sm'); b.appendChild(im(src)); b.appendChild(el('span', '', '42')); real.appendChild(b);
+    var duo = el('div', 'duo'), d1 = el('span', 'dark'), d2 = el('span', 'grass'); d1.appendChild(im(src, s.w, s.h)); d2.appendChild(im(src, s.w, s.h)); duo.appendChild(d1); duo.appendChild(d2); real.appendChild(duo);
+    c.appendChild(real); it.appendChild(c); grid.appendChild(it);
+  });
+  page.appendChild(grid);
+  return Promise.all(Array.prototype.map.call(document.images, function (i) { return i.decode ? i.decode().catch(function () {}) : null; }));
+};
+window.__report = function () { var half = [], sizes = []; ZSprites.ICONS.forEach(function (id) { var s = ZSprites.icon(id), d = s.c.getContext('2d').getImageData(0, 0, s.w, s.h).data; for (var i = 3; i < d.length; i += 4) if (d[i] !== 0 && d[i] !== 255) { half.push(id); break; } sizes.push(id + ' ' + s.w + 'x' + s.h + ' a' + s.ax + ',' + s.ay); }); return { half: half, sizes: sizes, n: ZSprites.ICONS.length }; };
+</script></body></html>

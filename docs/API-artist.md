@@ -3,6 +3,38 @@
 One IIFE, one global: `ZSprites`. Needs `ZGeo` (and reads `ZD` only inside `init`). Browser only. Nothing throws for unknown ids:
 every getter returns a fallback sprite.
 
+## Update 7: symbols v2 (flat style, approved by the owner 2026-11-15)
+
+Every symbol in `ZSprites.ICONS` is redrawn flat and front-on: no bevels, no lighting step, a bold 2-pixel dark outline, more
+interior detail, solid pixels only. Same ids, same calls (`icon`, `iconUrl`), same anchor rule (centre-bottom: `ax = ceil(w/2) - 1`,
+`ay = h`), `d: 2`. Nothing else in the API changed. This section replaces the picture descriptions in the two icon lists further down.
+
+- **Where the code is:** the block "SYMBOLS V2" in sprites.js (`V2` table, one small drawing function per id, painter `VG`).
+  The drawings are made directly in fine pixels (one drawn pixel = one CSS pixel in menus at density 2).
+- **Density:** the game ships at density 2 and shows the v2 drawings. At density 1 the old ids keep their old drawings exactly
+  (`test/art-regress.js` still pins them) and the new ids return a half-size copy of the v2 drawing, so nothing crashes.
+- **Pictures:** `stat-charm` pink sparkle with a second small sparkle · `stat-vigor` yellow bolt with an orange stripe ·
+  `stat-wit` lit lightbulb (no glow marks: they did not survive at real size) · `skill-care` green heart with a paw print ·
+  `skill-sci` three test tubes, three colours · `skill-exp` gold compass · `skill-charm` (Hosting) purple speech bubble with a smile ·
+  `coin` flat coin with a dollar sign · `rp` and `cost-rp` flask of blue liquid · `time` clock · `visitors` one big-headed guest in a
+  blue shirt · `habitat` three fence pickets on grass · `pen` crate with eyes in the slot · `land` signpost with a green plus ·
+  `sex-m`, `sex-f` · `juv` cracked spotted egg · `heart` · `star` · `flame` · `rep` gold medal on a blue ribbon · `odds` die showing five ·
+  `lock` padlock · `new` red burst with a plus · `ok` green tick · `no` red cross · `trophy` · `medal-gold/-silver/-bronze` with 1, 2, 3 ·
+  `grade-ss/-s/-a/-b/-c/-d` rosettes with the letter · `m-projects` clipboard · `m-build` hammer · `m-animals` paw · `m-staff` keeper ·
+  `m-research` large flask · `m-info` open book · `m-system` gear · floor markers `ready-event` red flag, `ready-breed` pink heart,
+  `busy` hourglass, `sick` green cross (white round badges) and `choice` (yellow badge with an exclamation mark).
+- **New ids:** `best` (gold crown: best animal of its species and sex) · `edit` (crossed pencil and hammer: build and edit; made the
+  same size as `m-build` so it can take its place on the main menu) · `move` (four-way blue arrows) · `sell` (green price tag with a
+  dollar sign) · `goal` (red and white target) · `level` (purple shield with two chevrons: a challenge level) · `path` (paving stones:
+  walkway) · `star-on` (the same picture as `star`) · `star-off` (the same star in grey, for unlit stars).
+- **Sizes** (fine pixels at density 2, width x height; the old size in brackets where it changed by more than 2):
+  `rp` 22x24 (was 18x22) · `stat-vigor` 19x23 (22x26) · `skill-exp` 22x25 (26x26) · `skill-charm` 24x24 (30x28) ·
+  `time` 22x22 (26x26) · `m-build` 26x26 (30x26) · `sex-m` 23x24 (22x22). All others are within 2 pixels of before
+  and the floor markers are exactly 22x22 as before.
+- **Review sheets:** `node test/art-symbols-final.js` writes `docs/art-review/symbols-v2/symbols-v2-all-1.png` to `-4.png`
+  (every symbol enlarged and at real size on cream, dark and grass) and fails if any pixel is see-through.
+  `test/art-symbols-v2*.js|html` made the first approval sample (old against new); re-running it now would show the new art in both columns.
+
 ## Differences from the contract (read these first)
 
 1. **Animals are a little bigger than the 16 to 24 px target.** Most adult land animals are 22 to 29 px wide; the largest are

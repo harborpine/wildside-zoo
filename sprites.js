@@ -1581,7 +1581,169 @@
     for (y = -h; y < 0; y++) for (x = -8; x <= 8; x++) if (!d.flat && P.has(x, y) && !P.has(x, y + 1) && P.kat(x, y) !== 'W' && P.kat(x, y) !== 'K') P.sh(x, y, 2);
     return P.bake(null);
   }
-  function icon(name) { return cached('i|' + name, function () { return DENS === 2 ? iconD(ZI, name) : drawIcon(name); }); }
+  // =====================================================================================================================
+  // SYMBOLS V2 (Update 7, approved by the owner): every symbol redrawn flat and front-on. No bevels, no lighting step,
+  // a bold 2-pixel dark outline, more interior detail, solid pixels only. Drawn directly in fine pixels (density 2: one
+  // drawn pixel = one CSS pixel in the menus). The game ships at density 2 and shows these. Density 1 keeps the old
+  // drawings for the old ids (pinned by test/art-regress.js) and shows a half-size copy of the new drawing for new ids.
+  // Ink ('K' or 'k') pixels are detail lines: the outline never grows around them, so they stay thin.
+  // =====================================================================================================================
+  var V2C = { K: INK, k: INK, W: '#ffffff', P: '#f0689a', p: '#fbb4d2', Y: '#f8cc30', Q: '#fff2a8', O: '#f08a2c', D: '#d89a1c', N: '#8a5a10',
+    B: '#4a8ae0', b: '#a8d0fa', C: '#bfeaf8', G: '#5cb85a', g: '#3f8f45', U: '#27a898', u: '#8fe0d2', T: '#b8844a', X: '#7a5230',
+    z: '#f0b880', R: '#e8503a', r: '#b8382a', V: '#8a5ad8', v: '#c0a4f4', y: '#5a3a9a', S: '#f4c8a0', H: '#f8c84a', M: '#a8acb8', E: '#e8e8f0', J: '#6a7088', F: '#fff2c8',
+    L: '#4a4060', I: '#cfd4de', i: '#f4f6fa', j: '#8f96a8', m: '#e8894a', n: '#fcc49a', o: '#b85c2a', A: '#e8d5a4', a: '#c2a870', e: '#2f5fb0', h: '#f4a23a' };
+  var VN = 48, VO = 8; // working grid and margin (room for the outline and for marks outside the box)
+  function VG() { this.d = new Array(VN * VN); for (var i = 0; i < this.d.length; i++) this.d[i] = null; }
+  VG.prototype = {
+    set: function (x, y, c) { x = Math.round(x) + VO; y = Math.round(y) + VO; if (x < 0 || y < 0 || x >= VN || y >= VN) return; this.d[y * VN + x] = c; },
+    get: function (x, y) { x += VO; y += VO; if (x < 0 || y < 0 || x >= VN || y >= VN) return null; return this.d[y * VN + x]; },
+    r: function (x, y, w, h, c) { for (var j = 0; j < h; j++) for (var i = 0; i < w; i++) this.set(x + i, y + j, c); return this; },
+    // filled ellipse in pixel-index coordinates; a centre of 9.5 sits between pixels 9 and 10
+    e: function (cx, cy, rx, ry, c) { for (var y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (var x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) { var dx = (x - cx) / rx, dy = (y - cy) / ry; if (dx * dx + dy * dy <= 1.0001) this.set(x, y, c); } return this; },
+    // filled polygon in pixel-edge coordinates (pixel x covers x..x+1), tested at pixel centres
+    p: function (pts, c) { var ys = pts.map(function (q) { return q[1]; }), xs = pts.map(function (q) { return q[0]; });
+      for (var y = Math.floor(Math.min.apply(0, ys)); y <= Math.ceil(Math.max.apply(0, ys)); y++) for (var x = Math.floor(Math.min.apply(0, xs)); x <= Math.ceil(Math.max.apply(0, xs)); x++) {
+        var px = x + 0.5, py = y + 0.5, inside = false;
+        for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) { var a = pts[i], b = pts[j]; if ((a[1] > py) !== (b[1] > py) && px < (b[0] - a[0]) * (py - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside; }
+        if (inside) this.set(x, y, c); } return this; },
+    // thick straight bar from one point to another (pixel-edge coordinates), hw = half its width
+    q: function (x0, y0, x1, y1, hw, c) { var dx = x1 - x0, dy = y1 - y0, n = Math.sqrt(dx * dx + dy * dy) || 1, ux = -dy / n * hw, uy = dx / n * hw; return this.p([[x0 + ux, y0 + uy], [x1 + ux, y1 + uy], [x1 - ux, y1 - uy], [x0 - ux, y0 - uy]], c); },
+    l: function (x0, y0, x1, y1, c) { var n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) || 1; for (var i = 0; i <= n; i++) this.set(Math.round(x0 + (x1 - x0) * i / n), Math.round(y0 + (y1 - y0) * i / n), c); return this; },
+    // rows of palette letters; '.' leaves the pixel alone, '_' clears it. k = size of each drawn pixel, c = one colour for all
+    s: function (x, y, rows, k, c) { k = k || 1; for (var j = 0; j < rows.length; j++) for (var i = 0; i < rows[j].length; i++) { var ch = rows[j].charAt(i); if (ch === '.') continue; this.r(x + i * k, y + j * k, k, k, ch === '_' ? null : (c || ch)); } return this; },
+    heart: function (cx, cy, sx, sy, c) { for (var y = Math.floor(cy - 1.3 * sy); y <= Math.ceil(cy + 1.1 * sy); y++) for (var x = Math.floor(cx - 1.2 * sx); x <= Math.ceil(cx + 1.2 * sx); x++) { var X = (x + 0.5 - cx) / sx, Y = -(y + 0.5 - cy) / sy, t = X * X + Y * Y - 1; if (t * t * t - X * X * Y * Y * Y <= 0) this.set(x, y, c); } return this; },
+    star: function (cx, cy, R, r, n, c, rot) { var pts = [], i; for (i = 0; i < n * 2; i++) { var a = -Math.PI / 2 + (rot || 0) + i * Math.PI / n, rr = i % 2 ? r : R; pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]); } return this.p(pts, c); },
+    spark: function (cx, cy, R, c) { for (var y = -R; y <= R; y++) for (var x = -R; x <= R; x++) if (Math.pow(Math.abs(x), 0.62) + Math.pow(Math.abs(y), 0.62) <= Math.pow(R, 0.62) + 0.001) this.set(cx + x, cy + y, c); return this; },
+    // draw something on top of what is there and put a thin ink line where the new shape meets the old one
+    over: function (fn) { var was = this.d.slice(), now, i, x, y; fn(this); now = this.d.slice();
+      for (y = 1; y < VN - 1; y++) for (x = 1; x < VN - 1; x++) { i = y * VN + x; if (!was[i] || now[i] !== was[i]) continue;
+        if ((now[i - 1] !== was[i - 1] && now[i - 1]) || (now[i + 1] !== was[i + 1] && now[i + 1]) || (now[i - VN] !== was[i - VN] && now[i - VN]) || (now[i + VN] !== was[i + VN] && now[i + VN])) this.d[i] = 'k'; }
+      return this; },
+    // the bold dark outline: two rings around every coloured (non-ink) pixel
+    outline: function () { var d = this.d, pass, x, y, i, t;
+      for (pass = 0; pass < 2; pass++) { var add = [];
+        for (y = 0; y < VN; y++) for (x = 0; x < VN; x++) { i = y * VN + x; if (d[i]) continue;
+          var hit = false, nb = [x > 0 ? d[i - 1] : null, x < VN - 1 ? d[i + 1] : null, y > 0 ? d[i - VN] : null, y < VN - 1 ? d[i + VN] : null];
+          for (t = 0; t < 4; t++) if (nb[t] && (pass === 0 ? (nb[t] !== 'K' && nb[t] !== 'k' && nb[t] !== '1') : nb[t] === '1')) hit = true;
+          if (hit) add.push(i); }
+        for (t = 0; t < add.length; t++) d[add[t]] = pass === 0 ? '1' : '2'; }
+      for (i = 0; i < d.length; i++) if (d[i] === '1' || d[i] === '2') d[i] = 'K'; return this; }
+  };
+  var V2DOLLAR = ['...NN...', '...NN...', '.NNNNNN.', 'NN.NN...', 'NN.NN...', '.NNNNNN.', '...NN.NN', '...NN.NN', '.NNNNNN.', '...NN...', '...NN...'];
+  var V2LET = { S: ['WWWWW', 'W....', 'WWWWW', '....W', 'WWWWW'], A: ['.WWW.', 'W...W', 'WWWWW', 'W...W', 'W...W'], B: ['WWWW.', 'W...W', 'WWWW.', 'W...W', 'WWWW.'], C: ['.WWWW', 'W....', 'W....', 'W....', '.WWWW'], D: ['WWWW.', 'W...W', 'W...W', 'W...W', 'WWWW.'],
+    SS: ['WWW.WWW', 'W...W..', 'WWW.WWW', '..W...W', 'WWW.WWW'], 1: ['.W.', 'WW.', '.W.', '.W.', 'WWW'], 2: ['WWW', '..W', 'WWW', 'W..', 'WWW'], 3: ['WWW', '..W', 'WWW', '..W', 'WWW'] };
+  function v2badge(g, bg) { g.e(8.5, 8.5, 9, 9, bg || 'W'); }
+  function v2medal(col, dark, num) { return function (g) { g.r(3, 0, 4, 7, 'R'); g.r(7, 0, 4, 7, 'W'); g.r(11, 0, 4, 7, 'B'); g.e(8.5, 12, 7.5, 7.5, col); g.s(6, 7, V2LET[num], 2, dark); }; }
+  function v2grade(col, dark, letter, ink) { return function (g) {
+    g.p([[3, 14], [8, 14], [8, 24], [5.5, 21.5], [3, 24]], dark); g.p([[10, 14], [15, 14], [15, 24], [12.5, 21.5], [10, 24]], dark);
+    g.e(8.5, 8.5, 9, 9, col); var L = V2LET[letter]; g.s(9 - L[0].length, 4, L, 2, ink || 'W'); }; }
+  function v2star(a, b) { return function (g) { g.star(9, 9.9, 9.9, 4.2, 5, a); g.star(9, 10.1, 4.6, 2, 5, b); }; }
+  function v2flask(g) { g.r(5, 0, 8, 2, 'E'); g.r(6, 2, 6, 6, 'C'); g.p([[6, 8], [12, 8], [18, 18], [18, 19], [0, 19], [0, 18]], 'C'); g.r(1, 19, 16, 1, 'C');
+    for (var y = 12; y < 20; y++) for (var x = 0; x < 18; x++) if (g.get(x, y) === 'C') g.set(x, y, y === 12 ? 'b' : 'B');
+    g.r(5, 15, 2, 2, 'W'); g.r(11, 14, 1, 1, 'W'); g.r(12, 17, 2, 2, 'W'); g.r(8, 9, 2, 2, 'b'); g.r(9, 5, 1, 1, 'b'); }
+  var V2 = {
+    // ---- on-floor markers: a round white badge with one bold picture ----
+    'ready-event': function (g) { v2badge(g); g.r(4, 3, 2, 12, 'K'); g.s(6, 3, ['RRRRRRRR', 'RRRRRRR.', 'RRRRRR..', 'RRRRRRR.', 'RRRRRRRR']); },
+    'ready-breed': function (g) { v2badge(g); g.heart(9, 9, 4.9, 4.6, 'P'); },
+    'busy': function (g) { v2badge(g); g.r(4, 3, 10, 2, 'B'); g.r(4, 13, 10, 2, 'B'); g.p([[5, 5], [13, 5], [9, 9]], 'b'); g.p([[9, 9], [13, 13], [5, 13]], 'D'); g.r(8, 8, 2, 3, 'D'); g.r(6, 5, 6, 1, 'D'); },
+    'sick': function (g) { v2badge(g); g.r(7, 3, 4, 12, 'G'); g.r(3, 7, 12, 4, 'G'); },
+    'choice': function (g) { v2badge(g, 'Y'); g.r(7, 3, 4, 8, 'K'); g.r(7, 12, 4, 3, 'K'); },
+    // ---- plain markers ----
+    'star': v2star('Y', 'Q'), 'star-on': v2star('Y', 'Q'), 'star-off': v2star('M', 'I'),
+    'flame': function (g) { g.s(0, 0, ['......RR......', '.....RRR......', '.....RRRR.....', '....RRRRR.....', '...RRRRRRR.R..', '..RRRRORRRRR..', '.RRRROORRRRRR.', '.RRROOOORRRRR.', 'RRRROOOOORRRRR', 'RRROOOYOOORRRR', 'RRROOYYYOOORRR', 'RRROOYYYYOORRR', 'RRROOYYYYOORRR', '.RROOYYYYOORR.', '.RRROOYYOORRR.', '..RRROOOORRR..', '...RRRRRRRR...', '....RRRRRR....']); },
+    'coin': function (g) { g.e(9.5, 9.5, 9.5, 9.5, 'Y'); g.e(9.5, 9.5, 7.6, 7.6, 'D'); g.e(9.5, 9.5, 6.6, 6.6, 'Y'); g.s(6, 4, V2DOLLAR.slice(1, 10)); g.r(9, 3, 2, 1, 'N'); g.r(9, 13, 2, 2, 'N'); },
+    'rp': v2flask, 'cost-rp': v2flask,
+    'heart': function (g) { g.heart(9, 8.9, 7.9, 7.1, 'R'); g.heart(9, 8.6, 4.3, 3.9, 'P'); },
+    'rep': function (g) { g.p([[0, 0], [4, 0], [8, 7], [4, 7]], 'B'); g.p([[14, 0], [10, 0], [6, 7], [10, 7]], 'B'); g.e(6.5, 9.5, 6, 6, 'Y'); g.e(6.5, 9.5, 4.3, 4.3, 'D'); g.e(6.5, 9.5, 3.3, 3.3, 'Y'); g.r(6, 9, 2, 2, 'D'); },
+    // ---- main-menu pictures ----
+    'm-projects': function (g) { g.r(0, 2, 18, 18, 'T'); g.r(2, 4, 14, 14, 'W'); g.r(5, 0, 8, 4, 'M'); g.r(7, 1, 4, 1, 'J'); [6, 10, 14].forEach(function (y, i) { g.r(3, y, 3, 3, i === 2 ? 'R' : 'G'); g.r(8, y + 1, 6, 1, 'J'); }); },
+    'm-build': function (g) { g.q(2, 21, 16, 7, 2, 'T'); g.q(3, 20, 6, 17, 2, 'X'); g.over(function () { g.q(11, 2, 21, 12, 3.5, 'M'); g.q(18.5, 9.5, 21, 12, 3.5, 'J'); }); },
+    'm-animals': function (g) { g.e(12.5, 15, 7.5, 6.5, 'T'); g.e(3, 9.5, 3, 3.5, 'T'); g.e(9, 4, 3, 4, 'T'); g.e(16, 4, 3, 4, 'T'); g.e(22, 9.5, 3, 3.5, 'T');
+      g.e(12.5, 15.5, 4.5, 3.5, 'z'); g.e(3, 9.5, 1.2, 1.8, 'z'); g.e(9, 4, 1.2, 2, 'z'); g.e(16, 4, 1.2, 2, 'z'); g.e(22, 9.5, 1.2, 1.8, 'z'); },
+    'm-staff': function (g) { g.s(0, 0, [
+      '.....GGGGGGGGGGGG.....', '....GGGGGGGGGGGGGG....', '....GGGGGGWWGGGGGG....', '....GGGGGGWWGGGGGG....', '..gggggggggggggggggg..', '..gggggggggggggggggg..',
+      '.....SSSSSSSSSSSS.....', '.....SSKKSSSSKKSS.....', '.....SSKKSSSSKKSS.....', '.....SSSSSSSSSSSS.....', '.....SSSKSSSSKSSS.....', '......SSSKKKKSSS......', '.......SSSSSSSS.......',
+      '...BBBBBBWSSWBBBBBB...', '.BBBBBBBBBWWBBBBBBBBB.', 'BBBBBBBBBBBBBBBBBBBBBB', 'BBBBBBBBBBWWBBBBBBBBBB', 'BBBBYYYBBBWWBBBBBBBBBB', 'BBBBYYYBBBBBBBBBBBBBBB', 'BBBBBBBBBBWWBBBBBBBBBB', 'BBBBBBBBBBWWBBBBBBBBBB', 'BBBBBBBBBBBBBBBBBBBBBB']); },
+    'm-research': function (g) { g.r(7, 0, 8, 2, 'E'); g.r(8, 2, 6, 7, 'C'); g.p([[8, 9], [14, 9], [22, 20], [22, 21], [0, 21], [0, 20]], 'C'); g.r(1, 21, 20, 1, 'C');
+      for (var y = 14; y < 22; y++) for (var x = 0; x < 22; x++) if (g.get(x, y) === 'C') g.set(x, y, y === 14 ? 'b' : 'B');
+      g.r(6, 17, 2, 2, 'W'); g.r(13, 16, 2, 2, 'W'); g.r(15, 19, 2, 2, 'W'); g.r(9, 19, 1, 1, 'W'); g.r(10, 10, 2, 2, 'b'); g.r(11, 6, 1, 1, 'b'); g.r(10, 3, 1, 1, 'b'); },
+    'm-info': function (g) { g.r(0, 1, 26, 19, 'B'); g.r(2, 0, 10, 17, 'W'); g.r(14, 0, 10, 17, 'W'); [3, 6, 9, 12].forEach(function (y) { g.r(4, y, 6, 1, 'J'); g.r(16, y, y < 8 ? 3 : 6, 1, 'J'); }); g.r(20, 0, 3, 8, 'R'); g.r(12, 1, 2, 16, 'e'); },
+    'm-system': function (g) { for (var i = 0; i < 8; i++) { var a = i * Math.PI / 4; g.q(13, 13, 13 + Math.cos(a) * 13, 13 + Math.sin(a) * 13, 2.6, 'M'); } g.e(12.5, 12.5, 9.5, 9.5, 'M'); g.e(12.5, 12.5, 6.3, 6.3, 'J'); g.e(12.5, 12.5, 3.3, 3.3, 'K'); },
+    // ---- animal stats and staff skills ----
+    'stat-charm': function (g) { g.spark(8, 8, 8, 'P'); g.spark(8, 8, 5, 'p'); g.spark(8, 8, 2, 'W'); g.spark(16, 16, 3, 'P'); g.set(16, 16, 'W'); },
+    'stat-vigor': function (g) { g.p([[10, 0], [17, 0], [12, 7], [18, 7], [5, 20], [8, 11], [2, 11]], 'Y'); g.l(12, 2, 8, 8, 'O'); g.l(13, 2, 9, 8, 'O'); g.l(9, 9, 13, 9, 'O'); g.l(12, 10, 9, 15, 'O'); g.l(13, 10, 10, 15, 'O'); },
+    'stat-wit': function (g) { g.e(8.5, 8, 8.5, 8, 'B'); g.r(5, 14, 8, 3, 'B'); g.e(8.5, 8, 6.2, 5.8, 'Q'); g.r(6, 12, 6, 4, 'Q');
+      g.s(5, 5, ['.NN..NN.', 'N..NN..N', 'N......N', '.N....N.', '.N....N.', '..N..N..', '..N..N..', '..N..N..', '..N..N..', '..N..N..', '..N..N..']); g.r(5, 17, 8, 4, 'M'); g.r(5, 18, 8, 1, 'J'); g.r(5, 20, 8, 1, 'J'); g.r(7, 21, 4, 1, 'J'); },
+    'skill-care': function (g) { g.e(4.5, 5.5, 5, 5.5, 'G'); g.e(14.5, 5.5, 5, 5.5, 'G'); g.p([[0, 7], [20, 7], [10, 19.5]], 'G'); g.r(9, 3, 2, 5, 'G');
+      g.e(9.5, 11, 3.2, 2.6, 'W'); g.r(8, 13, 4, 1, 'W'); g.r(4, 6, 2, 3, 'W'); g.r(7, 4, 2, 3, 'W'); g.r(11, 4, 2, 3, 'W'); g.r(14, 6, 2, 3, 'W'); },
+    'skill-sci': function (g) { var xs = [1, 8, 15], liq = ['U', 'V', 'O'], top = [9, 5, 11];
+      xs.forEach(function (x, i) { g.r(x - 1, 0, 6, 2, 'E'); g.r(x, 2, 4, 14, 'C'); g.r(x, top[i], 4, 16 - top[i], liq[i]); g.r(x + 1, 16, 2, 1, liq[i]); g.set(x + 1, top[i] + 2, 'W'); g.set(x + 2, top[i] + 4, 'W'); g.set(x + 2, top[i] - 2, liq[i]); });
+      g.r(-1, 6, 2, 2, 'T'); g.r(5, 6, 3, 2, 'T'); g.r(12, 6, 3, 2, 'T'); g.r(19, 6, 2, 2, 'T'); g.r(-1, 18, 22, 2, 'T'); g.r(-1, 8, 1, 10, 'X'); g.r(20, 8, 1, 10, 'X'); },
+    'skill-exp': function (g) { g.r(8, -1, 4, 3, 'D'); g.e(9.5, 10.5, 9, 9, 'D'); g.e(9.5, 10.5, 7, 7, 'F');
+      g.r(9, 4, 2, 2, 'K'); g.r(9, 15, 2, 2, 'K'); g.r(3, 10, 2, 2, 'K'); g.r(15, 10, 2, 2, 'K');
+      g.p([[8, 9], [15, 5], [11, 12]], 'R'); g.p([[8, 9], [11, 12], [4, 16]], 'B'); g.r(9, 10, 2, 2, 'K'); },
+    // Hosting: the owner picked the purple speech bubble with a smile (idea B)
+    'skill-charm': function (g) { g.r(1, 0, 18, 15, 'V'); g.r(0, 1, 20, 13, 'V'); g.p([[3, 14], [9, 14], [2, 20]], 'V');
+      g.r(5, 3, 3, 4, 'W'); g.r(12, 3, 3, 4, 'W'); g.s(3, 8, ['WW..........WW', '.WW........WW.', '..WWWWWWWWWW..', '...WWWWWWWW...']); },
+    // ---- small markers ----
+    'sex-m': function (g) { g.e(6.5, 13.5, 6.5, 6.5, 'B'); g.e(6.5, 13.5, 4.1, 4.1, null); g.q(11, 10, 17, 4, 1.5, 'B'); g.p([[12, 0], [20, 0], [20, 8]], 'B'); },
+    'sex-f': function (g) { g.e(6.5, 6.5, 6.5, 6.5, 'P'); g.e(6.5, 6.5, 4.1, 4.1, null); g.r(5, 12, 4, 8, 'P'); g.r(1, 15, 12, 3, 'P'); },
+    'juv': function (g) { g.e(8.5, 12, 8.5, 8, 'F'); g.e(8.5, 8, 6.5, 8, 'F'); g.r(5, 3, 2, 2, 'z'); g.r(10, 4, 3, 2, 'z'); g.r(4, 15, 3, 2, 'z'); g.r(11, 16, 2, 2, 'z');
+      [[1, 11, 4, 8], [4, 8, 7, 11], [7, 11, 10, 8], [10, 8, 13, 11], [13, 11, 16, 9]].forEach(function (s) { g.l(s[0], s[1], s[2], s[3], 'K'); g.l(s[0], s[1] + 1, s[2], s[3] + 1, 'K'); }); },
+    'time': function (g) { g.e(9.5, 9.5, 9.5, 9.5, 'B'); g.e(9.5, 9.5, 7.5, 7.5, 'W'); g.r(9, 2, 2, 2, 'B'); g.r(9, 16, 2, 2, 'B'); g.r(2, 9, 2, 2, 'B'); g.r(16, 9, 2, 2, 'B'); g.r(9, 4, 2, 7, 'K'); g.r(9, 9, 6, 2, 'K'); g.r(9, 9, 2, 2, 'R'); },
+    // Visitors: one guest, big head and simple body, so it still reads in the tight 13 px chip
+    'visitors': function (g) { g.s(0, 0, [
+      '....TTTTTTTTTT....', '...TTTTTTTTTTTT...', '...TTTTTTTTTTTT...', '...TTSSSSSSSSTT...', '...SSSSSSSSSSSS...', '...SSKKSSSSKKSS...', '...SSKKSSSSKKSS...', '...SSSSSSSSSSSS...', '...SSSKSSSSKSSS...', '....SSSKKKKSSS....', '.....SSSSSSSS.....',
+      '..BBBBBBBBBBBBBB..', 'BBBBBBBBBBBBBBBBBB', 'BBBBBBBBBBBBBBBBBB', 'BBBKBBBBBBBBBBKBBB', 'BBBKBBBBBBBBBBKBBB', 'SSSKBBBBBBBBBBKSSS', 'SSSKBBBBBBBBBBKSSS', '....LLLLLLLLLL....', '....LLLLKKLLLL....', '....LLLLKKLLLL....', '....XXXX..XXXX....']); },
+    'odds': function (g) { g.r(1, 0, 20, 22, 'W'); g.r(0, 1, 22, 20, 'W'); [[3, 3], [15, 3], [9, 9], [3, 15], [15, 15]].forEach(function (p) { g.r(p[0], p[1], 4, 4, 'K'); }); },
+    'lock': function (g) { g.e(8.5, 7, 6.5, 7, 'M'); g.e(8.5, 7, 3.3, 4, null); g.r(6, 7, 6, 3, null); g.r(0, 9, 18, 11, 'Y'); g.e(8.5, 13, 2, 2, 'K'); g.r(8, 14, 2, 4, 'K'); g.r(2, 11, 2, 1, 'D'); g.r(14, 11, 2, 1, 'D'); g.r(2, 17, 2, 1, 'D'); g.r(14, 17, 2, 1, 'D'); },
+    'new': function (g) { g.star(11, 11, 11.2, 7.2, 12, 'R'); g.e(10.5, 10.5, 5.2, 5.2, 'Y'); g.r(10, 7, 2, 8, 'W'); g.r(7, 10, 8, 2, 'W'); },
+    'ok': function (g) { g.p([[0, 8], [3, 5], [8, 10], [18, 0], [22, 4], [8, 16.5]], 'G'); },
+    'no': function (g) { g.p([[0, 3], [3, 0], [18, 15], [15, 18]], 'R'); g.p([[15, 0], [18, 3], [3, 18], [0, 15]], 'R'); },
+    // Habitat: three fat fence pickets, two rails and a strip of grass (simple on purpose: it must read at 13 px)
+    'habitat': function (g) { g.r(0, 5, 22, 3, 'T'); g.r(0, 11, 22, 3, 'T'); [0, 8, 16].forEach(function (x) { g.r(x, 2, 6, 15, 'z'); g.r(x + 1, 1, 4, 1, 'z'); g.r(x + 2, 0, 2, 1, 'z'); g.r(x + 2, 6, 2, 1, 'N'); g.r(x + 2, 12, 2, 1, 'N'); });
+      g.r(0, 15, 22, 3, 'G'); g.r(2, 14, 2, 1, 'G'); g.r(10, 14, 2, 1, 'G'); g.r(18, 14, 2, 1, 'G'); g.r(6, 14, 2, 1, 'G'); g.r(14, 14, 2, 1, 'G'); },
+    'pen': function (g) { g.r(0, 0, 22, 22, 'T'); g.r(3, 3, 16, 16, 'z'); g.r(8, 3, 1, 16, 'X'); g.r(13, 3, 1, 16, 'X'); g.r(5, 6, 12, 6, 'L'); g.r(7, 8, 2, 2, 'W'); g.r(13, 8, 2, 2, 'W'); g.r(3, 15, 16, 1, 'X'); },
+    'land': function (g) { g.r(1, 0, 20, 12, 'T'); g.r(3, 2, 16, 8, 'F'); g.r(10, 3, 2, 6, 'G'); g.r(8, 5, 6, 2, 'G'); g.r(9, 12, 4, 6, 'X'); g.r(0, 17, 22, 3, 'G'); g.r(2, 16, 2, 1, 'G'); g.r(5, 15, 2, 2, 'G'); g.r(16, 16, 2, 1, 'G'); g.r(18, 15, 2, 2, 'G'); },
+    'trophy': function (g) { g.r(0, 2, 22, 2, 'D'); g.r(0, 2, 2, 7, 'D'); g.r(20, 2, 2, 7, 'D'); g.r(0, 8, 6, 2, 'D'); g.r(16, 8, 6, 2, 'D');
+      g.over(function () { g.p([[4, 0], [18, 0], [17, 9], [13, 13], [9, 13], [5, 9]], 'Y'); }); g.star(11, 6, 4, 1.8, 5, 'W'); g.r(9, 13, 4, 4, 'D'); g.r(5, 17, 12, 2, 'Y'); g.r(3, 19, 16, 3, 'D'); },
+    'medal-gold': v2medal('Y', 'N', 1), 'medal-silver': v2medal('I', 'J', 2), 'medal-bronze': v2medal('m', 'X', 3),
+    'grade-ss': v2grade('Y', 'R', 'SS', 'X'), 'grade-s': v2grade('R', 'D', 'S'), 'grade-a': v2grade('O', 'r', 'A'),
+    'grade-b': v2grade('G', 'g', 'B'), 'grade-c': v2grade('B', 'e', 'C'), 'grade-d': v2grade('j', 'J', 'D'),
+    // ---- new in Update 7 ----
+    'best': function (g) { g.p([[1, 14], [0, 3], [5, 8], [9, 0], [13, 8], [18, 3], [17, 14]], 'Y'); g.r(1, 10, 16, 1, 'D'); g.r(8, 11, 2, 2, 'R'); g.r(3, 11, 2, 2, 'B'); g.r(13, 11, 2, 2, 'B'); },
+    'edit': function (g) { g.q(6, 5, 18, 17, 2.6, 'Y'); g.q(2.5, 1.5, 5, 4, 2.6, 'P'); g.q(5, 4, 6.5, 5.5, 2.6, 'M'); g.p([[19.8, 15.2], [16.2, 18.8], [22.5, 21.5]], 'z'); g.r(20, 19, 2, 2, 'K'); g.r(21, 20, 2, 2, 'K');
+      g.over(function () { g.q(3, 21, 17, 7, 2, 'T'); g.q(4, 20, 7, 17, 2, 'X'); }); g.over(function () { g.q(14, 2, 23, 11, 3.3, 'M'); g.q(20.5, 8.5, 23, 11, 3.3, 'J'); }); },
+    'move': function (g) { g.r(9, 4, 4, 14, 'B'); g.r(4, 9, 14, 4, 'B'); for (var i = 0; i < 4; i++) { g.r(10 - i, i, 2 + 2 * i, 1, 'B'); g.r(10 - i, 21 - i, 2 + 2 * i, 1, 'B'); g.r(i, 10 - i, 1, 2 + 2 * i, 'B'); g.r(21 - i, 10 - i, 1, 2 + 2 * i, 'B'); } },
+    'sell': function (g) { g.p([[7, 0], [24, 0], [24, 18], [7, 18], [0, 9]], 'G'); g.r(4, 8, 2, 2, 'K'); g.s(12, 3, V2DOLLAR, 1, 'W'); g.r(15, 2, 2, 1, 'W'); g.r(15, 14, 2, 1, 'W'); },
+    'goal': function (g) { g.e(10.5, 10.5, 11, 11, 'R'); g.e(10.5, 10.5, 8, 8, 'W'); g.e(10.5, 10.5, 5, 5, 'R'); g.e(10.5, 10.5, 2, 2, 'W'); },
+    'level': function (g) { g.r(0, 0, 18, 12, 'V'); g.p([[0, 12], [18, 12], [9, 22]], 'V'); g.p([[3, 2], [9, 6], [15, 2], [15, 5], [9, 9], [3, 5]], 'W'); g.p([[3, 8], [9, 12], [15, 8], [15, 11], [9, 15], [3, 11]], 'W'); },
+    'path': function (g) { g.r(1, 0, 20, 18, 'A'); g.r(0, 1, 22, 16, 'A'); g.r(0, 5, 22, 1, 'a'); g.r(0, 12, 22, 1, 'a'); g.r(7, 0, 1, 5, 'a'); g.r(15, 0, 1, 5, 'a'); g.r(3, 6, 1, 6, 'a'); g.r(11, 6, 1, 6, 'a'); g.r(19, 6, 1, 6, 'a'); g.r(7, 13, 1, 5, 'a'); g.r(15, 13, 1, 5, 'a'); }
+  };
+  var ICONS_NEW = ['best', 'edit', 'move', 'sell', 'goal', 'level', 'path', 'star-on', 'star-off'];
+  ICONS_NEW.forEach(function (n) { if (ICONS.indexOf(n) < 0) ICONS.push(n); });
+  function iconV2(name, half) {
+    var g = new VG(), x0 = VN, y0 = VN, x1 = -1, y1 = -1, x, y, v;
+    V2[name](g); g.outline();
+    for (y = 0; y < VN; y++) for (x = 0; x < VN; x++) if (g.d[y * VN + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    var w = x1 - x0 + 1, h = y1 - y0 + 1, c = document.createElement('canvas'); c.width = w; c.height = h;
+    var q = c.getContext('2d'), im = q.createImageData(w, h), px = im.data;
+    for (y = 0; y < h; y++) for (x = 0; x < w; x++) { v = g.d[(y + y0) * VN + x + x0]; if (!v) continue; var col = rgb(V2C[v]), j = (y * w + x) * 4; px[j] = col[0]; px[j + 1] = col[1]; px[j + 2] = col[2]; px[j + 3] = 255; }
+    q.putImageData(im, 0, 0);
+    if (!half) return { c: c, w: w, h: h, ax: Math.ceil(w / 2) - 1, ay: h, d: 2 };
+    // density 1 (old art, not shipped): every second pixel of the new drawing, still solid
+    var hw = Math.ceil(w / 2), hh = Math.ceil(h / 2), c1 = document.createElement('canvas'); c1.width = hw; c1.height = hh;
+    var q1 = c1.getContext('2d'), im1 = q1.createImageData(hw, hh), p1 = im1.data;
+    for (y = 0; y < hh; y++) for (x = 0; x < hw; x++) { var sx = Math.min(w - 1, x * 2 + 1), sy = Math.min(h - 1, y * 2 + 1), a = (sy * w + sx) * 4, b = (y * hw + x) * 4; p1[b] = px[a]; p1[b + 1] = px[a + 1]; p1[b + 2] = px[a + 2]; p1[b + 3] = px[a + 3]; }
+    q1.putImageData(im1, 0, 0);
+    return { c: c1, w: hw, h: hh, ax: Math.ceil(hw / 2) - 1, ay: hh, d: 1 };
+  }
+  function icon(name) {
+    return cached('i|' + name, function () {
+      if (DENS === 2) return V2[name] ? iconV2(name) : iconD(ZI, name);
+      return (!ICON_DEFS[name] && V2[name]) ? iconV2(name, true) : drawIcon(name);
+    });
+  }
 
   // named colours the page can reuse for menus, so the interface matches the floor
   var PALETTE = {
