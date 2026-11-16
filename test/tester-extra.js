@@ -12,7 +12,7 @@ const engine = process.argv[2] === 'webkit' ? 'webkit' : 'chromium';
   const frozen = () => page.evaluate(() => { ZCore.WEEK_MS[1] = 600000; ZCore.WEEK_MS[2] = 600000; });
   await frozen();
   const tick = n => page.evaluate(n => { ZCore.onReport('*', (r, d) => d()); ZT.tick(n); ZT.S.reports.length = 0; ZT.S.happening = null; ZT.popAll(); }, n);
-  async function toFloor() { for (let i = 0; i < 8; i++) { const s = await st(); if (!s.stack.length && !s.placing) return; if (s.placing) { await T.tapText(/^(Done|Cancel)$/, { floor: true, sel: '#placement-bar button' }); continue; } if (!(await T.tapText(/./, { sel: '.back' }))) await T.tapXY(195, 440); } }
+  const toFloor = () => L.toFloor(T, 195, 440); const E = L.edit(T);
   async function menu() { await toFloor(); await T.tapXY(195, 420); }
   async function show(name) { const d = await describe(T); say('   [' + name + '] ' + d.id + ' :: ' + (d.text || '').slice(0, 200) + ' :: ' + JSON.stringify(d.items).slice(0, 200)); await T.shot(name); await inv(name); return d; }
   // scene: a mid-size zoo
@@ -42,29 +42,40 @@ const engine = process.argv[2] === 'webkit' ? 'webkit' : 'chromium';
     say('headhunter: staff', n0, '->', await page.evaluate(() => ZT.S.staff.length), 'taps', T.taps - t0); await toFloor(); await inv('after hh', { expectClosed: true }); }
 
   // ---- Upgrade ----
+  /* Update 7: Upgrade, Move and Remove are no longer screens under Build. Each is now: Edit (main menu) > tap the thing on the map > the button in the strip. */
+  // ---- Upgrade (Edit > tap the habitat > Upgrade) ----
   say('== upgrade');
-  { const t0 = T.taps; const lv0 = await page.evaluate(() => ZT.S.items.filter(i => i.k === 'hab').map(i => i.lvl)); await menu(); await T.tapText('Build'); await T.tapText('Upgrade'); await show('x-upgrade');
-    await T.tapText(/./, { sel: '.row.tappable', nth: 0, wait: 400 }); await show('x-upgrade-confirm'); await T.tapText(/^(Upgrade|Yes|Confirm)/i, { wait: 500 }); await sleep(400);
-    say('upgrade: levels', JSON.stringify(lv0), '->', JSON.stringify(await page.evaluate(() => ZT.S.items.filter(i => i.k === 'hab').map(i => i.lvl))), 'taps', T.taps - t0); await show('x-upgrade-after'); await toFloor(); await inv('after upgrade', { expectClosed: true }); }
+  { const t0 = T.taps; const lv0 = await page.evaluate(() => ZT.S.items.filter(i => i.k === 'hab').map(i => i.lvl)); const hid = await page.evaluate(() => ZT.S.items.find(i => i.k === 'hab').id);
+    if (!(await E.open(195, 420))) T.find('upgrade:no-edit', 'Edit mode did not open from the menu'); const picked = await E.pick(hid); let b = await E.bar(); say('   [x-upgrade] picked habitat', picked, 'actions', JSON.stringify(b && b.acts), '::', b && b.actText); await T.shot('x-upgrade'); await inv('edit: habitat picked'); await L.audit(T, 'edit: habitat picked');
+    if (!picked) T.find('upgrade:no-pick', 'tapping the habitat on the map in Edit mode did not select it'); if (b && !b.acts.some(a => /^Upgrade/.test(a))) T.find('upgrade:no-button', 'a picked habitat has no Upgrade button (' + b.acts.join(', ') + ')'); if (b && b.small.length) T.find('upgrade:small', 'picked-habitat buttons under 44 px: ' + b.small.join('; '));
+    const m0 = await page.evaluate(() => Math.round(ZT.S.money)); await L.tapSel(T, '#edit-bar .mn-eact .mn-up', 600); if ((await st()).stack.length) { await show('x-upgrade-confirm'); await T.tapText(/^(Upgrade|Yes|Confirm)/i, { wait: 500 }); } await sleep(400);
+    const lv1 = await page.evaluate(() => ZT.S.items.filter(i => i.k === 'hab').map(i => i.lvl)); say('upgrade: levels', JSON.stringify(lv0), '->', JSON.stringify(lv1), 'money', m0, '->', await page.evaluate(() => Math.round(ZT.S.money)), 'taps', T.taps - t0); if (JSON.stringify(lv0) === JSON.stringify(lv1)) T.find('upgrade:nothing', 'Upgrade in the Edit strip did not raise the habitat level'); await T.shot('x-upgrade-after'); await inv('after upgrade tap');
+    for (let i = 0; i < 3 && (await st()).stack.length; i++) { await show('x-upgrade-popup-' + i); if (!(await T.tapText(/^(Not now|Move in)/, { sel: 'button, .btn', wait: 500 }))) await T.tapText(/./, { sel: '.back' }); }
+    await toFloor(); await inv('after upgrade', { expectClosed: true }); }
 
-  // ---- Move ----
+  // ---- Move (Edit > tap the building > Move > tap a spot > Place) ----
   say('== move');
-  { const t0 = T.taps; const pos0 = await page.evaluate(() => ZT.S.items.map(i => i.id + ':' + i.q + ',' + i.r).join(' ')); await menu(); await T.tapText('Build'); await T.tapText('Move'); await show('x-move-list');
-    const fac = await T.tapText(/Snack|Bench|Restroom|Stand/, { sel: '.row', wait: 500 }) || await T.tapText(/./, { sel: '.row.tappable', nth: 0, wait: 500 });
-    const s = await st(); say('move: placing', s.placing, 'stack', s.stack.join('>'));
+  { const t0 = T.taps; const pos0 = await page.evaluate(() => ZT.S.items.map(i => i.id + ':' + i.q + ',' + i.r).join(' ')); const fac = await page.evaluate(() => { const i = ZT.S.items.find(i => i.k === 'fac'); return i && { id: i.id, t: i.t }; });
+    await E.open(195, 420); const picked = fac && await E.pick(fac.id); let b = await E.bar(); say('   [x-move-list] picked', JSON.stringify(fac), picked, 'actions', JSON.stringify(b && b.acts)); await T.shot('x-move-list'); await inv('edit: building picked'); await L.audit(T, 'edit: building picked');
+    if (!picked) T.find('move:no-pick', 'tapping a building on the map in Edit mode did not select it'); if (b && !b.acts.includes('Move')) T.find('move:no-button', 'a picked building has no Move button (' + b.acts.join(', ') + ')'); if (b && b.acts.some(a => /^Upgrade/.test(a))) T.find('move:upgrade-on-fac', 'a picked building offers Upgrade');
+    await L.tapSel(T, '#edit-bar .mn-ea.move', 700);
+    const s = await st(); say('move: placing', s.placing, 'stack', s.stack.join('>')); if (!s.placing) T.find('move:not-placing', 'Move did not start placement');
     if (s.placing) { await T.shot('x-move-place'); await inv('move placing');
-      const c = await page.evaluate(() => { const S = ZT.S, id = ZRender.debug().placement; const it = S.items.find(i => i.k === 'fac'); for (let r = 8; r < 20; r++) for (let q = -10; q < 12; q++) { if (!ZE.inGrid(q, r) || !ZE.inLand(S, q, r)) continue; const p = ZRender.hexToClient(q, r); if (p && p.x > 40 && p.x < 350 && p.y > 100 && p.y < 560 && ZE.canPlace(S, 'fac', it.t, q, r, 0, it.id)) return { x: p.x, y: p.y }; } return null; });
+      const c = await E.spot('fac', fac.t, { ignoreId: fac.id, nth: 3 });
       if (c) await T.tapXY(c.x, c.y, 400); await T.shot('x-move-ghost'); await T.tapText(/^Place/, { floor: true, sel: '#placement-bar button', wait: 700 }); }
-    const s2 = await st(); say('after Place: placing', s2.placing, 'stack', s2.stack.join('>'));
-    const pos1 = await page.evaluate(() => ZT.S.items.map(i => i.id + ':' + i.q + ',' + i.r).join(' ')); say('move: changed', pos0 !== pos1, 'taps', T.taps - t0);
+    const s2 = await st(); say('after Place: placing', s2.placing, 'editing', s2.editing, 'stack', s2.stack.join('>')); if (!s2.editing) T.find('move:edit-ended', 'Edit mode ended by itself after a Move');
+    const pos1 = await page.evaluate(() => ZT.S.items.map(i => i.id + ':' + i.q + ',' + i.r).join(' ')); say('move: changed', pos0 !== pos1, 'taps', T.taps - t0); if (pos0 === pos1) T.find('move:nothing', 'Move > Place did not move the building');
     await toFloor(); await inv('after move', { expectClosed: true }); }
 
-  // ---- Remove ----
+  // ---- Remove, now Sell (Edit > tap the building > Sell > asks once) ----
   say('== remove');
-  { const t0 = T.taps; const n0 = await page.evaluate(() => ZT.S.items.length); await menu(); await T.tapText('Build'); await T.tapText('Remove'); await show('x-remove-list');
-    await T.tapText(/Restroom|Snack|Bench|Stand/, { sel: '.row', wait: 400 }) || await T.tapText(/./, { sel: '.row.tappable', nth: 0, wait: 400 }); await show('x-remove-confirm');
+  { const t0 = T.taps; const n0 = await page.evaluate(() => ZT.S.items.length); const fac = await page.evaluate(() => { const i = ZT.S.items.find(i => i.k === 'fac'); return i && { id: i.id, t: i.t, half: Math.floor(ZD.FAC[i.t].cost / 2) }; });
+    await E.open(195, 420); const picked = fac && await E.pick(fac.id); let b = await E.bar(); say('   [x-remove-list] picked', JSON.stringify(fac), picked, 'actions', JSON.stringify(b && b.acts), '::', b && b.actText); await T.shot('x-remove-list');
+    if (b && !b.acts.includes('Sell')) T.find('remove:no-button', 'a picked building has no Sell button (' + b.acts.join(', ') + ')');
+    const m0 = await page.evaluate(() => Math.round(ZT.S.money)); await L.tapSel(T, '#edit-bar .mn-ea.sell', 500); const sc = await st(); if (!sc.stack.length) T.find('remove:no-confirm', 'Sell did not ask before selling'); if ((await page.evaluate(() => ZT.S.items.length)) !== n0) T.find('remove:before-confirm', 'the building was sold before the question was answered'); await show('x-remove-confirm'); await L.audit(T, 'sell confirm');
     await T.tapText(/^(Remove|Yes|Confirm|Sell)/i, { wait: 500 }); await sleep(400);
-    say('remove: items', n0, '->', await page.evaluate(() => ZT.S.items.length), 'taps', T.taps - t0); await show('x-remove-after'); await toFloor(); await inv('after remove', { expectClosed: true }); }
+    const n1 = await page.evaluate(() => ZT.S.items.length), m1 = await page.evaluate(() => Math.round(ZT.S.money)); say('remove: items', n0, '->', n1, 'money', m0, '->', m1, '(half price would be +' + (fac && fac.half) + ')', 'taps', T.taps - t0); if (n1 !== n0 - 1) T.find('remove:nothing', 'Sell > yes did not remove the building'); if (m1 <= m0) T.find('remove:no-money', 'selling a building gave no money back (' + m0 + ' -> ' + m1 + ')');
+    if ((await st()).stack.length) T.find('remove:asked-twice', 'after answering the Sell question another screen is open: ' + (await st()).stack.join('>')); await T.shot('x-remove-after'); await inv('after remove tap'); await toFloor(); await inv('after remove', { expectClosed: true }); }
 
   // ---- Winter Show ----
   say('== winter show');

@@ -10,7 +10,7 @@ const YEARS = +(process.argv[3] || 3);
   await page.evaluate(() => { ZCore.WEEK_MS[1] = 600000; ZCore.WEEK_MS[2] = 600000; });
   const seen = new Set(); const popups = []; let choiceN = 0;
   async function shotOnce(k, tag) { if (seen.has(k)) return; seen.add(k); await T.shot(tag); }
-  async function toFloor() { for (let i = 0; i < 8; i++) { const s = await st(); if (!s.stack.length && !s.placing) return; if (s.placing) { await T.tapText(/^(Done|Cancel)$/, { floor: true, sel: '#placement-bar button' }); continue; } if (!(await T.tapText(/./, { sel: '.back' }))) await T.tapXY(195, 440); } }
+  const toFloor = () => L.toFloor(T, 195, 440); const E = L.edit(T); let placeN = 0;
   async function menu() { await toFloor(); await T.tapXY(195, 420); }
   const drainX = L.makeDrain(T, { maxCrates: 1, shot: async (id, txt, wk) => { await shotOnce('p-' + id + '-' + Math.floor(wk / 48), 'p-' + id + '-y' + (1 + Math.floor(wk / 48))); } });
   const drain = () => drainX();
@@ -27,18 +27,14 @@ const YEARS = +(process.argv[3] || 3);
   async function startProject(kind, startRe) { const t0 = T.taps; await menu(); if (!(await T.tapText('Projects'))) { await toFloor(); return false; } if (!(await T.tapText(kind))) { await toFloor(); return false; }
     const n0 = await num(() => ZT.S.projects.length); const ok = await through(startRe, kind); if (ok) await T.tapText(startRe, { sel: 'button, .btn', wait: 600 }); const n1 = await num(() => ZT.S.projects.length);
     await drain(); await toFloor(); if (n1 <= n0) { say('   ' + kind + ' not started (' + (ok ? 'refused' : 'no start button') + ')'); return false; } return T.taps - t0; }
-  async function placeAt(rowRe, back) { // Build > Habitats|Facilities > row, tap a free visible hex, Place, Done
-    const t0 = T.taps; await menu(); await T.tapText('Build'); if (!(await T.tapText(back))) { await toFloor(); return false; }
-    if (!(await T.tapText(rowRe, { sel: '.row', wait: 450 }))) { await toFloor(); return false; }
-    const s = await st(); if (!s.placing) { await toFloor(); return false; }
-    // ghost may be on an invalid spot: find a valid free hex, centre the camera there (view only), tap it
-    const info = await page.evaluate(() => { const g = ZRender.debug().placement; const S = ZT.S; const t = g && g.t; return { g, kind: g && g.kind }; });
-    const c = await page.evaluate(() => { const S = ZT.S, g = ZRender.debug().placement; const spec = g; const ok = (q, r) => { try { return ZE.canPlace(S, spec.kind || 'hab', spec.t, q, r, spec.rot || 0); } catch (e) { return false; } };
-      if (g && g.ok) return { stay: true }; let best = null; for (let r = 0; r < 20; r++) for (let q = -12; q < 14; q++) { if (!ZE.inGrid(q, r) || !ZE.inLand(S, q, r) || !ok(q, r)) continue; best = best || { q, r }; } return best; });
-    if (c && !c.stay) { await page.evaluate(c => ZRender.centerOn(c.q, c.r, true), c); await sleep(300); const p = await page.evaluate(c => ZRender.hexToClient(c.q, c.r), c); await T.tapXY(p.x, p.y, 400); }
-    await inv('placement ' + back); const n0 = await num(() => ZT.S.items.length);
-    await T.tapText('Place', { floor: true, sel: '#placement-bar button', wait: 800 }); const n1 = await num(() => ZT.S.items.length); await drain();
-    await toFloor(); await inv('after place', { expectClosed: true }); return n1 > n0 ? T.taps - t0 : false;
+  async function placeAt(group) { // Update 7: Edit > symbol tab > a card that is not greyed, tap a free legal hex, Place, Done ('hab' = habitats, 'fac' = any building group)
+    const t0 = T.taps; if (!(await E.open(195, 420))) { T.find('edit:no-open', 'Edit mode did not open from the menu'); await toFloor(); return false; }
+    let b = await E.bar(); const keys = [];
+    for (const g of (group === 'hab' ? ['hab'] : b.tabs.filter(x => x !== 'hab'))) { await L.tapSel(T, '#edit-bar .mn-et[data-grp="' + g + '"]', 350); const bb = await E.bar(); keys.push(...bb.cards.filter(c => !c.endsWith('!') && c.startsWith(group === 'hab' ? 'hab:' : 'fac:'))); await shotOnce('edit-' + g + '-' + Math.floor((await st()).week / 48), 'y-edit-' + g + '-y' + (1 + Math.floor((await st()).week / 48))); await inv('edit strip ' + g); if (bb.small.length) T.find('edit:small:' + g, 'Edit strip buttons under 44 px in group ' + g + ': ' + bb.small.join('; ')); if (bb.vScroll > 1) T.find('edit:vscroll:' + g, 'the Edit strip scrolls up and down in group ' + g); if (bb.below.length) T.find('edit:below:' + g, 'Edit strip buttons under the bottom inset: ' + bb.below.join('; ')); }
+    if (!keys.length) { await toFloor(); return false; }
+    const key = keys[placeN++ % keys.length];
+    const r = await E.add(key, { before: async () => { await inv('placement ' + group); } }); if (!r.ok) say('   ' + key + ' not placed: ' + r.why); await drain();
+    await toFloor(); await inv('after place', { expectClosed: true }); return r.ok ? (T.taps - t0) + ' (' + key + ')' : false;
   }
   async function simpleFlow(label, path, confirmRe) { await menu(); for (const p of path) { if (!(await T.tapText(p, { wait: 350 }))) { await toFloor(); return false; } } if (confirmRe) await T.tapText(confirmRe, { wait: 500 }); await drain(); await toFloor(); return true; }
 
@@ -63,12 +59,12 @@ const YEARS = +(process.argv[3] || 3);
     if (!run.includes('expedition') && money > 4000 && await startProject('Expedition', /^Send/)) say(' w' + s.week, 'expedition started');
     else if (ready('ready-event') && !run.includes('event') && money > 600 && await startProject('Event', /^Start/)) say(' w' + s.week, 'event started');
     else if (ready('ready-breed') && !run.includes('breed') && await startProject('Breeding', /^Start/)) say(' w' + s.week, 'breeding started');
-    else if (building < 40 && money > 30000 && (await num(() => ZT.S.items.filter(i => i.k === 'hab').length)) < 9) { const biome = /./; const t = await placeAt(biome, 'Habitats'); if (t) { say(' w' + s.week, 'habitat built, taps', t); building++; } }
-    else if (money > 3000 && (await num(() => ZT.S.items.filter(i => i.k === 'fac').length)) < 14) { const t = await placeAt(/./, 'Facilities'); if (t) say(' w' + s.week, 'facility built, taps', t); }
+    else if (building < 40 && money > 30000 && (await num(() => ZT.S.items.filter(i => i.k === 'hab').length)) < 9) { const t = await placeAt('hab'); if (t) { say(' w' + s.week, 'habitat built, taps', t); building++; } }
+    else if (money > 3000 && (await num(() => ZT.S.items.filter(i => i.k === 'fac').length)) < 14) { const t = await placeAt('fac'); if (t) say(' w' + s.week, 'facility built, taps', t); }
     // housing: anything in the pen? use one-tap House all
     if (await num(() => ZT.S.animals.some(a => a.hab == null))) { await menu(); await T.tapText('Animals'); await T.tapText(/^Pen/); await shotOnce('pen-filled', 'y-pen-filled'); await inv('pen with animals'); await T.tapText(/^House/, { wait: 500 }); await toFloor(); say(' w' + s.week, 'house tapped'); }
     // buy land when affordable
-    if (money > 90000 && w % 12 === 1) { await menu(); await T.tapText('Build'); if (await T.tapText(/^Buy land/)) { await shotOnce('land', 'y-land'); await T.tapText(/^(Buy|Yes|Confirm)/i, { wait: 500 }); } await drain(); await toFloor(); }
+    if (money > 90000 && w % 12 === 1) { const rows0 = await num(() => ZT.S.rows); if (await E.open(195, 420)) { const c = await E.card('land'); if (c.found && !c.off) { await sleep(300); await shotOnce('land', 'y-land'); await inv('buy land'); await T.tapText(/^(Buy|Yes|Confirm)/i, { wait: 500 }); const rows1 = await num(() => ZT.S.rows); say(' w' + s.week, 'more land: rows', rows0, '->', rows1); if (rows1 <= rows0) T.find('land:not-bought', 'the More land card was not greyed but tapping it and confirming bought no land (rows ' + rows0 + ')'); } } await drain(); await toFloor(); }
     // hire / research / upgrade now and then
     if (w % 24 === 13) { await menu(); await T.tapText('Research'); await shotOnce('res', 'y-research'); await inv('research'); await toFloor(); }
     if (w % 30 === 20) { await menu(); await T.tapText('Animals'); await T.tapText(/^Zoo/); await shotOnce('zoo-' + yr, 'y-zoo-list-y' + (yr + 1)); await inv('zoo list y' + (yr + 1)); await toFloor(); await menu(); await T.tapText('Info'); await T.tapText('Ranks'); await shotOnce('ranks-' + yr, 'y-ranks-y' + (yr + 1)); await inv('ranks'); await toFloor(); }

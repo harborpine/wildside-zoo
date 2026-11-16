@@ -3,13 +3,13 @@
    ZT.tick is used ONLY to age the zoo (this is the coverage script, not the playthrough). Headless only. */
 const L = require('./tester-lib.js'); const { sleep, describe } = L;
 const engine = process.argv[2] === 'webkit' ? 'webkit' : 'chromium';
-const SIZES = [['landscape', 844, 390, 2], ['small', 375, 667, 2], ['large', 430, 932, 3], ['ipad', 820, 1180, 2]];
+const SIZES = [['landscape', 844, 390, 2], ['small', 375, 667, 2], ['large', 430, 932, 3], ['ipad', 820, 1180, 2], ['owner', 393, 852, 3, '?play=1&standalone=1&inset=34&insett=62']];   // 'owner' = his iPhone as an installed app (Update 7)
 (async () => {
   const all = [];
-  for (const [name, w, h, dsf] of SIZES) {
+  for (const [name, w, h, dsf, query] of SIZES) {
     const T = await L.launch(engine, { width: w, height: h }, { dsf, tag: (engine === 'webkit' ? 'wk' : 'cr') + '-' + name });
     const page = T.page; console.log('== ' + engine + ' ' + name + ' ' + w + 'x' + h);
-    await T.goto();
+    await T.goto(query); const E = L.edit(T);
     // age the zoo a bit so lists are longer (test hook; skip report cards)
     await page.evaluate(() => { ZCore.onReport('*', (r, d) => d()); ZT.tick(30); ZT.S.reports.length = 0; ZT.S.happening = null; ZT.popAll(); ZCore.onReport('*', null); ZCore.WEEK_MS[1] = 600000; ZCore.WEEK_MS[2] = 600000; });
     await page.evaluate(() => { ZT.popAll(); }); await sleep(300);
@@ -31,7 +31,7 @@ const SIZES = [['landscape', 844, 390, 2], ['small', 375, 667, 2], ['large', 430
     let s = await T.state(); console.log('  menu opened by floor tap:', s.stack.join('>'));
     if (!s.stack.length) T.find('open:' + name, 'floor tap at ' + cx + ',' + Math.round(h * 0.5) + ' did not open the menu at ' + w + 'x' + h);
     await T.shot('menu'); const r0 = await L.invariants(T, name + ' menu'); console.log('  menu back/play:', JSON.stringify(r0.geo.back));
-    for (const box of ['Projects', 'Build', 'Animals', 'Staff', 'Research', 'Info', 'System']) {
+    for (const box of ['Projects', 'Animals', 'Staff', 'Research', 'Info', 'System']) {
       const ok = await T.tapText(box); if (!ok) { T.find('missing:' + name + ':' + box, box + ' not tappable at ' + w + 'x' + h + ' (scrolled off or hidden?)'); continue; }
       await sleep(250); await T.shot('box-' + box); const r = await L.invariants(T, name + ' ' + box);
       if (r.geo.back && !r.geo.back.visible) T.find('back-hidden:' + name + ':' + box, 'Back button not fully visible on ' + box + ' at ' + w + 'x' + h + ' ' + JSON.stringify(r.geo.back));
@@ -39,7 +39,12 @@ const SIZES = [['landscape', 844, 390, 2], ['small', 375, 667, 2], ['large', 430
       await T.tapText(/./, { sel: '.back' }); await sleep(250);
     }
     // placement bar
-    await T.tapText('Build'); await T.tapText('Facilities'); await T.tapText(/./, { sel: '.row.tappable', nth: 0 }); await sleep(400);
+    // Update 7: Build is now Edit, which is not a screen: it puts the strip #edit-bar on the map. Check the strip at this size, then start a placement from it.
+    if (!(await T.tapText('Edit', { wait: 700 }))) T.find('missing:' + name + ':Edit', 'Edit not tappable at ' + w + 'x' + h);
+    const eb = await E.bar(); console.log('  edit strip', JSON.stringify(eb && { shown: eb.shown, top: eb.top, bottom: eb.bottom, h: eb.h, tabs: eb.tabs, cards: eb.cards.length, small: eb.small, below: eb.below, vScroll: eb.vScroll })); await T.shot('box-Edit'); await L.invariants(T, name + ' Edit strip'); await L.audit(T, name + ' Edit strip');
+    if (!eb || !eb.shown) T.find('edit-none:' + name, 'Edit did not show the strip at ' + w + 'x' + h); else { if (eb.small.length) T.find('edit-small:' + name, 'Edit strip buttons under 44 px at ' + w + 'x' + h + ': ' + eb.small.join('; ')); if (eb.below.length || eb.bottom > h + 1) T.find('edit-off:' + name, 'the Edit strip runs off the bottom or under the home-indicator inset at ' + w + 'x' + h + ' ' + JSON.stringify({ bottom: eb.bottom, below: eb.below })); if (eb.vScroll > 1) T.find('edit-vscroll:' + name, 'the Edit strip scrolls up and down at ' + w + 'x' + h); if (eb.tabWords.length) T.find('edit-words:' + name, 'Edit group tabs with words at ' + w + 'x' + h); if (eb.h > h * 0.4) T.find('edit-tall:' + name, 'the Edit strip covers ' + Math.round(100 * eb.h / h) + '% of the screen at ' + w + 'x' + h); }
+    const es = await T.state(); if (es.running) T.find('edit-running:' + name, 'clock runs in Edit mode at ' + w + 'x' + h);
+    const ecard = await E.card('fac:snack'); if (!ecard.found) T.find('edit-nocard:' + name, 'no Snack Stand card in the Edit strip at ' + w + 'x' + h); await sleep(400);
     s = await T.state(); console.log('  placing:', s.placing);
     const pb = await page.evaluate(() => { const b = document.getElementById('placement-bar').getBoundingClientRect(); const n = document.getElementById('placement-note').getBoundingClientRect(); return { barTop: Math.round(b.top), barBottom: Math.round(b.bottom), h: Math.round(b.height), noteTop: Math.round(n.top), vh: innerHeight, btns: [...document.querySelectorAll('#placement-bar button')].map(x => { const r = x.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }) }; });
     console.log('  placement bar', JSON.stringify(pb)); await T.shot('placement'); await L.invariants(T, name + ' placement');
@@ -47,7 +52,7 @@ const SIZES = [['landscape', 844, 390, 2], ['small', 375, 667, 2], ['large', 430
     // ghost visible? is the floor area left above the bar big enough
     const g = await page.evaluate(() => { const p = ZRender.debug().placement; if (!p) return null; const c = ZRender.hexToClient(p.q, p.r); return { q: p.q, r: p.r, x: Math.round(c.x), y: Math.round(c.y), ok: p.ok }; });
     console.log('  ghost at', JSON.stringify(g)); if (g && (g.y > pb.barTop || g.y < 0 || g.x < 0 || g.x > w)) T.find('ghost-hidden:' + name, 'initial placement ghost is hidden behind the buttons or off screen at ' + w + 'x' + h + ' ' + JSON.stringify(g));
-    await T.tapText('Cancel', { floor: true, sel: '#placement-bar button' }); await sleep(300); await T.tapText(/./, { sel: '.back' }).catch(() => 0); await page.evaluate(() => ZT.popAll());
+    await T.tapText('Cancel', { floor: true, sel: '#placement-bar button' }); await sleep(300); const ea = await T.state(); if (!ea.editing) T.find('edit-ended:' + name, 'Cancel on a placement ended Edit mode at ' + w + 'x' + h); await L.toFloor(T); await page.evaluate(() => ZT.popAll());
     await sleep(300); await L.invariants(T, name + ' end', { expectClosed: true });
     const r = await T.state(); console.log('  end state', JSON.stringify(r));
     T.findings.forEach(f => all.push({ size: name, ...f })); if (T.consoleErrors.length) all.push({ size: name, key: 'console', msg: T.consoleErrors.join(' | ') });

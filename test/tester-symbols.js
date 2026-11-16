@@ -11,7 +11,7 @@ const engine = process.argv[2] === 'webkit' ? 'webkit' : 'chromium';
   const names = await page.evaluate(() => Object.keys(ZMenus.screens));
   say('screens:', names.join(' '));
   const data = await page.evaluate(() => ({ animal: ZT.S.animals[0] && ZT.S.animals[0].id, staff: ZT.S.staff[0] && ZT.S.staff[0].id, juv: (ZT.S.animals.find(a => ZE.isJuv(ZT.S, a)) || {}).id }));
-  async function open(name, fn, wait) { try { await page.evaluate(fn); } catch (e) { T.find('open:' + name, 'could not open ' + name + ': ' + e.message.slice(0, 80)); return; } await sleep(wait || 350); const d = await describe(T); await T.shot('s-' + name); await L.invariants(T, name); say('  ' + name.padEnd(14), d.id || '-', '::', (d.text || '').replace(/\s*\|\s*/g, ' | ').slice(0, 150)); await page.evaluate(() => ZT.popAll()); await sleep(150); }
+  async function open(name, fn, wait) { try { await page.evaluate(fn); } catch (e) { T.find('open:' + name, 'could not open ' + name + ': ' + e.message.slice(0, 80)); return; } await sleep(wait || 350); const d = await describe(T); await T.shot('s-' + name); await L.invariants(T, name); await L.audit(T, name, { allowScroll: true });   /* Update 7: also see-through, overlapping and clipped things */ say('  ' + name.padEnd(14), d.id || '-', '::', (d.text || '').replace(/\s*\|\s*/g, ' | ').slice(0, 150)); await page.evaluate(() => ZT.popAll()); await sleep(150); }
   for (const n of names) { if (['animal', 'staffer', 'newZoo'].includes(n)) continue; await open(n, "ZMenus.screens['" + n + "']()", 350); }
   if (data.animal) await open('animal-adult', 'ZMenus.screens.animal(' + data.animal + ')', 350);
   if (data.juv) await open('animal-baby', 'ZMenus.screens.animal(' + data.juv + ')', 350);

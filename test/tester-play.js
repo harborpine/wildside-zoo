@@ -15,7 +15,7 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
   const seenShot = new Set();
   const inv = (label, o) => L.invariants(T, label, o);
   const wk = () => page.evaluate(() => ZT.S.week);
-  const st = () => T.state();
+  const st = () => T.state(); const E = L.edit(T); const libDrain = L.makeDrain(T, { maxCrates: 1 });
 
   /* ---------- toast watcher: how long does each toast live, does it cover anything? ---------- */
   await page.exposeFunction('__toastSeen', (txt, top, bottom, stackTop) => { const k = txt.slice(0, 40); const m = metrics.toasts[k] || (metrics.toasts[k] = { first: Date.now(), last: Date.now(), top, bottom, overStack: stackTop }); m.last = Date.now(); m.top = top; m.bottom = bottom; m.overStack = stackTop; });
@@ -67,11 +67,13 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
       if (!s.stack.length) { if (s.reports > 0) { await sleep(500); const s2 = await st(); if (!s2.stack.length && s2.reports > 0 && guard > 3) { /* queue gap */ } else if (!s2.stack.length) { return; } else continue; } else return; continue; }
       const id = s.stack.slice(-1)[0];
       // main-menu stack that I opened on purpose is not a pop-up
-      if (s.stack[0] === 'menu') return;
+      if (s.stack[0] === 'menu' && !/^mo-|^movein$|staff-candidates/.test(id)) return;   // a pop-up that opened over a menu (the where list after buying at the Market) still has to be answered
       if (id !== lastId) { firstSeen = Date.now(); lastId = id; metrics.popups.push({ id, week: s.week }); }
       const d = await describe(T); const key = id + '|' + (d.text || '').slice(0, 80);
       await shotOnce('popup-' + key, 'popup-' + id + '-w' + s.week + '-' + (seenShot.size));
       await inv('popup ' + id);
+      /* the arrival decisions (sell or keep, where it goes), Move in? and applicants are decided by the shared touch drain in tester-lib.js */
+      if (await page.evaluate(() => { const l = [...document.querySelectorAll('#screens .layer:not([hidden])')].pop(); return !!l.querySelector('.mo-row.tap') || [...l.querySelectorAll('button, .btn')].some(b => /^(Keep|Move in|Hire)/.test(b.innerText.trim())); })) { await libDrain(); continue; }
       if (key === lastKey) same++; else { same = 0; lastKey = key; }
       if (same > 8) { T.find('stuck:' + id, 'pop-up "' + id + '" did not advance after 9 taps (text: ' + (d.text || '').slice(0, 100) + ')'); await T.shot('stuck-' + id); await page.evaluate(() => ZT.popAll()); return; }
       const items = d.items || [];
@@ -175,8 +177,16 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
   /* ----- 2. tour of every main box, then set speed 2 ----- */
   say('-- tour of the main boxes');
   const tourDump = {};
-  for (const [name, subs] of [['Projects', []], ['Build', []], ['Animals', []], ['Staff', []], ['Research', []], ['Info', []], ['System', []]]) {
+  for (const [name, subs] of [['Projects', []], ['Animals', []], ['Staff', []], ['Research', []], ['Info', []], ['System', []]]) {
     const d = await look('main-' + name, [name]); if (d) tourDump[name] = d.text; await closeAll('tour ' + name);
+  }
+  { // Update 7: Build is now Edit, which is not a screen: it closes the menu and puts the strip #edit-bar on the map with the clock paused
+    await openMenu('tour-edit'); if (await T.locate('Build')) T.find('menu:build-box', 'the main menu still has a Build box');
+    if (!(await T.tapText('Edit', { wait: 700 }))) T.find('missing:Edit', 'could not find "Edit" to tap on the main menu');
+    const b = await E.bar(), s = await st(); tourDump.Edit = b ? 'strip: tabs ' + b.tabs.join(',') + ' | cards ' + b.cards.join(',') : 'NO STRIP'; await shotOnce('look-main-Edit', 'look-main-Edit'); await inv('main-Edit'); await L.audit(T, 'main-Edit');
+    if (!b || !b.shown) T.find('edit:no-strip', 'tapping Edit did not show the Edit strip'); else { if (b.small.length) T.find('edit:small', 'Edit strip buttons under 44 px: ' + b.small.join('; ')); if (b.below.length) T.find('edit:below', 'Edit strip buttons under the bottom inset: ' + b.below.join('; ')); if (b.vScroll > 1) T.find('edit:vscroll', 'the Edit strip scrolls up and down'); if (b.tabWords.length) T.find('edit:tab-words', 'Edit group tabs carry words: ' + b.tabWords.join(',')); }
+    if (s.running) T.find('edit:running', 'the clock runs while Edit mode is on'); if (s.stack.length) T.find('edit:stack', 'a screen is still open over Edit mode');
+    await L.toFloor(T, 195, 440); await inv('tour Edit', { expectClosed: true });
   }
   say(JSON.stringify(tourDump, null, 1));
   // Info sub-screens
@@ -212,7 +222,12 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     const startT = T.taps;
     await openMenu('exp'); const base = T.taps;
     await T.tapText('Projects'); await T.tapText('Expedition');
-    await through(/^Send/, 'exp'); await T.tapText(/Standard/); await T.shot('exp-confirm-standard');
+    await through(/^Send/, 'exp');
+    { // Update 7: a star level (1 to 5) replaces Lean / Standard / Lavish. Pick 2 stars by touch, as the old script picked Standard.
+      const xs = await page.evaluate(() => { const Lr = [...document.querySelectorAll('#screens .layer:not([hidden])')].pop(); return { stars: [...Lr.querySelectorAll('.mn-xs')].map(x => x.dataset.star + (x.classList.contains('off') ? '!' : '') + (x.classList.contains('on') ? '*' : '')), text: Lr.innerText }; }); say('  star buttons:', xs.stars.join(' '));
+      if (/Lean|Standard|Lavish/.test(xs.text)) T.find('exp:old-budget-words', 'the Send out page still says Lean / Standard / Lavish'); if (xs.stars.length !== 5) T.find('exp:no-stars', 'the Send out page does not offer five star levels (' + xs.stars.join(' ') + ')');
+      await L.tapSel(T, '#screens .layer:not([hidden]) .mn-xs[data-star="2"]', 400); const on = await page.evaluate(() => { const x = [...document.querySelectorAll('#screens .layer:not([hidden])')].pop().querySelector('.mn-xs.on'); return x && x.dataset.star; }); if (on !== '2') T.find('exp:star-pick', 'tapping the 2 star button did not select it (selected: ' + on + ')');
+      await T.shot('exp-confirm-standard'); await inv('exp star picked'); await L.audit(T, 'send out page'); }
     const before = await page.evaluate(() => ZT.S.projects.length);
     await T.tapText(/^Send/, { wait: 600 });
     const after = await page.evaluate(() => ZT.S.projects.length);
@@ -280,30 +295,30 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
   });
 
   job('buildHab', async () => (await page.evaluate(() => ZT.S.money > 9000 && ZT.S.week >= 3)), async () => {
-    const t0 = T.taps; await openMenu('buildHab'); await T.tapText('Build'); await T.tapText('Habitats'); await T.shot('build-habs'); await inv('build habs');
-    await T.tapText(/./, { sel: '.row.tappable' }); await sleep(300);
+    const t0 = T.taps; await openMenu('buildHab'); await T.tapText('Edit', { wait: 700 }); await T.shot('build-habs'); await inv('build habs');
+    { const c = await E.card('hab:savanna'); if (!c.found) T.find('hab:no-card', 'no Savanna card in the Edit strip (' + c.why + ')'); } await sleep(300);
     const res = await place('hab', 'savanna', 'habitat2', { rotate: 2 });
     metrics.taps.buildHab = T.taps - t0; say('second habitat placed:', res.ok, 'taps incl floor:', metrics.taps.buildHab);
     if (!res.ok) { await T.tapText(/^(Done|Cancel)$/, { floor: true, sel: '#placement-bar button' }); await sleep(400); await closeAll('hab cancel'); }
     else { const s = await st(); say('  after placing: stack', s.stack.join('>'), 'placing', s.placing, 'running', s.running); }
     await inv('after hab placement', { expectClosed: false });
-    const s2 = await st(); if (!s2.placing && !s2.stack.length) await inv('hab done', { expectClosed: true });
+    await drain('after second habitat'); const s2 = await st(); if (!s2.editing && !s2.stack.length) T.find('hab:edit-ended', 'Edit mode ended by itself after the second habitat was placed'); await L.toFloor(T, 195, 440); await inv('hab done', { expectClosed: true });
   });
 
   async function buildFac(rowRe, label, wantCombo) {
-    const t0 = T.taps; await openMenu(label); await T.tapText('Build'); await T.tapText('Facilities'); await shotOnce('build-facs', 'build-facs'); await inv('build facs');
-    const got = await T.tapText(rowRe, { sel: '.row', wait: 400 }); if (!got) { T.find('fac:row:' + label, 'facility row ' + rowRe + ' not found'); await closeAll(label); return false; }
+    const t0 = T.taps; await openMenu(label); await T.tapText('Edit', { wait: 700 }); await shotOnce('build-facs', 'build-facs'); await inv('build facs');
+    const key = { 'Snack Stand': 'fac:snack', 'Garden Bench': 'fac:bench', 'Restroom': 'fac:restroom' }[rowRe.source]; const got = await E.card(key); if (!got.found) { T.find('fac:row:' + label, 'facility card ' + key + ' not found in the Edit strip (' + got.why + ')'); await L.toFloor(T, 195, 440); await closeAll(label); return false; }
     const s = await st(); if (!s.placing) { T.find('fac:placement-not-started', 'tapping a facility did not start placement'); await closeAll(label); return false; }
     await shotOnce('place-' + label + '-start', 'place-' + label + '-start'); await inv('placement start ' + label);
     const g0 = await page.evaluate(() => ({ p: ZRender.debug().placement }));
     if (g0.p && !g0.p.ok) T.find('place:ghost-starts-invalid', 'the placement ghost starts on an invalid spot ("' + g0.p.msg + '") so the first Place tap does nothing until the player moves it', 'tester-' + T.tag + '-place-' + label + '-start.png');
     const cands = await page.evaluate(() => {
       const S = ZT.S, res = []; const hab = S.items.filter(i => i.k === 'hab' && i.t === 'savanna'); const near = new Set();
-      for (const h of hab) for (const c of ZE.cells(h)) for (const d of ZE.DIRS) near.add((c[0] + d[0]) + ',' + (c[1] + d[1]));
+      for (const h of hab) for (const c of ZE.ringCells(S, h.id)) for (const d of ZE.DIRS) near.add((c[0] + d[0]) + ',' + (c[1] + d[1]));   // Update 7: "next to" a habitat now means across its walkway ring
       const fid = ZRender.debug().placement && ZRender.debug().placement.t;
       for (let r = -2; r < 25; r++) for (let q = -12; q < 14; q++) {
         if (!ZE.inGrid(q, r) || !ZE.inLand(S, q, r)) continue; const p = ZRender.hexToClient(q, r); if (!p || !(p.x > 30 && p.x < 360 && p.y > 90 && p.y < 640)) continue;
-        if (S.items.some(it => ZE.cells(it).some(c => c[0] === q && c[1] === r)) || ZE.isEntrance(q, r)) continue; res.push({ q, r, x: p.x, y: p.y, near: near.has(q + ',' + r) });
+        if (S.items.some(it => ZE.cells(it).some(c => c[0] === q && c[1] === r)) || ZE.isEntrance(q, r)) continue; if (!ZE.placeCheck(S, 'fac', fid, q, r, 0).ok) continue; res.push({ q, r, x: p.x, y: p.y, near: near.has(q + ',' + r) });
       }
       res.sort((a, b) => (b.near - a.near)); return res;
     });
@@ -324,7 +339,7 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     const s2 = await st(); say('  after combo popup: placing', s2.placing, 'running', s2.running, 'stack', s2.stack.join('>'));
     if (s2.placing) { await T.tapText(/^(Done|Cancel)$/, { floor: true, sel: '#placement-bar button', wait: 600 }); }
     await sleep(500); const s3 = await st(); say('  after Cancel: stack', s3.stack.join('>'), 'placing', s3.placing, 'running', s3.running);
-    await closeAll(label);
+    await closeAll(label); { const se = await st(); if (!se.editing) T.find('fac:edit-ended:' + label, 'Edit mode ended by itself after placing ' + label); } await L.toFloor(T, 195, 440);
     await sleep(1500); const s4 = await st(); say('  after closing everything: running', s4.running, 'stack', s4.stack.join('>'), 'reports', s4.reports);
     if (!s4.running && !s4.stack.length && !s4.placing && !s4.reports) T.find('pause:after-build-' + label, 'clock stays PAUSED after building ' + label + ' with nothing open (combos ' + before.combos + '->' + after.combos + ')');
     metrics.taps['fac-' + label] = T.taps - t0; return after.n > before.n;
@@ -374,23 +389,16 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     await drain('train'); await closeAll('train');
   });
 
-  job('hire', async () => (await page.evaluate(() => ZT.S.week >= 10 && ZT.S.money > 2000 && ZT.S.staff.length < 3)), async () => {
-    const t0 = T.taps; await openMenu('hire'); await T.tapText('Staff'); await T.tapText(/^Hire/); await sleep(250); await T.shot('hire-tiers'); await inv('hire tiers');
-    const d = await describe(T); say('  hire tiers:', d.text);
-    const n0 = await page.evaluate(() => ZT.S.staff.length);
-    await T.tapText(/./, { sel: '.row.tappable, .opt, .gbox', nth: 0, wait: 900 });
-    for (let i = 0; i < 6; i++) {       // advert reveal ("who turned up"): tap through, then Hire the first person
-      const s = await st(); const dd = await describe(T); say('  hire step', i, dd.id, '|', (dd.text || '').slice(0, 90));
-      await shotOnce('hire-' + i + '-' + dd.id, 'hire-step-' + i); await inv('hire step ' + i);
-      if (/Pay|Confirm/.test((dd.items || []).join('|')) && !/Who turned up|Hire/.test(dd.text)) { await T.tapText(/^(Pay|Confirm|Advertise)/i, { wait: 700 }); continue; }
-      if (/Hire/.test(dd.text) && !/Notice board/.test(dd.text)) { const hb = await T.tapText(/^Hire/, { sel: 'button, .btn', nth: 0, wait: 800 }); if (hb) break; }
-      await T.tapXY(195, 440, 700);
-    }
-    await sleep(500); await shotOnce('hire-after', 'hire-after');
-    const n1 = await page.evaluate(() => ZT.S.staff.length);
-    metrics.taps.hire = T.taps - t0; say('hired:', n1 > n0, 'staff', n0, '->', n1, 'taps (incl floor, Staff, Hire, tier, Hire):', metrics.taps.hire);
-    if (n1 <= n0) T.find('hire:no-hire', 'could not hire anyone from the advert result screen (staff stayed ' + n0 + ')');
-    await inv('hire done'); await T.tapText(/^Done/i, { sel: 'button, .btn', wait: 600 }); { const dd = await describe(T); say('  after Done on the pick list:', dd.id, '|', (dd.text || '').slice(0, 160)); await T.shot('hire-after-done'); await inv('hire after done'); } await drain('hire'); await closeAll('hire');
+  /* Hiring is timed since round 5: an advert tier on the Staff screen is paid now and the applicants turn up as a pop-up two weeks later
+     (the shared touch drain hires from it). The old "Staff > Hire > tier > who turned up" walk no longer exists, and its /^Hire/ tap hit the headhunter's button. */
+  let staffAtAdvert = -1;
+  job('hire', async () => (await page.evaluate(() => ZT.S.week >= 10 && ZT.S.money > 2000 && ZT.S.staff.length < ZE.staffCap(ZT.S) && !ZT.S.hiring && !ZT.S.candidates.length)), async () => {
+    const t0 = T.taps; const n0 = await page.evaluate(() => ZT.S.staff.length); await openMenu('hire'); await T.tapText('Staff'); await sleep(250); await T.shot('hire-tiers'); await inv('hire tiers');
+    const d = await describe(T); say('  hire tiers:', d.text.slice(0, 240)); const m0 = await page.evaluate(() => Math.round(ZT.S.money));
+    const ok = await T.tapText(/^Notice board/, { sel: 'button, .btn, .row', wait: 800 }); await shotOnce('hire-advert', 'hire-step-0'); await inv('hire advert');
+    const a = await page.evaluate(() => ({ hiring: !!ZT.S.hiring, cands: ZT.S.candidates.length, money: Math.round(ZT.S.money) })); say('  advert tapped:', !!ok, JSON.stringify(a), 'paid', m0 - a.money);
+    if (!ok || (!a.hiring && !a.cands)) T.find('hire:no-advert', 'tapping Notice board on the Staff screen did not start a job advert'); else staffAtAdvert = n0;
+    metrics.taps.hire = T.taps - t0; await drain('hire'); await closeAll('hire');
   });
 
   job('research', async () => (await page.evaluate(() => ZE.researchList(ZT.S).some(r => !r.done && !r.lock && r.rp <= ZT.S.rp))), async () => {
@@ -470,6 +478,7 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     await inv('tick ' + w, { expectClosed: true });
     await sleep(400);
   }
+  if (staffAtAdvert >= 0) { const n1 = await page.evaluate(() => ZT.S.staff.length); say('hired:', n1 > staffAtAdvert, 'staff', staffAtAdvert, '->', n1); if (n1 <= staffAtAdvert) T.find('hire:no-hire', 'could not hire anyone from the advert\'s applicants (staff stayed ' + staffAtAdvert + ')'); }
   const end = await st(); say('== end of loop: week', end.week, 'stack', end.stack.join('>'), 'money', end.money, 'elapsed', Math.round((Date.now() - startMs) / 1000) + 's');
   await T.shot('99-end');
   /* ----- summary ----- */

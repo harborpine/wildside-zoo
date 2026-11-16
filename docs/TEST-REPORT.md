@@ -1,5 +1,151 @@
 # Wildside Zoo: test report (Tester)
 
+# ROUND 7 (Update 7: Edit mode, walkway rings, star expeditions, challenges)
+
+Run on 2026-11-15, 21:28 to about 23:00 (the PC's clock), headless only (test/pw.js), on the game files as they stood at 21:27 (the last game file to change was menus.js at 21:27; moments.js was last changed at 21:03 and did not change while I tested; the Moments owner changed `test/moments-shot.js` at 22:16, after my run of it had started, so my result is for the version before that). Nothing was committed.
+
+## Summary
+
+**The game plays cleanly through Update 7 by touch on both engines.** The opening (tutorial through Edit mode) plus a full first year at the owner's phone size (393x852, installed-app insets 62 top and 34 bottom): Chromium and WebKit both reached the year-end screen with 0 findings, 0 console errors, 0 game errors. Three more years (tester-years), the wrong-order bare-land run, the edge cases, every size, the fit and symbol audits: 0 findings on both engines once my scripts were brought up to date.
+
+**New playthroughs (tester-u7.js, both engines):** Edit mode 41 of 41 checks, expedition star levels 36 of 36, where list and crown 13 of 13, green and red 6 of 6, speed 2 5 of 5 (a walking visitor covers 2.07 times the ground on Chromium, 2.12 on WebKit), audit of the new screens 14 of 15 at each of two sizes (one polish finding). All five challenge levels were started from the title by touch and played to their result card on both engines, several times each.
+
+**Six findings, none a blocker:** one "should fix" (the Levels button on the result card lands on the title, not on the level list) and five polish. Plus one question for the Rules owner about how hard the levels are (my simple touch player won level 1 every time, levels 3 and 4 sometimes, and levels 2 and 5 each of the others only now and then).
+
+**What was wrong was mostly my scripts, not the game:** ten tester scripts were stale against the new design and were updated (list below); several first-run failures of tester-u7.js were my own script's faults and are named as such.
+
+## Every suite and script, as actually run
+
+Owners' suites (run once each, one after another; exit code and the suite's own last line):
+
+| Suite | Chromium | WebKit | Notes |
+|---|---|---|---|
+| `rules-check.js` | PASS (61 checks, "RULES CHECK: ALL PASSED", 74 s) | n/a (Node) | |
+| `bot.js 0.8` | ran, exit 0 | n/a | prints pacing only; 13 habitats, 38 facilities, 97 walkway hexes at the end |
+| `bot.js challenge all 20` (extra, to know what to expect) | ran | n/a | every level finished in 95 to 100% of bot runs at every skill |
+| `art-check.js` | PASS | n/a | |
+| `art-regress.js` | PASS (1351 sprites, 0 half see-through pixels) | n/a | |
+| `render-shot.js both` | PASS | PASS | "ALL CHECKS PASSED" |
+| `render-edit.js both` | PASS | PASS | "ALL CHECKS PASSED" |
+| `render-alphaprobe.js` | ran, exit 0 | n/a | it only prints `{"density":2,"sprites":{}}`: an empty list, nothing to judge |
+| `shell-shot.js` | **FAILED 2 of 71 on the first run, PASS 71 of 71 when rerun alone** | PASS 71 of 71 | see finding 6 (a timing weakness in the test under load, not something a player can hit) |
+| `lead-sa.js` | ran, exit 0 | n/a | prints measurements: strip 124 px tall with the 62 px top inset, date text at 95 to 113 (33 px under the inset) |
+| `menus-shot.js` | PASS (68) | PASS (68) | |
+| `menus-title.js` | PASS (74) | PASS (74) | |
+| `menus-hire.js` | PASS | PASS | |
+| `menus-fit.js` | PASS (18) | PASS (18) | |
+| `menus-drag.js` | PASS (23) | PASS (14) | |
+| `menus-u7.js` | PASS (119) | PASS (119) | |
+| `moments-shot.js` | PASS (636 checks, 1 warning, 23.6 min) | PASS (634 checks, 1 warning, 24.8 min) | the warning: "not reached by random play this run: camp:1" |
+
+My scripts (final versions, both engines; "0" = no findings, no console errors, no game errors):
+
+| Script | Chromium | WebKit | Notes |
+|---|---|---|---|
+| `tester-blank.js` (390x753) | 0 | 0 | |
+| `tester-first5.js` 393x852 full, `Q=?standalone=1&inset=34&insett=62` | 0 (tutorial 6 steps, year-end reached, about 400 s) | 0 (about 390 s) | by touch: 6 / 8 expeditions, 2 / 3 breedings, 2 / 2 events, 1 / 1 hire |
+| `tester-extra.js` | 0 | 0 | the headhunter step tapped nothing (staff 2 to 2) and raises no finding; see "not done" |
+| `tester-years.js` (3 years) | 0 | 0 | 12 to 15 things built through Edit mode by touch |
+| `tester-sizes.js` (844x390, 375x667, 430x932, 820x1180, and now 393x852 installed) | 0 | 0 | |
+| `tester-fit.js` (8 sizes plus 393x852 installed) | 0 | 0 | first run had 1 false alarm from my new strip check at 320x568; fixed in my script |
+| `tester-symbols.js` | 0 | 0 | first run had 4 false alarms from my new audit on scrolling lists; fixed in my script |
+| `tester-edge5.js` (393x852) | 0 | 0 | |
+| `tester-play.js` (390x844, real clock, year one) | 0 | 0 | after two stale parts were fixed (below) |
+| `tester-u7.js edit exp where colours speed audit` | 1 polish finding (finding 2) | same | 129 of 131 checks |
+| `tester-u7.js level:*` | see the level table | see the level table | findings 1 and 2 only |
+
+## Scripts that were stale and were updated (the game was right)
+
+Nothing was loosened; where a check no longer applies it was replaced by the equivalent check on the new design, and several steps that used to only print now also raise a finding.
+
+- **tester-lib.js**: `T.state()` also reports Edit mode; the pause rule now also fails if the clock runs while Edit mode is on; the 44 px, overflow and off-screen scans also cover `#edit-bar` and the top strip on the floor; two NEW strict checks on every screen (the strip's text at least 30 px under the top inset; date, money and visitors on one row); every tap by text or selector now waits out a screen's 170 ms slide-in (a script can tap faster than a person can, and such taps are ignored, which made a trader purchase "fail"); new helpers `toFloor`, `tapSel`, `edit()` (open Edit, find a card through the symbol tabs, tap a hex, Place, pick a placed thing), `audit()` (up-and-down scrolling, see-through, overlapping, clipped).
+- **tester-first5.js**: the tutorial steps go floor > menu > Edit > the card in the strip. "Build glows on the menu" became "Edit glows and there is no Build box"; "the Savanna row is in the Habitats list" became "the Savanna card glows in the strip and the strip opens on its group"; added: the strip fits (44 px, above the bottom inset, no up-and-down scroll, symbol tabs), the coach strip does not overlap it, the ghost shows its ring, the built habitat has a ring that is drawn, the Snack Stand is not on a ring hex, Done glows when nothing is left to place, Done leaves Edit mode. The bench is now tapped onto a legal hex beside the stand and across the walkway (the old "beside the stand" hex could be a ring hex).
+- **tester-blank.js**: Buy land / Upgrade / Move / Remove "with nothing built" became: the More land card is greyed, a tap says why and buys nothing; a tap on empty ground in Edit mode offers no Move / Upgrade / Sell and opens no menu; Cancel on a placement keeps Edit mode on and builds nothing.
+- **tester-extra.js**: Upgrade, Move and Remove are now Edit > tap the thing on the map > the button. New failing conditions (they only printed before): the level did not rise, the building did not move, Sell did not ask first, sold before the answer, no money back, asked twice.
+- **tester-years.js**: building goes through the Edit strip (it now rotates through every card that is not greyed, so more kinds get built); More land through its card.
+- **tester-sizes.js, tester-fit.js**: the Build box became the Edit strip (fits, 44 px, above the inset, no up-and-down scroll, not taller than 40% of the screen, symbol tabs, clock paused); the owner's phone as an installed app was added to both.
+- **tester-edge5.js**: removing a habitat with animals in it is now Edit > tap it > Sell > asked once; the expedition's 4th argument is a star level.
+- **tester-play.js**: the tour, the star pick (2 stars by touch, where it used to tap "Standard"), building through the strip, "next to a habitat" = across its ring. Two parts were already stale from round 5 and are fixed: it could not answer a pop-up that opened over a menu (the where list after buying at the Market: the run sat there from week 8 to the time limit), and its hiring step still walked the old Staff > Hire screens (its tap landed on the headhunter's button).
+- **tester-symbols.js**: also runs the new audit on every screen.
+- **tester-u7.js**: new (Job 3).
+
+Faults in my own new script on its first runs, fixed and rerun (not game problems): pop-ups were not silenced the right way in the Edit section; the where-list step tapped during the slide-in; the "leave and Continue" comparison did not hold the clock; the "card comes back" step did not answer the other pop-ups of that last week first, and a retried run was saved over the run it was meant to restore; the "slots untouched" snapshot also watched a one-time hint flag (`wildside-drag-hint`), which the Animals screen sets.
+
+## Job 3: what was played, and what happened
+
+### Edit mode (41 of 41 on both engines)
+By touch on a zoo with $80,000 (set by the test hook): menu has Edit and no Build; Edit shows `#edit-bar` (192 px tall, solid, symbol tabs, one sideways row, nothing under 44 px, nothing under the home-indicator inset); **time stood still for the whole edit** (week 4 from start to Done, with 0.7 s weeks) and ran again after Done. A second Savanna habitat was added; its ghost showed a 9 hex ring; the built habitat had its ring and the renderer drew all 17 ring hexes. **A habitat touching another was refused**: ghost marked, Place greyed, note "Leave a walkway between habitats.", tapping Place built nothing and cost nothing. A bench on the walkway was refused with "Keep the walkway clear.". Tapping the habitat selected it (Move, Upgrade, Sell, back); **Move** took it to the tapped hex and its ring followed; **Upgrade** raised it one level and charged $10,000; **Sell** asked once ("Sell Savanna 2 for $2,500?"), No sold nothing, Sell removed it, paid $2,500 and its ring went. Screenshots: `test/shots/tester-cr-u7-edit-*.png`, `tester-wk-u7-edit-*.png`. As a player: clear and quick; the refused spot is obvious.
+
+### Expedition star levels (36 of 36 on both engines)
+A new zoo shows five star buttons; 1 and 2 open, 3 to 5 greyed with a padlock and the rank that opens them. **Tapping locked 3 stars did not select it and said "Rank 2".** 1 and 2 stars were each picked, sent ($3,000 and $3,300) and seen home; after the rank was raised by the test hook, 3, 4 and 5 stars the same ($9,500, $33,500, $60,000). Each time the page showed that star's price, weeks and odds, Send charged exactly that, and the result card showed that many lit stars. The page never scrolled. No Lean / Standard / Lavish anywhere.
+
+### Where list, crown, colours, speed
+- **Where list**: with 4 zebras in one habitat, 3 warthogs in the other and 2 ostriches in the pen, a bought animal's where list showed exactly those as small portraits with sex marks under each row (`tester-cr-u7-where-05-where-list.png`). Tapping a row housed it.
+- **Crown**: on Animals > Zoo the crown was on the best of three male zebras and the best of two female warthogs only; the lone female zebra and lone male warthog had none; the pen showed one crown for its two male ostriches; the animal screens agreed.
+- **Green and red**: seen in real play by touch: "It worked!", "Good call" and "Expedition back" on a solid green bar with a tick, "No luck" on a solid red bar with a cross; the plain result card both ways; the challenge card green when won and red when out of time. Not seen in my runs: a breeding result (no pair was ready); the Moments suite covers it and passed.
+- **Speed 2**: floor time ran exactly twice as fast; a walking visitor covered 26.1 then 54.0 px a second (Chromium), 25.6 then 54.3 (WebKit).
+
+### The five challenge levels
+Each level, both engines: started from the title's Challenges entry by touch (the entry shows the stars so far; the level list shows earlier best stars, this level open, later ones locked and not pickable); the level's figures (money, map rows, bare land or starter zoo), no tutorial and no first-move glow, the goal chip (goal, weeks left, stars still possible), Info without Years / Awards / Ranks / Rumors, System with Restart level and no Replay tutorial, Edit without a More land card; speed 2 set by touch; then played by touch with the clock shortened to 0.7 s a week by the test hook (building through Edit mode, expeditions with a star picked, events, breeding, research, adverts and hiring, campaigns, upgrades, selling, every pop-up answered). Around week 8 the level was left through System > Title screen and resumed with Continue (same week, same zoo, speed 2 kept). At the end: the result card's lit stars against `ZE.challengeStatus`, the bar colour, the buttons, 44 px and inset, a tap on the card not closing it, best stars stored, **Levels**, then (the run with its card restored by the hook) **Retry** and, where the level was won, **Next level**. The three zoo slots, their summaries and the legacy record were compared at eight points in every run: **never changed**.
+
+What each level forbids, checked by touch: level 2 offers only the Savanna habitat and no other region to research; level 3 greys Expedition with a padlock and starts nothing; level 5 greys the habitat card after two habitats and says "Only 2 habitats here."; no level sells land.
+
+| Level | Chromium (each run of my touch player) | WebKit |
+|---|---|---|
+| 1 Pocket Park (1,000 visitors) | won 3 of 3: 1 star at week 99, 108, 109 | won 3 of 3: 1 star at week 72, 109, 109 |
+| 2 Savanna Only (9 species) | lost 3 of 3 at 8 / 9 while my player never tapped a higher star; then **2 stars at week 52** once it picked stars | lost 3 of 3 at 8 / 9; then 1 star at week 76 |
+| 3 Shoestring ($50,000) | lost 4 of 4: $47.8K, $46.8K, $45.5K, $47.7K | 1 star at week 100, 1 star at week 119, lost at $44.6K, lost at $45.4K |
+| 4 Family Tree (grade A baby, 58) | lost at 52, lost at 54, **2 stars at week 68**, lost at 56 | lost 4 of 4: 57, 53, 57, 53 |
+| 5 Two Pens (rank 4, 1,000 reputation) | lost 3 of 3: 708, 697, 935 | lost at 763, lost at 894, 1 star at week 115 |
+
+A lost level still ends properly: the red card with a cross, 0 lit stars, Retry first, then Levels, no Next level, the next level stays locked, no stars stored. A won level: green card, the stars lit one by one match `ZE.challengeStatus`, Next level / Retry / Levels, best stars on the level list, the next level unlocked. A level takes my player 4 to 11 real minutes with the shortened clock.
+
+Everything about the cards and buttons passed except finding 1. Next level was pressed for real on levels 1 and 2 (both engines) and level 4 (Chromium); Retry and "the card comes back if you quit with it up" on every level.
+
+### Audit of the new screens against the owner's rules
+At 393x852 (installed) and 375x667, both engines: title with the Challenges entry, the level list (with stars, a locked level and Continue), the challenge floor and goal chip, the menu, Info, Log, System, Projects, the one-screen event set-up, the Edit strip (add view and picked view), plus (393 only) the Send out page, the where list, the trader, the result card. No up-and-down scrolling on any of them, no see-through element found (computed opacity and colour alpha), nothing tappable under 44 px, nothing overlapping or clipped, no text spilling out of a box, strip text 33 px under the top inset on one row at every size. Looking at the screenshots: everything is symbols and numbers except level names, theme names and the few button words; the level list reads well even at 375 wide.
+
+## Findings
+
+**The game is wrong**
+
+1. **Moments (`moments.js`), should fix: "Levels" on the result card lands on the title screen, not on the level list.** Did: finished a level (won or lost), tapped Levels. Happened: the title screen (the three zoo slots and the Challenges entry); one more tap on Challenges is needed to see the stars just earned and the next level. Should: open the level list (`title > challenges`), which is what the button says. Every level, both engines. `test/shots/tester-wk-u7-lv2-27-after-levels.png` (after it, one more tap gives `tester-wk-u7-lv2-28-levels-after.png`).
+2. **Menus (`menus.js`), polish: in Shoestring the padlocked Expedition box says nothing when tapped.** Did: level 3 > menu > Projects > tapped the greyed Expedition. Happened: nothing at all. Should: say why in a short line, as every other refused thing does ("Needs rank 2" on the land card, "Rank 2" on a locked star, "Only 2 habitats here."). `test/shots/tester-cr-u7-audit393x852-09-ch-projects.png`.
+3. **Menus (`menus.js`), polish: with only two themes the event set-up stretches each theme into a box about 360 px tall holding one line of text.** Did: Projects > Event in a young zoo. It fits and works, it just looks unfinished next to the neat host buttons above it. `test/shots/tester-cr-u7-audit393x852-10-event-setup.png`.
+4. **Shell (`core.js`) or Menus, polish: a refusal toast in Edit mode sits on top of the strip's group tabs.** Did: in Edit mode tapped a greyed card (third habitat in Two Pens, or More land). Happened: the pink toast covers two of the tabs for about two seconds. Should: sit above the strip. `test/shots/tester-cr-u7-lv5-25-tiny-third-habitat.png`.
+5. **Shell (`core.js`), polish, a question for the owner: a challenge starts at speed 1.** On a fresh install Start begins the level at 1x; the levels are timed for 10 minutes at 2x, so a first-timer gets a 20 minute level unless he finds System > 2x. (A resumed run keeps the speed it had.) No screenshot; `ZCore.speed` is 1 right after Start.
+6. **Renderer / Shell test, polish (no player can hit it): `shell-shot.js chromium` failed 2 checks once while the PC was busy** ("Edit mode pauses the clock...": editing false, clock running). The test loads a slot and calls `ZRender.startEdit` in the same instant; if the renderer has not drawn a frame in between, its "this is a new game" check on the next frame ends Edit mode again. Alone it passes 71 of 71. Either the test should wait a frame after `loadSlot`, or `startEdit` should note the current state itself.
+
+Seen, not counted as findings: floating "+$" pop-ups freeze where they are while the game is paused for an edit or a pop-up (my shortened clock piled several on top of each other at the gate, which will not happen at real speed; `tester-cr-u7-edit-07-touch-refused.png`). The 62 px dark band above the title and the zoo showing round the title panel are unchanged (round 3, R3-10).
+
+**A question, not a fault: how hard are the levels for a simple player? (Rules, `data.js`)**
+My touch player does what a careful first-timer would do and nothing clever: builds through Edit mode as money allows, houses animals, holds an event or breeds whenever the flag shows, sends an expedition whenever it can afford one, buys the cheapest research, advertises for staff, runs campaigns, upgrades a full habitat; it does not train staff, takes the first breeding pair offered, and only in level 4 sells spare animals. The Rules owner's bot finishes every level in 95 to 100% of runs. Mine: level 1 six of six (always 1 star, never before week 72); level 3 two of eight, losing by $2,000 to $5,500; level 4 one of eight, losing by 1 to 6 points; level 5 one of six, losing by 65 to 300 reputation. So "1 star is reachable by a careful first-timer" looks true for level 1 and doubtful for 3, 4 and 5. **Level 2 has a trap**: eight of the ten Savanna species are 1 to 3 star animals, so the ninth has to be a 4 or 5 star one; a player who keeps sending the star the page opens on stalls at 8 of 9 for the rest of the level (six runs out of six, with $340,000 in the bank at the end) and nothing on screen tells him why. Worth the owner playing levels 2 to 5 once before the 1 star lines are called final; how bad: should look at, not a bug.
+
+## Earlier findings: status
+
+| # | Finding | Status |
+|---|---|---|
+| R5-6 | Hosting icon unclear | **Fixed**: the purple smiling speech bubble (owner's choice B) on the event set-up and staff screens |
+| R3-10 | blank band above the title | **Not fixed** (polish) |
+| R5-2 | keeping everything drives money negative | not reproduced this round either |
+| R5-3, R5-5 | crate row picture; Screen check wording | not re-checked |
+
+## Not done, said plainly
+
+- **No level was won with more than 2 stars by my touch player**, so a 3 star card was never on screen; three lit stars are covered only by the Moments suite. Level 3 was never won on Chromium, level 4 never on WebKit and level 5 never on Chromium, so for those only the red out-of-time card with Retry and Levels was exercised. Level 3's Next level button was never pressed (in the one run where it could have been, my own script failed first).
+- The level result card was checked at 393x852 only (not at 375x667).
+- "Speed 2 moves the board": only visitors were measured; animals, staff and pop-ups were not measured separately (the Renderer's own test covers them).
+- Breeding's green and red cards were not seen in my colour run; a "No baby" card did not come up.
+- tester-extra's headhunter step taps nothing now (its button text changed) and only prints; the headhunter was hired by touch in tester-play's first run, but I did not fix that step.
+- tester-years started no breeding in three years (its breeding branch is rarely reached); breeding was exercised in tester-first5, tester-play and the levels instead.
+- Old saves with buildings standing against a habitat (legal as built) were not loaded by touch; rules-check and render-edit cover them.
+- Real touch drag in WebKit, a real iPhone, years 5 to 20 and the final score screen: as before, not tested.
+- `tester-art6.js` was not run this round (not asked for).
+
+---
+
+# ROUND 6 (previous section)
+
 # ROUND 6 (style-D art switched on, density 2)
 
 moments.js was unchanged for 28 minutes (last change 23:10) before my first pop-up-heavy run; the carried-over animal's decision pop-up is in (see below).

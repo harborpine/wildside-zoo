@@ -2,15 +2,15 @@
    Usage: node test/tester-fit.js [chromium|webkit]. Real touch taps open every screen. Headless only. */
 const L = require('./tester-lib.js'); const { sleep, describe } = L;
 const engine = process.argv[2] === 'webkit' ? 'webkit' : 'chromium';
-const SIZES = [[375, 553], [375, 647], [390, 664], [390, 753], [390, 844], [430, 739], [440, 956], [320, 568]];
+const SIZES = [[375, 553], [375, 647], [390, 664], [390, 753], [390, 844], [430, 739], [440, 956], [320, 568], [393, 852, '?standalone=1&inset=34&insett=62']];   // the last one is the owner's iPhone as an installed app (Update 7)
 (async () => {
   const all = [];
-  for (const [w, h] of SIZES) {
+  for (const [w, h, query] of SIZES) {
     const T = await L.launch(engine, { width: w, height: h }, { tag: (engine === 'webkit' ? 'wk' : 'cr') + '-fit' + w + 'x' + h });
     const page = T.page; const say = (...a) => console.log(...a); say('== ' + engine + ' ' + w + 'x' + h);
     const rec = (k, m, shot) => { T.find(k + ':' + w + 'x' + h, m + ' at ' + w + 'x' + h, shot); };
     // title first (clean profile)
-    await T.goto(''); await sleep(900);
+    await T.goto(query || ''); await sleep(900); const E = L.edit(T);
     const meas = () => page.evaluate(() => {
       const L = [...document.querySelectorAll('#screens .layer:not([hidden])')].pop(); const body = L && L.querySelector('.pbody'); const panel = L && L.querySelector('.panel'); const back = L && L.querySelector('.back');
       const app = document.getElementById('app').getBoundingClientRect(); const strip = document.getElementById('strip').getBoundingClientRect(); const news = document.getElementById('news').getBoundingClientRect(); const stage = document.getElementById('stage').getBoundingClientRect();
@@ -37,7 +37,7 @@ const SIZES = [[375, 553], [375, 647], [390, 664], [390, 753], [390, 844], [430,
       if (m.panel && (m.panel.l > 12 || m.vw - m.panel.r > 12)) rec('narrow:' + name, 'panel does not use the full width on "' + name + '": left ' + m.panel.l + ', right gap ' + (m.vw - m.panel.r));
       await T.shot(name); await L.invariants(T, name + ' ' + w + 'x' + h); };
     await T.tapXY(Math.round(w / 2), Math.round(h * 0.55), 450); await check('menu', true);
-    for (const box of ['Projects', 'Build', 'Animals', 'Staff', 'Research', 'Info', 'System']) {
+    for (const box of ['Projects', 'Animals', 'Staff', 'Research', 'Info', 'System']) {
       if (!(await T.tapText(box))) { rec('missing:' + box, box + ' box cannot be tapped'); continue; }
       await check(box);
       if (box === 'Research') { if (await T.tapText(/^Regions/)) { await check('Research-Regions'); await T.tapText(/./, { sel: '.back' }); await sleep(200); } }
@@ -47,10 +47,16 @@ const SIZES = [[375, 553], [375, 647], [390, 664], [390, 753], [390, 844], [430,
       await T.tapText(/./, { sel: '.back' }); await sleep(250);
     }
     // placement bar at this size
-    await T.tapText('Build'); await T.tapText('Facilities'); await T.tapText(/./, { sel: '.row.tappable', nth: 0, wait: 500 });
+    // Update 7: Build is now Edit (a strip on the map, not a screen). The strip must fit: one sideways row, nothing up-and-down, every button 44 px and above the bottom inset.
+    if (!(await T.tapText('Edit', { wait: 700 }))) rec('missing:Edit', 'Edit box cannot be tapped');
+    for (const grp of ((await E.bar()) || { tabs: [] }).tabs) { await L.tapSel(T, '#edit-bar .mn-et[data-grp="' + grp + '"]', 350); const eb = await E.bar(); say('  Edit ' + grp.padEnd(5), JSON.stringify({ top: eb.top, bottom: eb.bottom, h: eb.h, cards: eb.cards.length, small: eb.small, below: eb.below, vScroll: eb.vScroll, hScroll: eb.hScroll }));
+      if (eb.small.length) rec('small:Edit-' + grp, 'tap targets under 44 px in the Edit strip (' + grp + '): ' + eb.small.slice(0, 3).join('; ')); if (eb.below.length || eb.bottom > h + 1) rec('edit-off:' + grp, 'the Edit strip (' + grp + ') runs off the bottom or under the bottom inset'); if (eb.vScroll > 1) rec('scroll:Edit-' + grp, 'the Edit strip (' + grp + ') scrolls up and down by ' + eb.vScroll + ' px'); if (eb.h > h * 0.4) rec('edit-tall:' + grp, 'the Edit strip (' + grp + ') covers ' + Math.round(100 * eb.h / h) + '% of the screen');
+      await T.shot('Edit-' + grp); await L.invariants(T, 'Edit ' + grp + ' ' + w + 'x' + h); await L.audit(T, 'Edit ' + grp + ' ' + w + 'x' + h); }
+    if (!(await E.bar() || {}).shown) rec('edit:none', 'Edit did not show its strip');
+    await E.card('fac:snack'); await sleep(300);
     const pb = await page.evaluate(() => { const b = document.getElementById('placement-bar').getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom), vh: innerHeight, placing: ZRender.placing(), btns: [...document.querySelectorAll('#placement-bar button')].map(x => Math.round(x.getBoundingClientRect().width) + 'x' + Math.round(x.getBoundingClientRect().height)) }; });
     say('  placement bar:', JSON.stringify(pb)); if (!pb.placing) rec('placement:no', 'placement did not start'); else if (pb.bottom > pb.vh + 1) rec('placement:off', 'placement bar runs off the bottom'); await T.shot('placement');
-    await T.tapText(/^(Done|Cancel)$/, { floor: true, sel: '#placement-bar button' }); await sleep(300); await page.evaluate(() => ZT.popAll());
+    await T.tapText(/^(Done|Cancel)$/, { floor: true, sel: '#placement-bar button' }); await sleep(300); await L.toFloor(T); await page.evaluate(() => ZT.popAll());
     const e = await T.state(); if (e.errors) rec('errors', 'game errors recorded');
     T.findings.forEach(f => all.push({ size: w + 'x' + h, ...f })); if (T.consoleErrors.length) all.push({ size: w + 'x' + h, key: 'console', msg: 'console errors: ' + T.consoleErrors.join(' | ') });
     await T.browser.close();
