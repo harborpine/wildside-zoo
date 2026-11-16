@@ -104,3 +104,37 @@ Retry and Next level.
 
 ### G. Tester (last)
 Full suites and touch playthroughs on both engines, plus one playthrough of each challenge level.
+
+## Wave 2 contracts (Lead, after Rules, Shell and Artist reported)
+
+Read the "R7" section at the top of `docs/API-rules.md`, the "Update 7" sections at the top of `docs/API-shell.md` and `docs/API-artist.md`. Key facts:
+- Project choices now appear only a quarter of the time. Any test that waits for one must call `ZE.debug.alwaysChoices(true)` first.
+- Nothing may stand against a habitat any more (walkway ring). Tests that place a facility touching a habitat, or use the old Snack Stand spot, need new spots
+  (`ZE.starterSpots()`, `ZE.placeCheck`).
+- Red `.badge` boxes are gone; use the Shell's `.alert` gold frame (`ui.btn(..., {alert:true})`, grid/list/tabs items `{alert:true}`).
+- New symbol ids (Artist): `best`, `edit`, `move`, `sell`, `goal`, `level`, `path`, `star-on`, `star-off`. All symbols were redrawn; a few changed size by a
+  few pixels (`rp`, `stat-vigor`, `skill-exp`, `skill-charm`, `time`, `m-build`, `sex-m`), so check layouts.
+
+### Edit mode: who does what (note 6)
+The owner: "Move should let you select from the map and it should just be an edit screen where you can add, sell or move stuff, maybe with a scroll bar or
+something of places to choose." Build on the main menu becomes Edit (symbol `edit`) and opens the map in Edit mode; the old Build lists and the Move screen go.
+
+**Renderer provides (render.js):**
+- `ZRender.startEdit({ onPick, onExit })`, `ZRender.stopEdit()`, `ZRender.editing()`. While editing, the zoo keeps its normal look and the camera still drags.
+  A tap on a placed thing (habitat, facility; not the gate) calls `onPick(item)` with the engine item; a tap on empty ground calls `onPick(null)`.
+  The normal `onTap` is not called while editing.
+- `ZRender.select(itemId | null)`: a clear, solid, blinking outline around the selected thing (all its hexes), nothing see-through.
+- `startPlacement` keeps working exactly as today from inside Edit mode, for adding (`{kind, t, repeat}`) and for moving (`{moveId}`); the ghost uses
+  `ZE.placeCheck` so the note says why a spot is refused (touching another habitat, on a walkway ring, and so on) and shows the ring the habitat would get
+  (`ZE.ringAt`). When placement ends, Edit mode is still on.
+- While editing or placing, the floor must leave room for the Menus strip: the renderer reads the height of `#edit-bar` (if present and visible) the same way it
+  already allows for `#placement-bar`, so the ghost and the selected item are never hidden under it.
+
+**Menus provides (menus.js):**
+- `#edit-bar`: a solid strip docked at the bottom of the floor (Menus creates the element inside `#floor-wrap`; above the home-indicator inset). It holds a row
+  of group tabs as symbols (habitats, food and shops, fun, nature/decor or whatever groups Build has today) and ONE sideways-scrolling row of things to add
+  (picture, price, greyed with the reason when locked or too dear, hidden when a challenge level forbids them via `ZE.allowed`). Tapping one starts placement.
+  A Done button leaves Edit mode. Sideways scrolling of this one strip is what the owner asked for; nothing scrolls up and down.
+- When `onPick(item)` fires: call `ZRender.select(item.id)` and swap the strip for that thing's actions as big symbol buttons: Move (`move`), Sell (`sell`, with
+  the money you get back), Upgrade where it applies, and a way back to the add strip. Selling asks once before it happens.
+- The strip hides while `ZRender.placing()` (the renderer's own Place / Rotate / Cancel bar shows instead) and returns after.
