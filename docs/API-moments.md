@@ -4,6 +4,42 @@ Global: `ZMoments`. One IIFE, loaded last. It registers a handler for every repo
 (`ZMoments.init()` registers them again, harmlessly). CSS is injected once as `<style id="mo-style">`, every class starts with `mo-`.
 Tests: `node test/moments-shot.js [chromium] [webkit] [--quick] [--only=late,cards,callers,happenings,yearly,reveals,yearend,realplay,reopen,inmenu]` (headless; shots in `test/shots/moments-*.png`).
 
+## Update 7 (2026-11-15): who lives where, green and red results, star level, challenge card
+
+Where this section disagrees with older text further down, this section wins.
+Tests: `--only=` also takes `where`, `colours`, `expstar`, `challenge`, `rare` (plus the older `late`, `title`, `choices`, `blank`, `trader`, `arrivals`).
+
+* **Where list (note 1).** Every row (each habitat of the animal's region, then the pen) has a second line: the animals already living
+  there as small portraits, each with its sex mark underneath, in the engine's order (`ZE.arrivalChoices(S, id)[i].animals`, falling back
+  to `ZE.habAnimals`). One line only: twelve fit at 393 px wide; when they cannot all fit, the last ones become a `+N` box. No crown.
+  The header shows the arriving animal's own sex mark beside its name. A full habitat keeps its inline Upgrade button on the top line
+  (44 px tall; at the top level it reads only "Max level", no price). Five places with 26 residents fit with no scrolling at 393x852
+  and 375x667.
+* **Green and red (note 8).** A card that says "it worked" or "it failed" gets a **verdict bar**: the title bar turns solid green
+  (`#2e7d32`) or solid red (`#c0392b`) with white words and a tick or a cross in a cream box (`.mo-vmark.ok` / `.mo-vmark.no`).
+  The panel carries the class `good` or `bad`. The bar only appears on the card that gives the outcome, never during the suspense beat
+  before it. Where it is used: gamble choices ("It worked!" / "No luck", with a big tick or cross on the card), plain choices
+  ("Good call" / "Setback"), breeding ("New arrival" green, "No baby this time" red), expeditions (summary card: "Expedition back"
+  green, "Nothing found" red with a big cross), the Winter Show result ("Gold medal" green, "No medal" red; nothing while the score
+  counts up), training ("Trained" / "SUPER!"), `ZMoments.result({good})`, and the challenge card. Year-end award boxes read WON in green
+  and missed in red once they flip. Unchanged on purpose: a setback happening's plain outcome keeps its calm blue-grey bar (it is news,
+  not a failed attempt), and rank-ups, combos, secrets and VIPs stay gold.
+  For code: a step in a sequence may carry `verdict: { good, title }`; `M.verdict(good, title)` / `M.noVerdict()` do it by hand.
+* **Expedition star level (note 13).** The summary card shows `report.star` as that many lit stars out of five under the region name
+  (`.mo-xstar`). A report without `star` (sent before the update) shows no star row.
+* **Challenge result (note 12).** `ZCore.onReport('challenge', ...)` is registered. The card (`mo-challenge`) shows the level symbol,
+  number and name, the goal as symbol with `now / target` (from `ZE.challengeStatus`), the weeks used out of the limit, and three big
+  stars (`star-off`) that light one by one (`star-on`). Only after the last star has resolved does the bar turn green ("Level n" with a
+  tick) or red (with a cross), the goal chip turn green or red, and the buttons appear, pinned and 56 px tall: **Next level** (only when
+  stars > 0 and a next level exists; `ZCore.startChallenge(nextId)`), **Retry** (`ZCore.startChallenge(sameId)`), **Levels**
+  (`done()`, then `ZCore.leaveChallenge()`). A failed level shows Retry first (green), then Levels. Taps on the card never close it.
+  Quitting with the card up brings it back on return.
+* **Rare treats (note 9).** Nothing in Moments waits for a choice: a project whose choices do not come up goes straight to its result
+  card. Tests that need a choice call `ZE.debug.alwaysChoices(true)` first (`realplay`, `reopen`, `choices`, `colours`); `--only=rare`
+  plays an expedition, a breeding and an event with choices forced off and at the natural rate.
+* **Symbols.** The "sick" mark (now a green cross) is no longer used for bad outcomes: failures use the red cross (`no`), calm
+  setbacks use the happening's own symbol or the hourglass (`busy`).
+
 ## How a moment works
 
 * Every moment is **one modal screen** on the Shell's stack (`id` starts with `mo-`). Its content is swapped inside that screen, so the

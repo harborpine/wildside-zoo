@@ -8,7 +8,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const args = process.argv.slice(2).filter(a => !a.startsWith('--only=')), ONLY = (process.argv.find(a => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean), QUICK = args.includes('--quick');
 const browsers = args.filter(a => a === 'chromium' || a === 'webkit'); if (!browsers.length) browsers.push('chromium', 'webkit');
 let failures = 0, warnings = 0;
-const want = n => !ONLY.length || ONLY.includes(n);   // sections: cards callers happenings yearly reveals yearend realplay reopen inmenu
+const want = n => !ONLY.length || ONLY.includes(n);   // sections: cards callers happenings yearly reveals yearend realplay reopen inmenu late title choices blank trader arrivals where colours expstar challenge rare
 const check = (cond, msg) => { console.log((cond ? '  PASS ' : '  FAIL ') + msg); if (!cond) failures++; };
 const warn = msg => { console.log('  WARN ' + msg); warnings++; };
 
@@ -81,6 +81,26 @@ async function run(name) {
   const settled = async label => { const s = await waitStack(s => !s.stack.length && !s.busy, 4000); check(!!s && s.running, label + ': queue empty, stack empty, clock may resume' + (s ? '' : ' (stuck: ' + JSON.stringify(await state()) + ')')); };
   const fresh = async (fn, arg) => { await ev(fn || (() => { ZT.newGame({}); ZT.S.money = 1e6; ZT.S.rp = 5000; ZT.S.reports.length = 0; }), arg); await sleep(150); };
   const pushReport = r => ev(r0 => { ZT.S.reports.push(r0); ZT.flush(); }, r);
+  // Update 7: the verdict (green = it worked, red = it failed) lives on the title bar: a solid colour, white words, a tick or a cross in a box.
+  const GREEN = 'rgb(46, 125, 50)', RED = 'rgb(192, 57, 43)';
+  const verdict = () => ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); if (!l) return null; const p = l.querySelector('.panel'), t = p.querySelector(':scope > .ptitle'), cs = t ? getComputedStyle(t) : null, m = t ? t.querySelector('.mo-vmark') : null, mi = m ? m.querySelector('img') : null;
+    const tr = t ? t.getBoundingClientRect() : null, mr = m ? m.getBoundingClientRect() : null;
+    return { good: p.classList.contains('good'), bad: p.classList.contains('bad'), calm: p.classList.contains('calm'), bar: !!t, bg: cs ? cs.backgroundColor : null, ink: cs ? cs.color : null, title: t ? t.textContent.trim() : '',
+      mark: m ? (m.classList.contains('ok') ? 'ok' : 'no') : null, markPic: !!(mi && mi.complete && mi.naturalWidth > 0 && mi.getAttribute('src')), markIn: !!(tr && mr && mr.left >= tr.left && mr.right <= tr.right && mr.top >= tr.top && mr.bottom <= tr.bottom),
+      fits: !!(t && t.scrollWidth <= t.clientWidth + 1), bigMark: (() => { const b = l.querySelector('.mo-bigmark img'); return b ? /./.test(b.getAttribute('src') || '') : false; })(), id: l.dataset.screen }; });
+  const isGreen = v => !!v && v.bar && v.good && !v.bad && v.bg === GREEN && v.ink === 'rgb(255, 255, 255)' && v.mark === 'ok' && v.markPic && v.markIn && v.fits;
+  const isRed = v => !!v && v.bar && v.bad && !v.good && v.bg === RED && v.ink === 'rgb(255, 255, 255)' && v.mark === 'no' && v.markPic && v.markIn && v.fits;
+  const isNeutral = v => !!v && !v.good && !v.bad && !v.mark && v.bg !== GREEN && v.bg !== RED;
+  const vs = v => v ? JSON.stringify({ t: v.title, bg: v.bg, mark: v.mark, good: v.good, bad: v.bad, bar: v.bar }) : 'no screen';
+  // A real event's mid-project choice ('star' or 'boost'). Choices are rare treats now, so the test switches them on first.
+  const raiseChoice = key => ev(k => {
+    ZE.debug.alwaysChoices(true);
+    ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.rp = 5000; S.reports.length = 0;
+    const hab = S.items.find(i => i.k === 'hab'); const lead = ZE.freeStaff(S)[0];
+    if (!ZCore.act('startEvent', hab.id, 'feeding', lead.id).ok) return false;
+    for (let i = 0; i < 6; i++) { ZE.tick(S); const p = S.projects.find(x => x.choice && x.choice.key === k); if (p) { S.reports = S.reports.filter(r => r.type === 'choice' && r.pid === p.id); if (k === 'boost' || S.reports.length) { ZT.flush(); return true; } } if (k === 'boost') { const q = S.projects.find(x => x.choice && x.choice.key === 'star'); if (q) ZE.resolveChoice(S, q.id, 0); } }
+    return false;
+  }, key);
 
   const mkFound = (n, rar) => ev(({ n, rar }) => { const ids = ['lion', 'elephant', 'giraffe', 'zebra', 'tiger', 'panda'].filter(i => ZD.SPECIES[i]); const out = []; for (let i = 0; i < n; i++) { const sp = ids[i % ids.length]; out.push({ id: 900 + i, sp, rarity: rar || ZD.SPECIES[sp].rarity, isNew: i === 0, variant: i === 1, charm: 40 + i * 9, vigor: 30 + i * 7, wit: 25 + i * 11, hab: i === 2 ? null : (ZT.S.items.find(x => x.k === 'hab') || {}).id }); } return out; }, { n, rar });
   // ---------------------------------------------------------------- 1. quick cards
@@ -273,6 +293,7 @@ async function run(name) {
   // ---------------------------------------------------------------- 7. real play: projects, choices, results
   console.log(' -- real play');
   if (want('realplay')) {
+  await ev(() => ZE.debug.alwaysChoices(true));   // choices come up a quarter of the time now; this section needs every one
   const covered = {}, repSeen = {};
   async function playOut(maxTicks, optPick, shotsFor) {
     let ticks = 0, seen = [];
@@ -328,12 +349,13 @@ async function run(name) {
   const cnt = await ev(() => ({ shown: ZMoments.shown, finished: ZMoments.finished }));
   console.log('  handler calls in real play (shown / finished): ' + JSON.stringify(cnt));
   for (const t of ['expedition', 'birth', 'review', 'choice']) check((cnt.shown[t] || 0) > 0 && cnt.finished[t] === cnt.shown[t], 'real play: a real ' + t + ' report was shown and dismissed (' + (cnt.shown[t] || 0) + ' shown, ' + (cnt.finished[t] || 0) + ' dismissed)');
+  await ev(() => ZE.debug.alwaysChoices(false));
 
   }
   // ---------------------------------------------------------------- 8. showChoice reopen, save and reload, hidden tab
   console.log(' -- reopen, reload, hidden tab');
   if (want('reopen')) {
-  const pid = await ev(() => { ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; const ex = S.staff.find(s => s.role === 'explorer') || S.staff[0]; const r = ZCore.act('startExpedition', 'savanna', [ex.id], 1); if (!r.ok) return null; for (let i = 0; i < 12 && !S.projects.some(p => p.choice); i++) ZE.tick(S); S.reports = S.reports.filter(r => r.type === 'choice'); return (S.projects.find(p => p.choice) || {}).id || null; });
+  const pid = await ev(() => { ZE.debug.alwaysChoices(true); ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; const ex = S.staff.find(s => s.role === 'explorer') || S.staff[0]; const r = ZCore.act('startExpedition', 'savanna', [ex.id], 1); if (!r.ok) return null; for (let i = 0; i < 12 && !S.projects.some(p => p.choice); i++) ZE.tick(S); S.reports = S.reports.filter(r => r.type === 'choice'); return (S.projects.find(p => p.choice) || {}).id || null; });
   check(!!pid, 'a pending project choice exists for the reopen test');
   if (pid) {
     await ev(() => ZT.flush()); await waitStack(s => s.stack.length, 3000); await sleep(400);
@@ -353,7 +375,7 @@ async function run(name) {
     check(await ev(() => window.__sc === true && ZT.stack().length === 0), 'showChoice on a stale id just calls done');
   }
   // hidden tab mid-sequence
-  await ev(() => { ZT.newGame({}); ZT.S.reports.length = 0; });
+  await ev(() => { ZE.debug.alwaysChoices(false); ZT.newGame({}); ZT.S.reports.length = 0; });
   await pushReport({ type: 'expedition', region: 'savanna', found: await mkFound(3), rp: 3, fragment: 0, notes: [], ups: [], staff: [] });
   await waitStack(s => s.stack.length, 3000); await sleep(300);
   await ev(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('pagehide')); });
@@ -477,13 +499,7 @@ async function run(name) {
   if (want('choices')) {
     console.log(' -- event choices use symbols');
     for (const key of ['star', 'boost']) {
-      const ok = await ev(k => {
-        ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.rp = 5000; S.reports.length = 0;
-        const hab = S.items.find(i => i.k === 'hab'); const lead = ZE.freeStaff(S)[0];
-        if (!ZCore.act('startEvent', hab.id, 'feeding', lead.id).ok) return false;
-        for (let i = 0; i < 6; i++) { ZE.tick(S); const p = S.projects.find(x => x.choice && x.choice.key === k); if (p) { S.reports = S.reports.filter(r => r.type === 'choice' && r.pid === p.id); if (k === 'boost' || S.reports.length) { ZT.flush(); return true; } } if (k === 'boost') { const q = S.projects.find(x => x.choice && x.choice.key === 'star'); if (q) ZE.resolveChoice(S, q.id, 0); } }
-        return false;
-      }, key);
+      const ok = await raiseChoice(key);
       check(ok, key + ' choice raised by a real event');
       if (!ok) continue;
       await waitStack(s => s.stack.length > 0, 3000); await sleep(500); await shot('choice-' + key + '-icons');
@@ -491,14 +507,15 @@ async function run(name) {
       check(!/Charm|Energy|Smarts|Vigor|Wit/.test(info.txt) && info.imgs > 0, key + ' options show stat/skill symbols, no stat words (' + info.txt.slice(0, 120) + ' / ' + info.imgs + ' icons)');
       if (key === 'boost') {   // suspense beat must not give the outcome away: neutral heading, neutral band, no result words
         await page.locator('.layer:not([hidden]) .choices .btn.opt').first().tap(); await sleep(260);
-        const sus = await ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); const p = l.querySelector('.panel'); return { txt: l.textContent, title: (l.querySelector('.ptitle') || {}).textContent, bad: p.classList.contains('bad') || p.classList.contains('calm'), dots: !!l.querySelector('.mo-dots') }; });
-        check(sus.dots && !/worked|No luck|Good call|Setback/i.test(sus.txt) && !sus.bad, 'suspense beat shows no outcome (heading "' + sus.title + '", neutral band, dots)'); await shot('choice-suspense-neutral');
+        const sus = await ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); const p = l.querySelector('.panel'); return { txt: l.textContent, title: (l.querySelector('.ptitle') || {}).textContent, bad: p.classList.contains('bad') || p.classList.contains('calm') || p.classList.contains('good') || !!l.querySelector('.mo-vmark, .mo-bigmark'), dots: !!l.querySelector('.mo-dots') }; });
+        check(sus.dots && !/worked|No luck|Good call|Setback/i.test(sus.txt) && !sus.bad && isNeutral(await verdict()), 'suspense beat shows no outcome (heading "' + sus.title + '", neutral band, no tick or cross, dots)'); await shot('choice-suspense-neutral');
         await sleep(1200);
         const res = await ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); return (l.querySelector('.ptitle') || {}).textContent; });
         check(/worked|No luck/.test(res), 'then heading, band and text switch together (' + res + ')');
       }
       await ev(() => ZT.popAll()); await sleep(200);
     }
+    await ev(() => ZE.debug.alwaysChoices(false));
   }
 
   if (want('blank')) {
@@ -630,6 +647,7 @@ async function run(name) {
       await shot('crate-decide');
       await page.locator('.mo-foot .btn.primary').tap(); await sleep(400);
       await page.locator('.layer:not([hidden]) .mo-row.tap').last().tap(); await sleep(700);
+      await waitStack(s => s.stack.length === 1, 3000);   // same condition, checked strictly below; only allows a slow machine a little longer
       check(await ev(() => (ZE.crateInfo(ZT.S) || { left: 0 }).left === 4 && ZT.S.arrivals.length === 0 && ZT.stack().length === 1), 'crate decided; back on the trader with 4 left');
       await ev(() => ZT.popAll());
       // reopen a waiting arrival
@@ -724,6 +742,311 @@ async function run(name) {
       check(!/mo-hire/.test(top), 'applicants reveal left in two taps; stack now: ' + top);
       await ev(() => ZT.popAll()); await sleep(200);
     }
+  }
+
+
+  // ---------------------------------------------------------------- Update 7: where list shows who lives there (note 1)
+  if (want('where')) {
+    console.log(' -- where list: the animals already living in each place');
+    for (const [w, h] of [[393, 852], [375, 667]]) {
+      await page.setViewportSize({ width: w, height: h }); await sleep(300);
+      const built = await ev(() => {
+        ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; S.arrivals = [];
+        const cells = []; for (let row = 19; row >= 0; row--) for (let col = 0; col < 10; col++) cells.push(ZE.fromOffset(col, row));
+        let made = 0; for (const [q, r] of cells) { if (made >= 3) break; if (ZE.canPlace(S, 'hab', 'savanna', q, r, 0) && ZCore.act('build', 'hab', 'savanna', q, r, 0).ok) made++; }
+        const habs = S.items.filter(i => i.k === 'hab' && i.t === 'savanna');
+        const sav = ZD.SPECIES_LIST.filter(x => x.biome === 'savanna').map(x => x.id);
+        const base = S.animals[0]; S.animals = [];
+        const fill = (hb, n) => { for (let i = 0; i < n; i++) S.animals.push(Object.assign({}, base, { id: 9700 + S.animals.length, sp: sav[(i >> 1) % sav.length], sex: i % 3 ? 'F' : 'M', name: 'A' + i, hab: hb ? hb.id : null })); };
+        if (habs[0]) { habs[0].lvl = 1; fill(habs[0], ZE.habCap(habs[0])); }                 // full: 4 animals, Upgrade offered
+        if (habs[1]) { habs[1].lvl = 5; fill(habs[1], ZE.habCap(habs[1])); }                 // full at the top level: 12 animals
+        if (habs[2]) { habs[2].lvl = 3; fill(habs[2], ZE.habCap(habs[2]) - 1); }             // 7 of 8
+        fill(null, 3);                                                                        // three already in the pen; habs[3] stays empty
+        S.reports.length = 0;
+        S.arrivals.push({ a: Object.assign({}, base, { id: 9799, hab: null, sp: 'zebra', sex: 'F', name: 'Newbie' }), src: 'expedition', at: S.week });
+        ZMoments.showArrival(9799); return habs.length;
+      });
+      check(built >= 4, 'where @' + w + ': a zoo with ' + built + ' savanna habitats was set up (4 wanted: full, full at top level, nearly full, empty)');
+      await sleep(2400); await page.locator('.mo-foot .btn.primary').tap(); await sleep(500);
+      const m = await ev(() => {
+        const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); const body = l.querySelector('.pbody'), p = l.querySelector('.panel').getBoundingClientRect();
+        const choices = ZE.arrivalChoices(ZT.S, 9799);
+        const rows = [...l.querySelectorAll('.mo-rows > .mo-row')].map((row, i) => {
+          const rr = row.getBoundingClientRect(), line = row.querySelector('.mo-resl'), cells = line ? [...line.querySelectorAll('.mo-res:not(.more)')] : [], more = line ? line.querySelector('.mo-res.more') : null;
+          const wantA = choices[i].animals || [];
+          const out = [...row.querySelectorAll('*')].filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && (r.left < rr.left - 0.5 || r.right > rr.right + 0.5 || r.top < rr.top - 0.5 || r.bottom > rr.bottom + 0.5); }).map(e => e.className || e.tagName);
+          const clip = [...row.querySelectorAll('.t, .mo-wtop, .mo-resl, .mid, .btn')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.className);
+          const lr = line ? line.getBoundingClientRect() : null;
+          const cellOut = lr ? [...line.children].filter(c => { const r = c.getBoundingClientRect(); return r.right > lr.right + 0.5 || r.left < lr.left - 0.5; }).length : 0;
+          const b = row.querySelector('.btn'), br = b ? b.getBoundingClientRect() : null;
+          return { n: wantA.length, shown: cells.length, plus: more ? +more.textContent.replace('+', '') : 0, out: out, clip: clip, cellOut: cellOut, h: Math.round(rr.height),
+            sexOk: cells.every((c, k) => { const im = c.querySelector('img.mo-symg'); return im && im.getAttribute('src') && im.alt === (wantA[k].sex === 'M' ? 'male' : 'female') && im.getBoundingClientRect().height >= 8; }),
+            picOk: cells.every((c, k) => { const im = c.querySelector('img.mo-resp'); return im && im.complete && im.naturalWidth > 0 && im.getBoundingClientRect().height >= 10 && im.getAttribute('src') === ZSprites.animalUrl(wantA[k].sp, { variant: !!wantA[k].variant, juv: !!wantA[k].juv }, 2); }),
+            crown: !!row.querySelector('img[alt="best"]'), full: row.classList.contains('full'), btn: br ? { h: Math.round(br.height), w: Math.round(br.width), txt: b.textContent.trim() } : null, label: (row.querySelector('.t') || {}).textContent };
+        });
+        return { rows: rows, over: body.scrollHeight - body.clientHeight, pt: Math.round(p.top), pb: Math.round(p.bottom), ih: innerHeight, places: choices.length };
+      });
+      await shot('where-portraits' + (w === 375 ? '-small' : ''));
+      console.log('  rows @' + w + ': ' + m.rows.map(r => r.label.trim() + ' ' + r.shown + (r.plus ? '+' + r.plus : '') + '/' + r.n + ' h' + r.h + (r.btn ? ' [' + r.btn.txt + ' ' + r.btn.w + 'x' + r.btn.h + ']' : '')).join(' | '));
+      check(m.rows.length === m.places && m.rows.length === built + 1, 'where @' + w + ': one row per place (' + m.rows.length + ' rows, ' + m.places + ' places)');
+      check(m.rows.every(r => r.shown + r.plus === r.n && (r.n === 0 || r.shown > 0) && r.sexOk && r.picOk), 'where @' + w + ': every row shows the animals living there as portraits with a sex mark, in the engine\'s order; any that cannot fit are counted as +N ' + JSON.stringify(m.rows.map(r => [r.n, r.shown, r.plus, r.sexOk, r.picOk])));
+      check(m.rows.some(r => r.n === 12) && m.rows.some(r => r.n === 0) && m.rows.some(r => r.full && r.n === 4), 'where @' + w + ': the case covers a 12-animal habitat, an empty one and a full one with Upgrade');
+      check(m.rows.every(r => !r.out.length && !r.clip.length && !r.cellOut), 'where @' + w + ': nothing overflows or is clipped in any row (the full row with its Upgrade button included) ' + JSON.stringify(m.rows.filter(r => r.out.length || r.clip.length || r.cellOut).map(r => [r.label, r.out, r.clip, r.cellOut])));
+      check(m.rows.filter(r => r.btn).length >= 2 && m.rows.filter(r => r.btn).every(r => r.btn.h >= 44 && r.btn.w >= 44) && m.rows.every(r => r.h >= 44), 'where @' + w + ': every row and every Upgrade button is at least 44 px');
+      check(m.over <= 1 && m.pt >= 0 && m.pb <= m.ih, 'where @' + w + 'x' + h + ': the whole list (' + m.rows.length + ' places, 26 residents) fits with no scrolling ' + JSON.stringify({ over: m.over, pt: m.pt, pb: m.pb }));
+      check(m.rows.every(r => !r.crown), 'where @' + w + ': no crown on the small portraits');
+      if (w === 393) {
+        check(m.rows.find(r => r.n === 12).shown === 12, 'where @393: all 12 residents of the biggest habitat fit on the one line');
+        // the place still works: tap the nearly full habitat, the animal moves in
+        await page.locator('.layer:not([hidden]) .mo-row.tap:not(.off)').first().tap(); await sleep(600);
+        check(await ev(() => ZT.S.arrivals.length === 0 && ZT.S.animals.some(a => a.id === 9799 && a.hab != null) && ZT.stack().length === 0), 'where: tapping a habitat row still places the animal there');
+      }
+      await ev(() => ZT.popAll()); await sleep(200);
+    }
+    // a very narrow line falls back to a +N count instead of overflowing
+    await page.setViewportSize({ width: 320, height: 700 }); await sleep(300);
+    await ev(() => {
+      ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; S.arrivals = []; const hab = S.items.find(i => i.k === 'hab'); const base = S.animals[0]; S.animals = []; hab.lvl = 5;
+      for (let i = 0; i < 12; i++) S.animals.push(Object.assign({}, base, { id: 9700 + i, sex: i % 2 ? 'F' : 'M', hab: hab.id }));
+      S.arrivals.push({ a: Object.assign({}, base, { id: 9799, hab: null }), src: 'expedition', at: S.week }); ZMoments.showArrival(9799);
+    });
+    await sleep(2400); await page.locator('.mo-foot .btn.primary').tap(); await sleep(500); await shot('where-portraits-narrow');
+    const nar = await ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); const line = l.querySelector('.mo-resl'), lr = line.getBoundingClientRect(), more = line.querySelector('.more'); return { shown: line.querySelectorAll('.mo-res:not(.more)').length, plus: more ? +more.textContent.replace('+', '') : 0, out: [...line.children].filter(c => c.getBoundingClientRect().right > lr.right + 0.5).length, btnOut: (() => { const b = l.querySelector('.mo-row .btn'), r = b.closest('.mo-row').getBoundingClientRect(), br = b.getBoundingClientRect(); return br.right > r.right + 0.5 || br.left < r.left; })() }; });
+    check(nar.plus > 0 && nar.shown + nar.plus === 12 && nar.out === 0 && !nar.btnOut, 'where @320: 12 residents on a narrow screen become ' + nar.shown + ' portraits and "+' + nar.plus + '", nothing overflows');
+    await ev(() => ZT.popAll()); await sleep(150);
+    await page.setViewportSize({ width: 390, height: 844 }); await sleep(300);
+  }
+
+  // ---------------------------------------------------------------- Update 7: it worked = green, it failed = red (note 8)
+  if (want('colours')) {
+    console.log(' -- results in colour: green when it worked, red when it failed, only after the suspense');
+    // a real gamble (the event "big idea"), forced to win and then to lose
+    for (const win of [true, false]) {
+      const ok = await raiseChoice('boost'); check(ok, 'colours: a real gamble choice came up');
+      if (!ok) continue;
+      await waitStack(s => s.stack.length > 0, 3000); await sleep(500);
+      const idx = await ev(() => [...document.querySelectorAll('.layer:not([hidden]) .choices .btn.opt')].findIndex(b => b.querySelector('.odds') && !b.classList.contains('disabled')));
+      check(idx >= 0, 'colours: the gamble has an option with odds');
+      check(isNeutral(await verdict()), 'gamble (' + (win ? 'win' : 'lose') + '): the question itself is neutral ' + vs(await verdict()));
+      await ev(w => { window.__rand = Math.random; Math.random = () => (w ? 0.0001 : 0.9999); }, win);
+      await page.locator('.layer:not([hidden]) .choices .btn.opt').nth(Math.max(0, idx)).tap();
+      await ev(() => { Math.random = window.__rand; });
+      await sleep(250); const sus = await verdict(), dots = await ev(() => !!document.querySelector('.layer:not([hidden]) .mo-dots'));
+      check(dots && isNeutral(sus) && !sus.bigMark, 'gamble (' + (win ? 'win' : 'lose') + '): during the suspense there is no green, no red, no tick, no cross ' + vs(sus));
+      await sleep(1300); const res = await verdict(); await shot('colour-gamble-' + (win ? 'worked' : 'failed'));
+      check(win ? isGreen(res) : isRed(res), 'gamble (' + (win ? 'win: solid green bar with a tick' : 'lose: solid red bar with a cross') + ') ' + vs(res));
+      check(res.bigMark && (win ? /worked/i : /No luck/i).test(res.title), 'gamble (' + (win ? 'win' : 'lose') + '): header "' + res.title + '" and a big ' + (win ? 'tick' : 'cross') + ' on the card');
+      for (let g = 0; g < 5 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); }
+      await ev(() => { ZE.debug.alwaysChoices(false); ZT.popAll(); }); await sleep(200);
+    }
+    await fresh();
+    const habId = await ev(() => (ZT.S.items.find(x => x.k === 'hab') || {}).id), anId = await ev(() => ZT.S.animals[0].id);
+    const finalCard = async () => { await waitStack(s => s.cur && s.cur.final, 6000); await sleep(700); return verdict(); };
+    const closeAll = async label => { for (let g = 0; g < 6 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); } await settled(label); };
+    // breeding
+    await pushReport({ type: 'birth', fail: true, a: 1, b: 2, lead: 1, sp: 'zebra', chance: 0.55, kids: [] });
+    let v = await finalCard(); await shot('colour-birth-failed'); check(isRed(v) && /No baby/.test(v.title), 'breeding failed: red bar with a cross ' + vs(v)); await closeAll('colour birth failed');
+    await pushReport({ type: 'birth', fail: false, a: 1, b: 2, lead: 1, sp: 'zebra', chance: 0.7, kids: [{ id: 800, sp: 'zebra', sex: 'F', name: 'Pip', hab: habId, rolls: ['charm', 'vigor', 'wit'].map(st => ({ stat: st, parents: 40, value: 44, delta: 4, lucky: false })), variantChance: 0.06, variant: false }], twins: false, firstBred: false });
+    v = await finalCard(); await shot('colour-birth-worked'); check(isGreen(v), 'breeding worked: green bar with a tick ' + vs(v)); await closeAll('colour birth worked');
+    // expeditions
+    await pushReport({ type: 'expedition', region: 'jungle', star: 2, found: [], rp: 5, fragment: 0, notes: [], ups: [], staff: [] });
+    v = await finalCard(); await shot('colour-expedition-nothing'); check(isRed(v) && /Nothing/.test(v.title) && v.bigMark, 'expedition with nothing found: red bar with a cross ' + vs(v)); await closeAll('colour expedition nothing');
+    await pushReport({ type: 'expedition', region: 'savanna', star: 1, found: await mkFound(1), rp: 5, fragment: 0, notes: [], ups: [], staff: [] });
+    await waitStack(s => s.stack.length > 0, 3000); await sleep(400); v = await verdict();
+    check(!v.bar && isNeutral(v), 'expedition: while the find is being revealed there is no coloured bar ' + vs(v));
+    v = await finalCard(); check(isGreen(v), 'expedition with a find: the summary has a green bar with a tick ' + vs(v)); await closeAll('colour expedition found');
+    // the Winter Show
+    for (const medal of ['gold', null]) {
+      await pushReport({ type: 'showresult', animal: anId, stat: 'charm', score: medal ? 88 : 31, medal: medal, medals: { gold: 80, silver: 60, bronze: 45 }, bar: 80, money: medal ? 9000 : 0, rep: medal ? 30 : 0, trophy: !!medal });
+      await waitStack(s => s.stack.length > 0, 3000); await sleep(450); v = await verdict();
+      check(!v.bar && isNeutral(v), 'show (' + (medal || 'no medal') + '): while the score counts up there is no coloured bar ' + vs(v));
+      v = await finalCard(); await shot('colour-show-' + (medal || 'none'));
+      check(medal ? isGreen(v) : (isRed(v) && v.bigMark), 'show (' + (medal ? 'gold medal: green bar with a tick' : 'no medal: red bar with a cross') + ') ' + vs(v)); await closeAll('colour show');
+    }
+    // the reusable result card, and training
+    for (const good of [true, false]) {
+      await ev(g => ZMoments.result({ title: g ? 'Hired' : 'Nobody came', lines: ['One line'], good: g }), good);
+      v = await finalCard(); if (!good) await shot('colour-result-failed'); check(good ? isGreen(v) : isRed(v), 'ZMoments.result({good: ' + good + '}): ' + (good ? 'green' : 'red') + ' bar ' + vs(v)); await closeAll('colour result');
+    }
+    await ev(() => ZMoments.revealTrain(ZT.S.staff[0], { gain: 4, super: false, stat: 'care', value: 30 }));
+    v = await finalCard(); await shot('colour-train'); check(isGreen(v) && /Trained/.test(v.title), 'training: green bar ' + vs(v)); await closeAll('colour train');
+    // year-end awards: WON in green, missed in red, only once each box has flipped
+    await pushReport({ type: 'yearend', year: 3, table: Array.from({ length: 12 }, (_, i) => ({ name: 'Zoo ' + i, rating: 900 - i * 50, me: i === 4 })), place: 5, awards: ['Best Exhibit', 'Rising Star', 'Fan Favourite', 'Green Award', 'Zoo of the Year'].map((nm, i) => ({ id: 'a' + i, name: nm, won: i % 2 === 0, mine: 12, bar: 40, prize: 5000 })), prize: 5000, stats: { income: 9000, cost: 5000, visitors: 1234, species: 4, bestReview: 30 } });
+    await waitStack(s => s.stack.length > 0, 3000); await sleep(150);
+    const aw0 = await ev(() => [...document.querySelectorAll('.layer:not([hidden]) .mo-award')].filter(c => c.classList.contains('won') || c.classList.contains('lost')).length);
+    await sleep(400); await tapAway(); await sleep(500); await shot('colour-awards');   // one tap completes the flips and holds the card there (the beat would move on by itself after 3 s)
+    const aw = await ev(() => [...document.querySelectorAll('.layer:not([hidden]) .mo-award')].map(c => ({ won: c.classList.contains('won'), ink: getComputedStyle(c.querySelector('b')).color, t: c.querySelector('b').textContent })));
+    check(aw0 === 0 && aw.length === 5 && aw.every(a => a.won ? a.ink === 'rgb(47, 138, 58)' && a.t === 'WON' : a.ink === RED && a.t === 'missed'), 'year-end awards: WON is green and missed is red, and nothing is coloured before the boxes flip (' + aw0 + ' early) ' + JSON.stringify(aw.map(a => a.ink)));
+    await closeAll('colour awards');
+  }
+
+  // ---------------------------------------------------------------- Update 7: the star level on the expedition card (note 13)
+  if (want('expstar')) {
+    console.log(' -- expedition card shows the star level that was run');
+    await fresh();
+    const starsOnCard = () => ev(() => { const x = document.querySelector('.layer:not([hidden]) .mo-xstar'); if (!x) return null; const r = x.getBoundingClientRect(), c = x.closest('.mo-card').getBoundingClientRect(); return { all: x.querySelectorAll('.star').length, lit: x.querySelectorAll('.star:not(.off)').length, inside: r.left >= c.left && r.right <= c.right && r.height >= 18 }; });
+    for (const star of [1, 3, 5]) {
+      await pushReport({ type: 'expedition', region: 'savanna', star: star, found: star === 3 ? [] : await mkFound(1), rp: 5, fragment: 0, notes: [], ups: [], staff: [] });
+      await waitStack(s => s.cur && s.cur.final, 6000); await sleep(700); const sc = await starsOnCard(); if (star !== 1) await shot('expedition-star' + star);
+      check(!!sc && sc.all === 5 && sc.lit === star && sc.inside, 'a ' + star + '-star run shows ' + star + ' of 5 stars on the result card ' + JSON.stringify(sc));
+      for (let g = 0; g < 6 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); } await settled('expedition star ' + star);
+    }
+    await pushReport({ type: 'expedition', region: 'savanna', star: null, found: [], rp: 5, fragment: 0, notes: [], ups: [], staff: [] });
+    await waitStack(s => s.cur && s.cur.final, 6000); await sleep(600);
+    check((await starsOnCard()) === null, 'an expedition sent before the update (no star level) shows no star row');
+    for (let g = 0; g < 6 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); } await settled('expedition without star');
+    // a real 2-star run
+    const real = await ev(() => { ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.reports.length = 0; const ex = S.staff.find(s => s.role === 'explorer') || ZE.freeStaff(S)[0]; const r = ZCore.act('startExpedition', 'savanna', [ex.id], 2); if (!r.ok) return r.msg || 'refused'; for (let i = 0; i < 30; i++) { ZE.tick(S); const p = S.projects.find(x => x.choice); if (p) ZE.resolveChoice(S, p.id, 0); const e = S.reports.filter(x => x.type === 'expedition'); if (e.length) { S.reports = e; const st = e[0].star; ZT.flush(); return st; } S.reports.length = 0; } return 'never came home'; });
+    check(real === 2, 'a real 2-star expedition comes home with star = 2 in its report (' + real + ')');
+    if (real === 2) { let seen = null; await drive('real 2-star expedition', { timed: false, after: async () => { seen = await starsOnCard(); } }); check(!!seen && seen.lit === 2 && seen.all === 5, 'its result card shows 2 of 5 stars ' + JSON.stringify(seen)); await settled('real 2-star expedition'); }
+  }
+
+  // ---------------------------------------------------------------- Update 7: the challenge result card (note 12)
+  if (want('challenge')) {
+    console.log(' -- challenge result card: stars one by one, then green or red, then Next level / Retry / Levels');
+    await page.setViewportSize({ width: 393, height: 852 }); await sleep(250);
+    const gotoLevel = async id => { await page.goto(URL + '?challenge=' + id); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready && window.ZMoments, null, { timeout: 10000 }); await ev(() => { ZT.WEEK_MS[1] = 1e9; ZT.WEEK_MS[2] = 1e9; }); await sleep(300); };
+    await gotoLevel('broke');
+    check(await ev(() => ZCore.inChallenge() && ZCore.challengeId === 'broke' && !!ZE.level(ZT.S)), 'challenge: level "broke" (Shoestring, money goal) is running');
+    // finish the level the real way: the engine judges the goal at the end of a week and pushes its one report
+    const endLevel = (stars) => ev(st => { const S = ZT.S, L = ZE.level(S); S.reports.length = 0; S.happening = null; if (st === 0) { S.money = 10; S.week = L.weeks - 1; } else { S.week = st === 3 ? 5 : st === 2 ? L.stars[0] + 2 : L.stars[1] + 2; S.money = 999999; } ZE.tick(S); S.reports = S.reports.filter(r => r.type === 'challenge'); const r = S.reports[0]; ZT.flush(); return r ? r.stars : null; }, stars);
+    const sample = async ms => { const out = []; const t0 = Date.now(); while (Date.now() - t0 < ms) { out.push(await ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); if (!l || l.dataset.screen !== 'mo-challenge') return null; const p = l.querySelector('.panel'), row = l.querySelector('.mo-chstars'); return { lit: row ? +row.getAttribute('data-lit') : -1, on: row ? [...row.querySelectorAll('img')].filter(i => i.getAttribute('src') === ZSprites.iconUrl('star-on', 6)).length : -1, off: row ? [...row.querySelectorAll('img')].filter(i => i.getAttribute('src') === ZSprites.iconUrl('star-off', 6)).length : -1, col: p.classList.contains('good') ? 'good' : p.classList.contains('bad') ? 'bad' : '', mark: !!l.querySelector('.mo-vmark'), btns: l.querySelectorAll('.mo-foot .btn').length, goalMark: !!l.querySelector('.mo-chgoal.good, .mo-chgoal.bad') }; })); await sleep(50); } return out.filter(Boolean); };
+    const cardInfo = () => ev(() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); if (!l) return null; const body = l.querySelector('.pbody'), p = l.querySelector('.panel').getBoundingClientRect();
+      const btns = [...l.querySelectorAll('.mo-foot .btn')].map(b => { const r = b.getBoundingClientRect(); return { t: (b.querySelector('.lbl') || b).textContent.trim(), h: Math.round(r.height), w: Math.round(r.width), bottom: Math.round(r.bottom), primary: b.classList.contains('primary'), cls: b.className }; });
+      const row = l.querySelector('.mo-chstars'), cr = l.querySelector('.mo-card').getBoundingClientRect();
+      const starBox = row ? [...row.querySelectorAll('img')].map(i => { const r = i.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), in: r.left >= cr.left && r.right <= cr.right, ok: i.complete && i.naturalWidth > 0 }; }) : [];
+      return { id: l.dataset.screen, txt: l.querySelector('.mo-card').textContent, lvl: (l.querySelector('.mo-chlvl') || {}).textContent, goal: (l.querySelector('.mo-chgoal') || {}).textContent, goalCls: (l.querySelector('.mo-chgoal') || {}).className, goalTick: (() => { const g = l.querySelector('.mo-chgoal'); const im = g ? [...g.querySelectorAll('img')].pop() : null; return im ? im.getAttribute('src') === ZSprites.iconUrl('ok', 3) ? 'ok' : im.getAttribute('src') === ZSprites.iconUrl('no', 3) ? 'no' : '?' : null; })(),
+        btns: btns, stars: starBox, over: body.scrollHeight - body.clientHeight, pt: Math.round(p.top), pb: Math.round(p.bottom), ih: innerHeight, imgsBad: [...l.querySelectorAll('img')].filter(i => !i.getAttribute('src') || !i.complete || !i.naturalWidth).length }; });
+    const checkReveal = (sm, stars, label) => {
+      const lits = sm.map(x => x.lit), mono = lits.every((x, i) => i === 0 || x >= lits[i - 1]), each = Array.from({ length: stars + 1 }, (_, k) => lits.includes(k)).every(Boolean);
+      const early = sm.filter(x => x.lit < stars && (x.col || x.mark || x.btns || x.goalMark)).length, firstCol = sm.find(x => x.col), last = sm[sm.length - 1];
+      const firstFrames = sm.slice(0, 3).every(x => !x.col && !x.mark && !x.btns && x.lit === 0);
+      check(sm.length > 10 && mono && each && sm.every(x => x.on === x.lit && x.on + x.off === 3), label + ': the stars light one by one (' + [...new Set(lits)].join(' then ') + '; lit pictures are star-on, the rest star-off)');
+      check(early === 0 && firstFrames && !!firstCol && firstCol.lit === stars, label + ': no green or red, no tick or cross and no buttons until the last star has resolved (' + early + ' early frames)');
+      check(!!last && last.col === (stars ? 'good' : 'bad') && last.mark && last.lit === stars && last.btns === (stars ? 3 : 2), label + ': ends ' + (stars ? 'green' : 'red') + ' with ' + stars + ' star' + (stars === 1 ? '' : 's') + ' lit and its buttons up');
+    };
+    const fitsCheck = (c, label) => check(c.over <= 1 && c.pt >= 0 && c.pb <= c.ih && c.btns.every(b => b.h >= 44 && b.w >= 44 && b.bottom <= c.ih) && c.stars.length === 3 && c.stars.every(s => s.in && s.ok && s.h >= 40) && c.imgsBad === 0 && !/NaN|undefined|null/.test(c.txt), label + ': fits the screen with no scrolling, three stars inside the card, every button 44 px or more (' + c.btns.map(b => b.t + ' ' + b.w + 'x' + b.h).join(', ') + ')');
+
+    // ---- 3 stars: Next level
+    let got = await endLevel(3); check(got === 3, 'challenge: the engine ended the level with 3 stars (' + got + ')');
+    let sm = await sample(2600); checkReveal(sm, 3, '3-star result'); await sleep(300);
+    let v = await verdict(), c = await cardInfo(); await shot('challenge-3star');
+    check(isGreen(v) && v.title === 'Level 3', '3-star result: solid green bar with a tick, "Level 3" ' + vs(v));
+    check(/3/.test(c.lvl) && /Shoestring/.test(c.lvl) && /50K|50,000/.test(c.goal) && /good/.test(c.goalCls) && c.goalTick === 'ok', '3-star result: shows the level number and the goal reached (' + (c.lvl || '').trim() + ' | ' + (c.goal || '').trim() + ')');
+    check(c.btns.map(b => b.t).join(',') === 'Next level,Retry,Levels' && c.btns[0].primary, '3-star result: buttons are Next level (first, green), Retry, Levels (' + c.btns.map(b => b.t).join(', ') + ')');
+    fitsCheck(c, '3-star result');
+    check(await ev(() => ZCore.challengeStars().broke === 3), 'the shell stored 3 best stars for the level');
+    await tapAway(); await sleep(400); await page.touchscreen.tap(196, 300); await sleep(400);
+    check((await state()).stack.includes('mo-challenge'), 'taps on the card do not close it: only a button leaves');
+    await page.locator('.mo-foot .btn.mo-next').tap(); await sleep(700);
+    check(await ev(() => ZCore.inChallenge() && ZCore.challengeId === 'breed' && ZE.level(ZT.S).n === 4 && ZT.S.week <= 1 && !ZT.S.ch.done && ZT.stack().length === 0), 'Next level starts level 4 fresh (' + (await ev(() => ZCore.challengeId + ', week ' + ZT.S.week)) + ')');
+    await settled('after Next level');
+
+    // ---- 2 stars, then 1 star: Retry
+    await ev(() => { ZCore.startChallenge('broke'); }); await sleep(400);
+    got = await endLevel(2); check(got === 2, 'challenge: ended with 2 stars (' + got + ')');
+    sm = await sample(2300); checkReveal(sm, 2, '2-star result'); await sleep(200); await shot('challenge-2star');
+    await page.locator('.mo-foot .btn.mo-retry').tap(); await sleep(700);
+    check(await ev(() => ZCore.challengeId === 'broke' && ZT.S.week <= 1 && !ZT.S.ch.done && Math.round(ZT.S.money) === ZE.level(ZT.S).money && ZT.stack().length === 0), 'Retry (after a win) starts the same level again from the beginning (week ' + (await ev(() => ZT.S.week + ', $' + Math.round(ZT.S.money))) + ')');
+    await settled('after Retry');
+    got = await endLevel(1); check(got === 1, 'challenge: ended with 1 star (' + got + ')');
+    sm = await sample(1900); checkReveal(sm, 1, '1-star result'); await sleep(200); v = await verdict(); await shot('challenge-1star');
+    check(isGreen(v), '1-star result is still a pass: green ' + vs(v));
+    await ev(() => ZT.popAll()); await sleep(300);
+
+    // ---- out of time: red, Retry first, no Next level; survives a reload; Levels goes back to the title
+    await ev(() => { ZCore.startChallenge('broke'); }); await sleep(400);
+    got = await endLevel(0); check(got === 0, 'challenge: out of time gives 0 stars (' + got + ')');
+    sm = await sample(1900); checkReveal(sm, 0, 'failed result'); await sleep(200);
+    v = await verdict(); c = await cardInfo(); await shot('challenge-failed');
+    check(isRed(v) && v.title === 'Level 3', 'failed result: solid red bar with a cross ' + vs(v));
+    check(c.btns.map(b => b.t).join(',') === 'Retry,Levels' && c.btns[0].primary && /bad/.test(c.goalCls) && c.goalTick === 'no', 'failed result: Retry comes first (green), then Levels; no Next level; the goal is marked missed (' + c.btns.map(b => b.t).join(', ') + ' | ' + (c.goal || '').trim() + ')');
+    fitsCheck(c, 'failed result');
+    await ev(() => ZT.save()); await sleep(150); await gotoLevel('broke'); await sleep(900);
+    c = await cardInfo(); v = await verdict();
+    check(!!c && c.id === 'mo-challenge' && isRed(v) && c.btns.length === 2, 'quitting with the result card up brings it back on return (' + (c ? c.id : 'nothing') + ')');
+    await page.setViewportSize({ width: 375, height: 667 }); await sleep(400); c = await cardInfo(); fitsCheck(c, 'failed result @375x667'); await shot('challenge-failed-small');
+    await page.setViewportSize({ width: 393, height: 852 }); await sleep(300);
+    await page.locator('.mo-foot .btn.mo-levels').tap(); await sleep(800);
+    const left = await ev(() => ({ inCh: ZCore.inChallenge(), saved: ZCore.challengeSaved(), stars: ZCore.challengeStars(), stack: ZT.stack(), mo: ZT.stack().some(i => /^mo-/.test(i)) }));
+    check(!left.inCh && !left.mo && left.stack.length > 0 && left.saved === null && left.stars.broke === 3, 'Levels: back on the title, out of the challenge, the finished run is not offered again, best stars kept ' + JSON.stringify(left));
+    await shot('challenge-after-levels');
+
+    // ---- failed, then Retry
+    await gotoLevel('broke'); got = await endLevel(0); await sleep(1900);
+    await page.locator('.mo-foot .btn.mo-retry').tap(); await sleep(700);
+    check(got === 0 && await ev(() => ZCore.challengeId === 'broke' && ZT.S.week <= 1 && !ZT.S.ch.done && ZT.stack().length === 0), 'Retry (after failing) starts the same level again');
+    await settled('after Retry from a fail');
+
+    // ---- the last level has no Next level
+    await ev(() => { ZCore.startChallenge('tiny'); }); await sleep(400);
+    await ev(() => { const S = ZT.S; S.reports.length = 0; S.reports.push({ type: 'challenge', level: 'tiny', n: 5, stars: 2, week: 90 }); ZT.flush(); });
+    await sleep(2300); c = await cardInfo(); v = await verdict(); await shot('challenge-last');
+    check(isGreen(v) && v.title === 'Level 5' && c.btns.map(b => b.t).join(',') === 'Retry,Levels', 'the last level (5) passed: green, Retry and Levels only, no Next level (' + c.btns.map(b => b.t).join(', ') + ')');
+    await page.locator('.mo-foot .btn.mo-levels').tap(); await sleep(700);
+    check(await ev(() => !ZCore.inChallenge()), 'Levels from the last level leaves the challenge');
+    // every level's card: number, name and goal read correctly
+    for (const id of ['small', 'savanna', 'breed']) {
+      await gotoLevel(id);
+      await ev(i => { const S = ZT.S, L = ZE.level(S); S.reports.length = 0; S.reports.push({ type: 'challenge', level: i, n: L.n, stars: 0, week: L.weeks }); ZT.flush(); }, id);
+      await sleep(1700); c = await cardInfo(); await shot('challenge-level-' + id);
+      const L = await ev(() => { const L = ZE.level(ZT.S); return { n: L.n, name: L.name }; });
+      check(!!c && c.id === 'mo-challenge' && c.lvl.includes(String(L.n)) && c.lvl.includes(L.name) && c.imgsBad === 0 && !/NaN|undefined|null|\?/.test(c.goal || '?'), 'level ' + L.n + ' card: ' + (c.lvl || '').trim() + ' | goal ' + (c.goal || '').trim());
+      fitsCheck(c, 'level ' + L.n + ' card');
+      await page.locator('.mo-foot .btn.mo-levels').tap(); await sleep(500);
+    }
+    await page.setViewportSize({ width: 390, height: 844 }); await sleep(200);
+    await boot();
+  }
+
+  // ---------------------------------------------------------------- Update 7: rare treats (note 9): projects finish with or without their choices
+  if (want('rare')) {
+    console.log(' -- rare treats: projects run to their result card when no choice comes up, and when one does');
+    await ev(() => ZE.debug.alwaysChoices(false));
+    for (const mode of ['never', 'natural']) {
+      for (const kind of ['expedition', 'breed', 'event']) {
+        const started = await ev(({ kind, mode }) => {
+          ZT.newGame({}); const S = ZT.S; S.money = 1e6; S.rp = 5000; S.reports.length = 0; S.happening = null; S.nextHap = S.week + 500;
+          const free = ZE.freeStaff(S), hab = S.items.find(i => i.k === 'hab'); let r;
+          if (kind === 'expedition') { const ex = S.staff.find(s => s.role === 'explorer') || free[0]; r = ZCore.act('startExpedition', 'savanna', [ex.id], 1); }
+          else if (kind === 'breed') { S.animals.forEach(a => { a.rest = 0; }); const p = ZE.readyPairs(S, hab.id)[0]; if (!p) return 'no pair'; const lead = free.find(s => s.role === 'keeper') || free[0]; r = ZCore.act('startBreeding', p[0], p[1], lead.id); }
+          else r = ZCore.act('startEvent', hab.id, 'feeding', free[0].id);
+          if (!r || !r.ok) return (r && r.msg) || 'refused';
+          // 'never': every "does a choice come up" roll says no (the roll is Math.random() < ZD.CHOICE_CHANCE), everything else stays random
+          window.__seen = { choice: 0, result: null };
+          return 'ok';
+        }, { kind, mode });
+        check(started === 'ok', 'rare (' + mode + '): a real ' + kind + ' project started (' + started + ')');
+        if (started !== 'ok') continue;
+        const want1 = kind === 'expedition' ? 'expedition' : kind === 'breed' ? 'birth' : 'review';
+        let result = null, choices = 0;
+        for (let t = 0; t < 60 && !result; t++) {
+          const r = await ev(({ mode, want1 }) => {
+            const S = ZT.S, R = Math.random;
+            if (mode === 'never') { const C = ZD.CHOICE_CHANCE; Math.random = () => { const x = R(); return x < C ? C + x * (1 - C) : x; }; }   // never below the choice chance: no choice can come up
+            try { ZE.tick(S); } finally { Math.random = R; }
+            const res = S.reports.find(x => x.type === want1), ch = S.reports.filter(x => x.type === 'choice').length;
+            S.reports = S.reports.filter(x => x.type === want1 || x.type === 'choice');
+            const out = { ch: ch, res: res ? { star: res.star, fail: res.fail, kids: res.kids ? res.kids.length : null, found: res.found ? res.found.length : null } : null, pending: S.projects.filter(p => p.choice).length };
+            ZT.flush(); return out;
+          }, { mode, want1 });
+          choices += r.ch; if (r.res) result = r.res;
+          // answer whatever is on screen (a choice, a result card, a keep-or-sell)
+          for (let g = 0; g < 12 && (await state()).stack.length; g++) {
+            if (await ev(() => !!document.querySelector('.layer:not([hidden]) .choices'))) await drive('rare ' + kind + ' choice', { pick: 0, shots: null });
+            else await drive('rare ' + kind + ' ' + want1, { timed: false, shots: null });
+            await sleep(150);
+          }
+        }
+        check(!!result, 'rare (' + mode + '): the ' + kind + ' reached its ' + want1 + ' result (' + choices + ' choice' + (choices === 1 ? '' : 's') + ' came up) ' + JSON.stringify(result));
+        if (mode === 'never') check(choices === 0, 'rare (never): no choice came up for the ' + kind + ', and nothing waited for one');
+        if (kind === 'event' && result) check(!!result.star && result.star.animal != null, 'rare (' + mode + '): the review still has its star animal (the engine picks one when the star choice does not come up)');
+        await settled('rare ' + mode + ' ' + kind);
+        check(await ev(() => !ZT.S.projects.some(p => p.choice)), 'rare (' + mode + ') ' + kind + ': no project is left waiting on a choice');
+      }
+    }
+    const cnt = await ev(() => ({ shown: ZMoments.shown, finished: ZMoments.finished }));
+    for (const t of ['expedition', 'birth', 'review']) check((cnt.shown[t] || 0) >= 2 && cnt.finished[t] === cnt.shown[t], 'rare: ' + t + ' cards were shown and dismissed (' + (cnt.shown[t] || 0) + ' / ' + (cnt.finished[t] || 0) + ')');
   }
 
   // ---------------------------------------------------------------- 9. errors

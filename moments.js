@@ -174,7 +174,7 @@
 .mo-awards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
 .mo-award { background: var(--paper); box-shadow: 0 0 0 2px var(--bd); padding: 8px 6px; min-height: 76px; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
 .mo-award i { font-style: normal; font-size: 13px; } .mo-award b { font-size: 16px; color: #9a8a70; } .mo-award small { font-size: 11px; color: var(--ink2); }
-.mo-award.won { background: #fff3b8; box-shadow: 0 0 0 3px var(--gold-d); } .mo-award.won b { color: var(--gold-d); } .mo-award.lost { background: #e8dfca; }
+.mo-award.won { background: #fff3b8; box-shadow: 0 0 0 3px var(--gold-d); } .mo-award.lost { background: #e8dfca; }
 .mo-award.mo-hid { visibility: hidden; }
 .mo-award:last-child { grid-column: 1 / -1; }
 .mo-score { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 6px 10px; background: var(--paper); box-shadow: 0 0 0 2px var(--line); font-size: 15px; }
@@ -184,7 +184,24 @@
 .mo-thumbs { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
 .mo-thumbs .mo-pic { height: 44px; width: 52px; background: #bfe0a0; box-shadow: 0 0 0 2px var(--bd); align-items: center; } .mo-thumbs img { max-height: 40px; max-width: 48px; }
 .mo.calm .ptitle { background: #7a8fb0; } .mo-calm .mo-big { color: #55688a; }
-.mo-bad .ptitle, .mo.bad .ptitle { background: var(--red); }
+.mo.bad .ptitle { background: #c0392b; } .mo.good .ptitle { background: #2e7d32; }
+.mo .ptitle { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.mo-vmark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--cream); box-shadow: 0 0 0 2px var(--bd); }
+.mo-vmark img { height: 18px; width: auto; image-rendering: pixelated; }
+.mo-bigmark img { height: 72px; width: auto; }
+.mo-xstar .stars { gap: 4px; }
+.mo-wrow .mid { gap: 3px; } .mo-wtop { display: flex; align-items: center; gap: 6px; min-width: 0; } .mo-wtop .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mo-wtop .mo-room { min-width: 0; flex: none; } .mo-wtop .mo-fee { flex: none; margin-right: 2px; } .mo-wtop .btn { flex: none; margin: 0; }
+.mo-resl { display: flex; gap: 1px; width: 100%; height: 32px; overflow: hidden; align-items: flex-end; }
+.mo-res { flex: none; width: 23px; height: 32px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1px; }
+.mo-res .mo-resp { max-width: 23px; max-height: 20px; width: auto; height: auto; image-rendering: pixelated; } .mo-res .mo-symg { height: 10px; }
+.mo-res.more { width: 44px; height: 32px; justify-content: center; font-size: 14px; background: var(--cream2); box-shadow: inset 0 0 0 2px var(--line); }
+.mo-head .mo-who .mo-symg { height: 18px; margin-left: 4px; }
+.mo-chstars { display: flex; gap: 10px; justify-content: center; min-height: 60px; align-items: center; } .mo-chstars img { height: 56px; width: auto; image-rendering: pixelated; }
+.mo-chstars img.lit { animation: mo-pop .3s steps(5) both; } .mo-fast .mo-chstars img.lit { animation: none; }
+.mo-chlvl { display: inline-flex; align-items: center; gap: 6px; font-size: 16px; } .mo-chlvl .mo-symg { height: 24px; }
+.mo-chgoal { font-size: 20px; min-height: 40px; } .mo-chgoal img { height: 26px; }
+.mo-award.won b { color: var(--good); } .mo-award.lost b { color: var(--bad); }
 .mo-medal { display: inline-block; padding: 6px 16px; font-size: 26px; color: #fff; box-shadow: 0 0 0 3px var(--bd); }
 .mo-medal.gold { background: var(--gold-d); } .mo-medal.silver { background: #8c97a3; } .mo-medal.bronze { background: #a8693a; } .mo-medal.none { background: #9a8a70; }
 .mo-odds { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; width: 100%; } .mo-odds span { font-size: 12px; background: var(--paper); box-shadow: 0 0 0 2px var(--line); padding: 3px 6px; }
@@ -219,7 +236,24 @@
     M.head = (...n) => part('head', n); M.foot = (...n) => part('foot', n);
     M.clearParts = () => { try { const panel = M.api && M.api.el && M.api.el.querySelector('.panel'); if (panel) [].forEach.call(panel.querySelectorAll(':scope > .mo-top, :scope > .mo-foot'), x => x.remove()); } catch (e) { /* none */ } };
     M.rerender = () => { try { if (M.api && !M.ended) M.api.rerender(); } catch (e) { rec(e, id + ' rerender'); } };
-    M.tone = t => { try { const p = M.api && M.api.el && M.api.el.querySelector('.panel'); if (p) { p.classList.toggle('bad', t === 'bad'); p.classList.toggle('calm', t === 'calm'); } } catch (e) { /* none */ } };
+    M.tone = t => { try { const p = M.api && M.api.el && M.api.el.querySelector('.panel'); if (p) { p.classList.toggle('bad', t === 'bad'); p.classList.toggle('calm', t === 'calm'); p.classList.toggle('good', t === 'good'); } } catch (e) { /* none */ } };
+    // The verdict: the title bar turns solid green (it worked) or solid red (it failed) with a tick or a cross in a box.
+    // Call it only once the suspense is over. M.noVerdict() puts the bar back to neutral (and removes it if the moment has no title).
+    const bar = () => { const p = M.api && M.api.el && M.api.el.querySelector('.panel'); return p ? p.querySelector(':scope > .ptitle') : null; };
+    M.verdict = (good, text) => {
+      try {
+        M.tone(good ? 'good' : 'bad'); M.api.setTitle(text || (good ? 'It worked!' : 'It failed'));
+        const b = bar(); if (b) b.insertBefore(el('span', { cls: 'mo-vmark ' + (good ? 'ok' : 'no') }, pic(iUrl(good ? 'ok' : 'no', 3))), b.firstChild);
+        M.hasVerdict = true;
+      } catch (e) { rec(e, id + ' verdict'); }
+    };
+    M.noVerdict = () => {
+      try {
+        if (!M.hasVerdict) return; M.hasVerdict = false; M.tone('');
+        const b = bar(); if (!b) return;
+        if (o.title == null || o.title === '') b.remove(); else { const m = b.querySelector('.mo-vmark'); if (m) m.remove(); }
+      } catch (e) { rec(e, id + ' verdict'); }
+    };
     let api = null;
     try {
       api = Z.push({
@@ -266,6 +300,7 @@
       M.clear(); card.textContent = ''; card.className = 'mo-card' + (instant ? ' mo-fast' : '');
       const step = steps[i]; M.i = i;
       M.clearParts && M.clearParts();
+      if (step.verdict) M.verdict(step.verdict.good, step.verdict.title); else M.noVerdict();
       const st = mkState(M, instant, card); M.st = st; st.M = M; st.next = next; st.isLast = isFinal();
       try { if (window.ZMoments) window.ZMoments.cur = { id: M.id, i: i, n: steps.length, final: isFinal(), at: Date.now() }; } catch (e) { /* none */ }
       try { step.render(card, st, i); } catch (e) { rec(e, 'step'); }
@@ -297,37 +332,58 @@
   // Sell or keep, then where. Needs the engine's arrivals (ZE.arrival, arrivalChoices, keepArrival, sellArrival).
   const hasArrivals = () => !!(E.arrival && E.arrivalChoices && E.keepArrival && E.sellArrival);
   // The "where" list: habitats that fit first (best ticked), the holding pen last with its weekly cost.
+  // The animals already living in a place: one line of small portraits, each with its sex mark underneath.
+  function resLine(list) {
+    if (!list || !list.length) return null;
+    const line = el('div', { cls: 'mo-resl' }); line.setAttribute('data-n', String(list.length));
+    list.forEach(a => line.appendChild(el('span', { cls: 'mo-res', title: a.name || '' }, pic(aUrl(a.sp, { variant: !!a.variant, juv: !!a.juv }, 2), 'mo-resp'), sym(a.sex === 'M' ? 'sex-m' : 'sex-f', a.sex === 'M' ? 'M' : 'F', a.sex === 'M' ? 'male' : 'female', 2))));
+    return line;
+  }
+  // Portraits that cannot fit on the one line are replaced by a "+N" count (needs the rows to be on the page to measure).
+  function fitRes(root) {
+    [].forEach.call(root.querySelectorAll('.mo-resl'), line => {
+      const cells = [].slice.call(line.children), n = cells.length; if (!n) return;
+      const w = line.clientWidth, cw = cells[0].offsetWidth || 23, gap = 1;
+      const max = w > 0 ? Math.max(3, Math.floor((w + gap) / (cw + gap))) : 9;
+      if (n <= max) return;
+      const keep = max - 2; cells.slice(keep).forEach(c => c.remove());   // the count box is two portraits wide
+      line.appendChild(el('span', { cls: 'mo-res more' }, '+' + (n - keep)));
+    });
+  }
   function whereList(card, st, f, afterDecision) {
     const M = st.M, id = f.id;
     M.clearParts(); M.clear(); card.textContent = ''; card.className = 'mo-card mo-fast';
-    card.appendChild(el('div', { cls: 'mo-head', style: { padding: '0 4px' } }, el('div', { cls: 'mo-pic tiny', style: { height: '56px' } }, pic(aUrl(f.sp, { variant: !!f.variant }, 3))), el('div', { cls: 'mo-who' }, animalName(f))));
-    const entry = E.arrival(S(), id);
+    const entry = E.arrival(S(), id), sex = f.sex || (entry && entry.a && entry.a.sex);
+    card.appendChild(el('div', { cls: 'mo-head', style: { padding: '0 4px' } }, el('div', { cls: 'mo-pic tiny', style: { height: '56px' } }, pic(aUrl(f.sp, { variant: !!f.variant }, 3))),
+      el('div', { cls: 'mo-who' }, animalName(f), sex ? sym(sex === 'M' ? 'sex-m' : 'sex-f', sex, sex === 'M' ? 'male' : 'female') : null)));
     let fee = null; try { if (E.holdFee && entry) fee = (E.isOpen && !E.isOpen(S())) ? 0 : Math.round(E.holdFee(S(), entry.a)); } catch (e) { /* none */ }
     const rows = el('div', { cls: 'mo-rows' });
     (E.arrivalChoices(S(), id) || []).forEach(c => {
       const it = c.hab != null ? E.item(S(), c.hab) : null;
       const label = c.hab == null ? 'Pen' : (it ? E.habName(S(), it) : 'Habitat');
       const left = c.hab == null ? el('div', { cls: 'mo-pic' }, pic(iUrl('pen', 4))) : el('div', { cls: 'mo-pic' }, pic(tUrl('hab:' + (it ? it.t : spOf(f.sp).biome), 2)));
-      const right = [];
-      if (c.hab == null && fee != null) right.push(el('span', { cls: 'mo-fee' }, sym('coin', '$', 'upkeep'), el('b', String(fee)), sym('time', '', 'per week', 2)));
-      right.push(el('span', { cls: 'mo-room' }, sym(c.hab == null ? 'pen' : 'habitat', '', 'room', 3), el('b', String(Math.max(0, c.room)))));
+      let who = c.animals; if (!who && E.habAnimals) { try { who = E.habAnimals(S(), c.hab); } catch (e) { who = null; } }
+      const res = resLine(who);
+      const room = el('span', { cls: 'mo-room' }, sym(c.hab == null ? 'pen' : 'habitat', '', 'room', 3), el('b', String(Math.max(0, c.room))));
       // a full habitat offers an inline upgrade (then the animal is placed there in the same tap sequence)
       if (!c.fit && it && it.k === 'hab' && E.habUpgradeCost) {
         const st0 = S(), cost = E.habUpgradeCost(it, st0), cap = E.habLevelCap ? E.habLevelCap(st0) : 5, newCap = E.habCap ? E.habCap({ lvl: it.lvl + 1 }) : null;
         const why = it.lvl >= 5 ? 'Max level' : it.lvl >= cap ? 'Needs research' : st0.money < cost ? 'Need ' + fmt.money(cost) : null;
-        const up = ui.btn('▲ ' + fmt.money(cost), () => {
+        const up = ui.btn(it.lvl >= 5 ? '\u25B2' : '\u25B2 ' + fmt.money(cost), () => {
           const r = Z.act('upgrade', c.hab);
           if (r && r.ok) { const k = Z.act('keepArrival', id, c.hab); if (k && k.ok) { ui.toast(animalName(f) + ' joins ' + label, 'good'); afterDecision(); } else whereList(card, st, f, afterDecision); }
-        }, { cls: 'blue', disabled: !!why, sub: why || (newCap ? '→ ' + newCap : null), onDisabled: () => ui.toast(why, 'bad') });
-        const rowF = el('div', { cls: 'mo-row compact' }, left, el('div', { cls: 'mid' }, el('span', { cls: 't' }, label)), el('span', { cls: 'mo-room', style: { minWidth: '0' } }, sym('habitat', '', 'room', 3), el('b', '0')), up);
-        rows.appendChild(rowF); return;
+        }, { cls: 'blue', disabled: !!why, sub: why || (newCap ? '\u2192 ' + newCap : null), onDisabled: () => ui.toast(why, 'bad') });
+        rows.appendChild(el('div', { cls: 'mo-row compact mo-wrow full' }, left, el('div', { cls: 'mid' }, el('div', { cls: 'mo-wtop' }, el('span', { cls: 't' }, label), room, up), res)));
+        return;
       }
-      const row = el('div', { cls: 'mo-row compact tap' + (c.fit ? '' : ' off') + (c.best ? ' sel' : '') }, left,
-        el('div', { cls: 'mid' }, el('span', { cls: 't' }, label, ' ', c.best ? sym('ok', 'o', 'best place') : null)), right);
+      const feeEl = c.hab == null && fee != null ? el('span', { cls: 'mo-fee' }, sym('coin', '$', 'upkeep'), el('b', String(fee)), sym('time', '', 'per week', 2)) : null;
+      const row = el('div', { cls: 'mo-row compact mo-wrow tap' + (c.fit ? '' : ' off') + (c.best ? ' sel' : '') }, left,
+        el('div', { cls: 'mid' }, el('div', { cls: 'mo-wtop' }, el('span', { cls: 't' }, label, ' ', c.best ? sym('ok', 'o', 'best place') : null), feeEl, room), res));
       if (c.fit) row.addEventListener('click', () => { const r = Z.act('keepArrival', id, c.hab); if (r && r.ok) { ui.toast(animalName(f) + (c.hab == null ? ' is in the pen' : ' joins ' + label), 'good'); afterDecision(); } });
       rows.appendChild(row);
     });
     card.appendChild(rows);
+    try { fitRes(rows); } catch (e) { rec(e, 'where list'); }
   }
   // Only "where" (the player already chose to buy it): used after a purchase.
   function placeMoment(animalId, done) {
@@ -413,7 +469,7 @@
 
   // ------------------------------------------------------------------ simple card (also reusable by Menus)
   function cardStep(o) {
-    return { ms: o.ms, noEnd: o.noEnd, anim: o.anim, render(card, st) {
+    return { ms: o.ms, noEnd: o.noEnd, anim: o.anim, verdict: o.verdict, render(card, st) {
       if (o.tone) card.classList.add('mo-' + o.tone);
       if (o.rare) card.classList.add('mo-rare');
       if (o.kicker) card.appendChild(el('div', { cls: 'mo-kicker' }, o.kicker));
@@ -432,6 +488,7 @@
   function result(o, done) {
     o = Object.assign({}, o || {}); if (o.good != null && !o.tone) o.tone = o.good ? 'good' : 'bad';
     if (typeof o.lines === 'string') o.lines = [o.lines];
+    if (o.good != null && !o.verdict) { o.verdict = { good: !!o.good, title: o.title || (o.good ? 'It worked!' : 'It failed') }; o.title = null; }   // green or red title bar with a tick or a cross
     return simpleCard('mo-result', o, done);
   }
 
@@ -495,12 +552,14 @@
     return open(spec.id, (body, M, api) => {
       if (M.result) {
         const r = M.result, odds = M.optOdds != null, tone = r.good ? 'good' : 'bad';
-        const revealTone = r.good ? 'good' : (spec.bad ? 'calm' : 'bad'), revealTitle = r.good ? (odds ? 'It worked!' : 'Good call') : (odds ? 'No luck' : 'Setback');
-        if (odds) { M.tone(''); api.setTitle(M.optLabel || spec.title || ''); } else { M.tone(revealTone); api.setTitle(revealTitle); }
+        // a gamble (odds) or a plain choice that went well or badly: green or red. A setback's plain outcome stays calm blue-grey.
+        const calm = !r.good && !odds && !!spec.bad, revealTitle = r.good ? (odds ? 'It worked!' : 'Good call') : (odds ? 'No luck' : 'Setback');
+        if (odds) { M.noVerdict(); M.tone(''); api.setTitle(M.optLabel || spec.title || ''); }
         const steps = [];
         if (odds) steps.push({ ms: 750, anim: 650, render(card, st) { card.appendChild(el('div', { cls: 'mo-line hi' }, M.optLabel || '')); card.appendChild(el('div', { cls: 'mo-dots' }, el('i', '.'), el('i', '.'), el('i', '.'))); } });
-        const rs = cardStep({ tone: tone, img: iUrl(r.good ? 'star' : 'sick', 8), imgCls: 'small', lines: [r.text || ''], anim: 400 }), r0 = rs.render;
-        rs.render = function (card, st, i) { M.tone(revealTone); api.setTitle(revealTitle); r0.call(this, card, st, i); };   // title, band and text change together
+        const rs = cardStep({ tone: calm ? 'calm' : tone, img: iUrl(calm ? (spec.icon || 'busy') : r.good ? 'ok' : 'no', 8), imgCls: 'small mo-bigmark', lines: [r.text || ''], anim: 400 }), r0 = rs.render;
+        if (!calm) rs.verdict = { good: !!r.good, title: revealTitle };   // title bar, tick or cross and text change together, after the suspense
+        rs.render = function (card, st, i) { if (calm) { M.tone('calm'); api.setTitle(revealTitle); } r0.call(this, card, st, i); };
         steps.push(rs);
         sequence(M, body, steps); return;
       }
@@ -542,7 +601,7 @@
           const hs = el('div', { cls: 'mo-pics', style: { display: 'flex', gap: '4px', justifyContent: 'center' } });
           const wu = rep.who ? pUrl(rep.who, 5) : null; if (wu) hs.appendChild(el('div', { cls: 'mo-pic' }, pic(wu)));
           const sa = rep.animal != null ? E.animal(S(), rep.animal) : null; const au = sa ? aUrl(sa.sp, { variant: !!sa.variant }, 4) : null; if (au) hs.appendChild(el('div', { cls: 'mo-pic' }, pic(au)));
-          if (!hs.children.length) { const iu = iUrl(HAP_ICON[rep.key] || (rep.bad ? 'sick' : 'star'), 8); if (iu) hs.appendChild(el('div', { cls: 'mo-pic small' }, pic(iu))); }
+          if (!hs.children.length) { const iu = iUrl(HAP_ICON[rep.key] || (rep.bad ? 'busy' : 'star'), 8); if (iu) hs.appendChild(el('div', { cls: 'mo-pic small' }, pic(iu))); }
           card.appendChild(st.anim(hs, 0));
           card.appendChild(st.anim(el('div', { cls: 'mo-title' }, rep.title), 120));
           card.appendChild(st.anim(el('div', { cls: 'mo-line hi' }, rep.text), 240));
@@ -565,10 +624,9 @@
     const kid0 = r.kids[k] || {}, decide = !!(hasArrivals() && kid0.pending && kid0.id != null && E.arrival(S(), kid0.id));
     return {
       ms: decide ? 0 : ms, noAdvance: decide, anim: decide ? 2300 : (ms ? Math.round(ms * 0.92) : Math.round(2300 * f)),
+      verdict: { good: true, title: n > 1 ? 'Twins! Baby ' + (k + 1) + ' of ' + n : 'New arrival' },   // breeding worked: green bar
       render(card, st) {
         st.t = decide ? (x => x) : (x => x * f);
-        const kicker = n > 1 ? 'Twins! Baby ' + (k + 1) + ' of ' + n : 'New arrival';
-        card.appendChild(el('div', { cls: 'mo-kicker' }, kicker));
         const kid = r.kids[k] || {}; const T = st.t;
         const u = aUrl(kid.sp || r.sp, { juv: true, variant: !!kid.variant }, 5);
         const p = pic(u, 'mo-unveil'); p.style.setProperty('--dur', (T(900) / 1000) + 's');
@@ -605,7 +663,7 @@
   function birthMoment(r, done) {
     if (r.fail || !r.kids || !r.kids.length) {
       const a = E.animal(S(), r.a), s = spOf(r.sp);
-      return simpleCard('mo-birth', { tone: 'bad', kicker: 'Breeding', img: aUrl(r.sp, {}, 4), imgCls: 'small', title: 'No baby this time', lines: [(a ? a.name : 'The pair') + ' need a rest. ' + (r.chance != null ? 'Chance was ' + Math.round(r.chance * 100) + '%.' : '')] }, done);
+      return simpleCard('mo-birth', { tone: 'bad', verdict: { good: false, title: 'No baby this time' }, img: aUrl(r.sp, {}, 4), imgCls: 'small', lines: [(a ? a.name : 'The pair') + ' need a rest. ' + (r.chance != null ? 'Chance was ' + Math.round(r.chance * 100) + '%.' : '')] }, done);
     }
     const kids = r.kids.filter(x => !(hasArrivals() && x.pending && x.id != null && !E.arrival(S(), x.id)));   // decided before a reload: skip
     if (!kids.length) { once(done)(); return null; }
@@ -675,14 +733,15 @@
     const ms = n ? Math.max(850, Math.min(1800, Math.floor(3400 / n))) : 0, f = ms ? Math.min(1, ms / 1800) : 1;
     const region = D.BIOMES[r.region] ? D.BIOMES[r.region].region : 'the wild';
     const steps = found.map((x, k) => { const dec = arr && x.pending; return animalStep(x, dec ? { kicker: 'Found ' + (k + 1) + ' of ' + n, decide: true, isNew: x.isNew } : { kicker: 'Found ' + (k + 1) + ' of ' + n, ms: ms, f: f, hab: x.hab, isNew: x.isNew }); });
-    steps.push({ anim: 500, render(card, st) {
-      card.appendChild(el('div', { cls: 'mo-kicker' }, 'Expedition back'));
+    const lvl = r.star != null && r.star > 0 ? Math.min(5, r.star | 0) : 0;   // the star level that was run (older reports have none)
+    steps.push({ anim: 500, verdict: { good: all.length > 0, title: all.length ? 'Expedition back' : 'Nothing found' }, render(card, st) {
       card.appendChild(el('div', { cls: 'mo-title' }, region));
+      if (lvl) { const sv = ui.stars(lvl, 5); sv.classList.add('big'); card.appendChild(el('div', { cls: 'mo-stars mo-xstar', 'data-star': String(lvl) }, sv)); }
       if (n) {
         const th = el('div', { cls: 'mo-thumbs' });
         found.forEach(x => th.appendChild(el('div', { cls: 'mo-pic' }, pic(aUrl(x.sp, { variant: !!x.variant }, 3)))));
         card.appendChild(st.anim(th, 0));
-      } else card.appendChild(el('div', { cls: 'mo-line hi' }, 'Nothing found this time'));
+      } else if (!all.length) card.appendChild(st.anim(el('div', { cls: 'mo-pic small mo-bigmark' }, pic(iUrl('no', 8))), 0));
       const chips = el('div', { cls: 'mo-chips' });
       if (r.rp) chips.appendChild(chip('rp', sgn(Math.round(r.rp)) + ' research'));
       card.appendChild(st.anim(chips, 120));
@@ -885,10 +944,10 @@
       card.appendChild(el('div', { cls: 'mo-title' }, a ? a.name : 'Your animal'));
       const sc = el('div', { cls: 'mo-big' }, ''); card.appendChild(sc); st.count(sc, Math.round(r.score || 0), 900, 100);
       card.appendChild(el('div', { cls: 'mo-line' }, medalSym('gold'), ' ' + (r.medals ? r.medals.gold : r.bar)));
-    } }, { anim: 500, render(card, st) {
+    } }, { anim: 500, verdict: { good: !!m, title: m ? m.charAt(0).toUpperCase() + m.slice(1) + ' medal' : 'No medal' }, render(card, st) {
       card.classList.add(m ? 'mo-gold' : 'mo-x'); if (m === 'gold') card.classList.add('mo-rare');
       if (a) card.appendChild(el('div', { cls: 'mo-pic small' }, pic(aUrl(a.sp, { variant: !!a.variant }, 4))));
-      card.appendChild(st.anim(m ? el('div', { cls: 'mo-bigmedal' }, medalSym(m, 8)) : el('div', { cls: 'mo-medal none' }, 'No medal'), 0));
+      card.appendChild(st.anim(m ? el('div', { cls: 'mo-bigmedal' }, medalSym(m, 8)) : el('div', { cls: 'mo-pic small mo-bigmark' }, pic(iUrl('no', 8))), 0));
       card.appendChild(el('div', { cls: 'mo-line' }, Math.round(r.score || 0) + ' / ', medalSym('gold'), ' ' + (r.medals ? r.medals.gold : r.bar)));
       card.appendChild(st.anim(el('div', { cls: 'mo-chips' }, chips), 200));
       card.appendChild(hint());
@@ -1045,8 +1104,42 @@
     if (!res) { once(done)(); return null; }
     return simpleCard('mo-train', {
       tone: res.super ? 'gold' : 'good', rare: !!res.super, kicker: staff ? staff.name : 'Training', img: staff ? pUrl(staff.role, 5) : null, imgCls: 'small',
-      title: res.super ? 'SUPER!' : 'Trained', big: el('span', skillSym(res.stat), ' ' + sgn(res.gain)), lines: [res.value != null ? String(res.value) : ''], ms: 0
+      verdict: { good: true, title: res.super ? 'SUPER!' : 'Trained' }, big: el('span', skillSym(res.stat), ' ' + sgn(res.gain)), lines: [res.value != null ? String(res.value) : ''], ms: 0
     }, done);
+  }
+
+  // ------------------------------------------------------------------ challenge level result
+  // report {type:'challenge', level (id), n, stars (0 = out of time), week}. The stars light one by one; only then does the bar turn
+  // green or red and the buttons appear. Only the buttons leave the card.
+  function challengeMoment(r, done) {
+    const LV = D.LEVELS || [];
+    const L = LV.find(x => x.id === r.level) || (E.level ? E.level(S()) : null) || null;
+    const n = r.n != null ? r.n : (L ? L.n : '');
+    const stars = Math.max(0, Math.min(3, r.stars | 0)), ok = stars > 0;
+    const next = ok && L ? (LV.find(x => x.n === L.n + 1) || null) : null;
+    const sameId = L ? L.id : r.level, title = 'Level ' + n;
+    let cs = null; try { cs = E.challengeStatus ? E.challengeStatus(S()) : null; } catch (e) { cs = null; }
+    if (cs && L && cs.id !== L.id) cs = null;
+    const num = v => (typeof v === 'number' ? (fmt.short ? fmt.short(v) : String(Math.round(v))) : String(v == null ? '?' : v));
+    return open('mo-challenge', (body, M) => sequence(M, body, [{ noAdvance: true, anim: 500 + Math.max(stars, 1) * 450 + 300, render(card, st) {
+      card.appendChild(el('div', { cls: 'mo-chlvl' }, sym('level', 'L', 'level', 3), el('b', String(n)), L && L.name ? ' ' + L.name : ''));
+      const icon = (cs && cs.icon) || (L && D.GOAL_ICON && D.GOAL_ICON[L.goal.kind]) || 'goal';
+      const goal = el('span', { cls: 'mo-chip mo-chgoal' }, pic(iUrl(hasIcon(icon) ? icon : 'goal', 3)), el('b', (cs ? num(cs.cur) + ' / ' : '') + num(cs ? cs.target : L ? L.goal.target : '?')));
+      const wk = r.week != null ? el('span', { cls: 'mo-chip' }, pic(iUrl('time', 3)), el('b', r.week + (L ? ' / ' + L.weeks : ''))) : null;
+      card.appendChild(el('div', { cls: 'mo-chips' }, goal, wk));
+      const row = el('div', { cls: 'mo-chstars', 'data-lit': '0' }), off = iUrl('star-off', 6), on = iUrl('star-on', 6);
+      const imgs = [0, 1, 2].map(() => { const im = pic(off); row.appendChild(im); return im; });
+      card.appendChild(row);
+      for (let k = 0; k < stars; k++) st.at(500 + k * 450, () => { imgs[k].src = on; imgs[k].classList.add('lit'); row.setAttribute('data-lit', String(k + 1)); });
+      st.at(500 + Math.max(stars, 1) * 450 + 200, () => {
+        M.verdict(ok, title); goal.classList.add(ok ? 'good' : 'bad');
+        goal.appendChild(pic(iUrl(ok ? 'ok' : 'no', 3)));
+        const retry = ui.btn('Retry', () => { Z.startChallenge(sameId); }, { cls: (ok ? '' : 'primary ') + 'big mo-retry' });
+        const levels = ui.btn('Levels', () => { M.end(); try { Z.leaveChallenge(); } catch (e) { rec(e, 'leave challenge'); } }, { cls: 'ghost big mo-levels' });
+        const nx = next ? ui.btn('Next level', () => { Z.startChallenge(next.id); }, { cls: 'primary big mo-next', icon: iUrl('level', 3), sub: next.n + ' ' + (next.name || '') }) : null;
+        M.foot(el('div', { cls: 'mo-sec stack' }, ok ? [nx, retry, levels] : [retry, levels]));
+      });
+    } }]), done, { title: title });
   }
 
   // ------------------------------------------------------------------ registration
@@ -1074,7 +1167,8 @@
     reg('showresult', (r, d) => showResultMoment(r, d));
     reg('yearend', (r, d) => yearEndMoment(r, d));
     reg('final', (r, d) => finalMoment(r, d));
-    reg('holdwarn', (r, d) => simpleCard('mo-holdwarn', { tone: 'calm', kicker: 'Holding pen', img: sym('pen', '', 'holding pen', 8), imgCls: 'small', title: String(r.count != null ? r.count : ''), lines: [el('div', { cls: 'mo-chips' }, chip('coin', moneyOf(r.cost || 0)), sym('time', '', 'per week', 3))] }, d));
+    reg('challenge', (r, d) => challengeMoment(r, d));
+    reg('holdwarn', (r, d) => simpleCard('mo-holdwarn', { tone: 'calm', kicker: 'Holding pen', img: iUrl('pen', 8), imgCls: 'small', title: String(r.count != null ? r.count : ''), lines: [el('div', { cls: 'mo-chips' }, chip('coin', moneyOf(r.cost || 0)), sym('time', '', 'per week', 3))] }, d));
     reg('applicants', (r, d) => {
       const list = (r.candidates && r.candidates.length ? r.candidates : S().candidates) || [];
       if (!list.length) { d(); return; }
