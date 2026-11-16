@@ -24,11 +24,11 @@
   const fitLevel = r => (r < 0.6 ? 0 : r < 0.9 ? 1 : r < 1.2 ? 2 : 3);
   const needMoney = n => 'Need ' + money(n);
   const starsOn = n => { const w = el('span', { cls: 'stars mn-stars' }); for (let i = 0; i < n; i++) w.appendChild(el('i', { cls: 'star' })); return w; };
-  // Two tiny pixel icons drawn here (no matching art exists for them): arrows for Move, a cross for Remove.
+  // Tiny pixel icons drawn here (no matching art exists for them): up and down arrows, a back arrow, a cross.
   const PIX = {
     up: ['....##....', '...####...', '..######..', '.########.', '...####...', '...####...', '...####...', '...####...'],
     down: ['...####...', '...####...', '...####...', '...####...', '.########.', '..######..', '...####...', '....##....'],
-    move: ['......#......', '.....###.....', '....#####....', '......#......', '...#..#..#...', '..##..#..##..', '.#############', '..##..#..##..', '...#..#..#...', '......#......', '....#####....', '.....###.....', '......#......'],
+    left: ['....##....', '...###....', '..########', '.#########', '.#########', '..########', '...###....', '....##....'],
     remove: ['.##.......##.', '####.....####', '.####...####.', '..####.####..', '...#######...', '....#####....', '....#####....', '...#######...', '..####.####..', '.####...####.', '####.....####', '.##.......##.']
   };
   const pixCache = {};
@@ -43,8 +43,6 @@
   const mny = v => ui.cost({ money: v }), rpc = v => ui.cost({ rp: v }), wkc = v => ui.cost({ weeks: v });
   const clk = v => span('mn-cnt', ui.sym('time', { scale: 2, label: 'Weeks', text: 'wk' }), ' ' + v);
   const capChip = (icon, word, v) => el('span', { cls: 'chip iconchip mn-capchip' }, ui.sym(icon, { scale: 2, label: word, text: word.slice(0, 2) }), span('mn-cap', word), el('span', { cls: 'v' }, String(v)));
-  // One line that names the symbols the first time they show on a screen.
-  const keyRow = kind => el('div', { cls: 'mn-key' }, (kind === 'a' ? ASTATS.map(k => [aIcon(k), (D.ASTAT && D.ASTAT[k] && D.ASTAT[k].name) || k]) : SKILLS.map(k => [kIcon(k), (D.SKILL && D.SKILL[k] && D.SKILL[k].name) || k])).map(p => span('mn-cnt', ui.sym(p[0], { scale: 2, label: p[1], text: p[1].slice(0, 2) }), ' ' + p[1])));
   const A = (k, v) => ui.astat(k, v), K = (k, v) => ui.skillChip(k, v);
   const ASTATS = ['charm', 'vigor', 'wit'], SKILLS = ['care', 'sci', 'exp', 'charm'];
   const aIcon = k => (D.ASTAT && D.ASTAT[k] && D.ASTAT[k].icon) || 'stat-' + k;
@@ -67,6 +65,13 @@
     return el('div', { cls: 'mn-staffcap' + (full ? ' full' : ''), role: 'status', 'aria-label': 'Staff ' + n + ' of ' + cap }, imgEl(iUrl('m-staff', 3)), span('', n + ' / ' + cap), full ? span('tag', 'Full') : null,
       nx && nx > cap ? span('nx', 'Rank ' + (rk + 1) + ': ' + nx) : null);
   }
+  const inCh = () => { try { return !!(Core.inChallenge && Core.inChallenge()); } catch (e) { return false; } };
+  const allowMsg = (what, id) => { try { const r = E.allowed && E.allowed(S(), what, id); return r && r.ok === false ? (r.msg || 'Not here') : ''; } catch (e) { return ''; } };
+  const allow = (what, id) => !allowMsg(what, id);
+  const short = n => (fmt.short ? fmt.short(n) : fmt.num(n));
+  const symS = (k, label, sc) => ui.sym(k, { scale: sc || 2, label: label || '', text: '' });
+  const lvBox = n => el('span', { cls: 'mn-lv', title: 'Level ' + n, 'aria-label': 'Level ' + n }, String(n));   // a staff level: the number in a small gold box
+  const lockSub = () => symS('lock', 'Locked');
   const pn = (a, one, many) => a + ' ' + (a === 1 ? one : many);
 
   // A short, fixed set of boxes fills the panel and never scrolls: rows share the height, icons shrink a little on short screens.
@@ -108,7 +113,7 @@
 .layer .panel,.layer .pbody{min-width:0}.row.mn-r .t{white-space:normal}.row.mn-r .main{overflow:hidden}
 .btn.danger .sub{color:#ffe0dc}
 .mn-sc .chip{margin:1px}.mn-sc .chip b{padding:4px 3px;font-size:10px}.mn-sc .chip .v{padding:4px 3px;min-width:20px;font-size:13px}
-.mn-cl{display:flex;flex-wrap:nowrap;align-items:center;gap:3px;white-space:nowrap;margin-top:2px}
+.mn-cl{display:flex;flex-wrap:nowrap;align-items:center;gap:5px;white-space:nowrap;margin-top:1px;padding:2px 2px 3px}.mn-cl .chip img.sym{height:18px;width:auto}
 .mn-cl .chip{margin:0;font-size:12px}.mn-cl .chip b{padding:4px 3px;font-size:10px}.mn-cl .chip .v{padding:4px 3px;min-width:18px;font-size:13px}.mn-cl .mn-grade{margin-left:4px}
 .row.mn-split.wrap{flex-wrap:wrap}.row.mn-split .mn-line{flex:1 0 100%;padding:0 4px 4px}
 .grid.mn-fitgrid{flex:1 1 auto;min-height:0;gap:8px}
@@ -206,6 +211,50 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
 .mn-pips{display:flex;gap:6px;justify-content:center}.mn-pips i{width:22px;height:22px;background:#6b5a3c;box-shadow:0 0 0 2px var(--bd)}.mn-pips i.on{background:var(--gold)}
 .mn-big{font-size:22px;text-align:center}
 .mn-sticky{display:flex;flex-direction:column;gap:6px}
+.mn-lv{display:inline-block;min-width:18px;padding:0 4px;margin:2px 3px 3px;background:var(--gold);color:var(--ink);box-shadow:0 0 0 2px var(--bd);font-size:12px;line-height:16px;font-weight:700;text-align:center;vertical-align:middle}
+.mn-albox{display:inline-block;width:34px;height:26px;background:var(--paper);box-shadow:0 0 0 2px var(--bd)}
+.mn-best{height:16px;width:auto;margin-left:2px}
+.mn-bigchips .chip{font-size:16px;margin:2px}.mn-bigchips .chip .v{font-size:18px;padding:4px 8px;min-width:30px}.mn-bigchips .chip img.sym{height:24px;width:auto;margin:2px 4px}
+#edit-bar{position:absolute;left:0;right:0;bottom:0;z-index:6;display:flex;flex-direction:column;gap:6px;padding:8px calc(8px + var(--safe-r)) calc(8px + var(--safe-b)) calc(8px + var(--safe-l));background:var(--cream2);box-shadow:0 -3px 0 0 var(--bd);box-sizing:border-box}
+#edit-bar[hidden]{display:none}
+.mn-etabs{display:flex;gap:8px}
+.mn-et{flex:1 1 0;min-width:44px;min-height:48px;margin:0;padding:2px;border:0;display:flex;align-items:center;justify-content:center;gap:4px;background:var(--paper);box-shadow:0 0 0 3px var(--bd);font:inherit;font-weight:700;font-size:15px;color:var(--ink);cursor:pointer}
+.mn-et img{height:28px;width:auto;image-rendering:pixelated}.mn-et.on{background:#ffcf33}.mn-et.done{flex:1.6 1 0;background:var(--green);color:#fff}.mn-et.done img{height:20px}
+.mn-es{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;padding:3px;touch-action:pan-x;overscroll-behavior:contain}
+.mn-ec{flex:none;width:78px;min-height:82px;margin:0;padding:3px 2px;border:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:2px;background:var(--paper);box-shadow:0 0 0 3px var(--bd);font:inherit;font-weight:700;color:var(--ink);cursor:pointer}
+.mn-ec .im{height:50px;display:flex;align-items:center;justify-content:center}.mn-ec .im img{max-height:50px;max-width:70px;width:auto;height:auto;image-rendering:pixelated}
+.mn-ec .pr,.mn-ea .pr{display:flex;align-items:center;gap:2px;font-size:13px;line-height:1;white-space:nowrap}.mn-ec .pr img,.mn-ea .pr img{height:14px;width:auto}
+.mn-ec.off{background:#cfc3a6;box-shadow:0 0 0 3px #8d7a52}.mn-ec.off .pr{color:#8a2a20}
+.mn-eact{display:flex;gap:8px;align-items:stretch;padding:3px}
+.mn-ewho{flex:none;width:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:700}.mn-ewho>img{max-height:44px;max-width:60px;image-rendering:pixelated}.mn-ewho .mn-mini{height:14px}
+.mn-ea{flex:1 1 0;min-width:44px;min-height:72px;margin:0;padding:2px;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--paper);box-shadow:0 0 0 3px var(--bd);font:inherit;font-weight:700;color:var(--ink);cursor:pointer}
+.mn-ea>img{height:34px;width:auto;image-rendering:pixelated}.mn-ea.sell{background:#ffe0a8;box-shadow:0 0 0 3px #b56f10}.mn-ea.back{flex:0 0 48px;background:var(--cream2)}.mn-ea.back>img{height:24px}.mn-ea.off{background:#cfc3a6;box-shadow:0 0 0 3px #8d7a52;color:#6b5a3c}
+.mn-eact .mn-up{flex:1 1 0;min-width:44px;min-height:72px;flex-direction:column;gap:3px;padding:2px;font-size:13px;white-space:normal;text-align:center}.mn-eact .mn-up>img{height:26px}.mn-eact .mn-up.off{font-size:11px}
+.mn-xhead{display:flex;align-items:center;gap:8px;min-height:40px;padding:2px 8px;background:var(--paper);box-shadow:0 0 0 2px var(--line);font-weight:700}
+.mn-xreg{height:32px;width:auto;max-width:56px;image-rendering:pixelated}.mn-xname{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mn-xteam{display:flex;align-items:flex-end}.mn-xteam img{height:34px;width:auto;image-rendering:pixelated}
+.mn-xstars{display:flex;gap:6px}
+.mn-xs{flex:1 1 0;min-width:44px;min-height:60px;margin:0;padding:2px;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:var(--paper);box-shadow:0 0 0 3px var(--bd);font:inherit;font-weight:700;color:var(--ink);cursor:pointer}
+.mn-xs .n{display:flex;align-items:center;gap:2px;font-size:22px;line-height:1}.mn-xs .n img{height:18px;width:auto}.mn-xs .lk{display:flex;align-items:center;gap:1px;font-size:13px;line-height:1}.mn-xs .lk img{height:14px;width:auto}
+.mn-xs.on{background:#ffcf33;box-shadow:0 0 0 3px #8a6a00}.mn-xs.off{background:#cfc3a6;box-shadow:0 0 0 3px #8d7a52;color:#6b5a3c}.mn-xs.off .n{font-size:16px}.mn-xs.off .n img{height:13px}
+.mn-xinfo{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mn-xinfo .c{display:flex;align-items:center;justify-content:center;gap:4px;min-height:44px;background:var(--paper);box-shadow:0 0 0 2px var(--line);font-size:20px;font-weight:700}.mn-xinfo .c img{height:24px;width:auto}
+.mn-xodds{display:flex;flex-direction:column;gap:2px;padding:4px 8px;background:var(--paper);box-shadow:0 0 0 2px var(--line)}.mn-xodds .mn-odd{min-height:28px}.mn-xodds .mn-odd.me .p{font-size:17px}
+.btn.mn-send{flex:none}
+.mn-pick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.mn-pick.themes{grid-template-columns:repeat(2,minmax(0,1fr));flex:1 1 auto;min-height:0;grid-auto-rows:minmax(44px,1fr)}.mn-pick.themes.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mn-pk{min-width:44px;min-height:44px;margin:0;padding:2px 3px;border:0;display:flex;align-items:center;justify-content:center;gap:3px;background:var(--paper);box-shadow:0 0 0 2px var(--line);font:inherit;font-weight:700;color:var(--ink);cursor:pointer}
+.mn-pk.host{flex-direction:column;min-height:58px}.mn-pk.host img{height:30px;width:auto;image-rendering:pixelated}.mn-pk.host .chip{margin:0;font-size:12px}.mn-pk.host .chip img.sym{height:14px;width:auto}.mn-pk.host .chip .v{padding:1px 3px;font-size:12px;min-width:14px}
+.mn-pk.theme{justify-content:space-between;text-align:left;padding:2px 6px}.mn-pk.theme .tn{font-size:13px;line-height:1.1;min-width:0}.mn-pk.theme .fs{flex:none;display:flex;align-items:center;gap:2px}.mn-pk.theme .fs img{height:14px;width:auto}.mn-pk.theme .sg{min-width:22px;padding:2px 3px;font-size:12px}.mn-pick.c3 .mn-pk.theme{padding:2px 4px;gap:2px}.mn-pick.c3 .mn-pk.theme .tn{font-size:12px}
+.mn-pk.on{background:#ffcf33;box-shadow:0 0 0 3px #8a6a00}
+.mn-steps{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:2px;padding:3px 3px 5px}.mn-stp{display:inline-flex;align-items:center;font-size:13px}.mn-pips.sm{justify-content:flex-start;gap:4px}.mn-pips.sm i{width:16px;height:16px}
+.mn-vips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.mn-vip{min-height:64px;margin:0;padding:2px;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:var(--paper);box-shadow:0 0 0 2px var(--line);font:inherit;font-weight:700;color:var(--ink2);cursor:pointer}.mn-vip>img:first-child{height:36px;width:auto;image-rendering:pixelated}.mn-vip .sym{height:14px;width:auto}.mn-vip.seen{background:#e2f3d3}.mn-vip .q{font-size:14px;line-height:14px}
+button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;background:#e9defc;cursor:pointer;font-weight:700;font-size:18px;text-align:left}.mn-chi{height:34px;width:auto;image-rendering:pixelated;flex:none}.mn-chal .mn-new{flex:1;min-width:0}.mn-chs{flex:none;display:flex;align-items:center;font-size:15px}.mn-chs img{height:16px;width:auto}
+.mn-lvline{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;flex:none}
+.mn-lvc{min-width:44px;margin:0;padding:4px 1px;border:0;display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--paper);box-shadow:0 0 0 2px var(--line);font:inherit;font-weight:700;color:var(--ink);cursor:pointer}
+.mn-lvc .num{width:30px;height:30px;line-height:30px;text-align:center;font-size:20px;background:#b99cf0;color:#2a1b0e;box-shadow:0 0 0 2px var(--bd)}
+.mn-lvc .goal{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:15px;line-height:1}.mn-lvc .goal>img{height:26px;width:auto}.mn-lvc .gv{display:flex;align-items:center;gap:1px}.mn-lvc .gv img{height:16px;width:auto}
+.mn-lvc .rs{display:flex;flex-direction:column;align-items:flex-start;gap:3px;font-size:12px;line-height:1;min-height:88px}.mn-lvc .ln{display:flex;align-items:center;gap:3px;white-space:nowrap}.mn-lvc .ln img{height:14px;width:auto;image-rendering:pixelated}.mn-lvc .ln img.tile{height:18px;max-width:30px}
+.mn-s3{display:flex;gap:1px;justify-content:center}.mn-s3 img{height:15px;width:auto}
+.mn-lvc.on{background:#ffcf33;box-shadow:0 0 0 3px #8a6a00}.mn-lvc.off{background:#cfc3a6;box-shadow:0 0 0 2px #8d7a52;color:#6b5a3c}.mn-lvc.off .num{background:#a89c82}
+@media (max-width:350px){.mn-lvc .rs{font-size:11px}.mn-lvc .ln img{height:12px}.mn-lvc .num{width:26px;height:26px;line-height:26px;font-size:17px}}
 `;
     const st = document.createElement('style'); st.id = 'mn-css'; st.textContent = css; document.head.appendChild(st);
   })();
@@ -218,11 +267,11 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       const waiting = (s.arrivals ? s.arrivals.length : 0) + s.projects.filter(p => p.choice).length + (s.happening && s.happening.options ? 1 : 0) + (s.yearly ? 1 : 0) + (s.show ? 1 : 0);
       const pen = E.holding(s).length;
       body.appendChild(fitGrid([
-        { icon: iUrl('m-projects', 6), label: 'Projects', badge: waiting || false, onTap: projectsScreen },
-        { icon: iUrl('m-build', 6), label: 'Build', onTap: buildScreen },
-        { icon: iUrl('m-animals', 6), label: 'Animals', badge: pen || false, onTap: () => animalsScreen(!habs().length && pen ? 'pen' : 'zoo') },
-        { icon: iUrl('m-staff', 6), label: 'Staff', sub: s.staff.length + '/' + E.staffCap(s), badge: (s.candidates && s.candidates.length) || s.headhunt ? true : false, onTap: staffScreen },
-        { icon: iUrl('m-research', 6), label: 'Research', onTap: researchScreen },
+        { icon: iUrl('m-projects', 6), label: 'Projects', alert: waiting > 0, onTap: projectsScreen },
+        { icon: iUrl('edit', 6), label: 'Edit', onTap: () => editMode() },
+        { icon: iUrl('m-animals', 6), label: 'Animals', alert: pen > 0, onTap: () => animalsScreen(!habs().length && pen ? 'pen' : 'zoo') },
+        { icon: iUrl('m-staff', 6), label: 'Staff', sub: s.staff.length + '/' + E.staffCap(s), alert: !!((s.candidates && s.candidates.length) || s.headhunt), onTap: staffScreen },
+        { icon: iUrl('m-research', 6), label: 'Research', alert: researchReady() > 0, onTap: researchScreen },
         { icon: iUrl('m-info', 6), label: 'Info', onTap: infoScreen },
         { icon: iUrl('m-system', 6), label: 'System', cls: 'mn-wide', onTap: systemScreen }
       ], 2));
@@ -254,7 +303,8 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   // ------------------------------------------------------------------ PROJECTS
   function expStatus() {
     const s = S(), out = s.projects.filter(p => p.type === 'expedition').length;
-    if (!D.BIOME_ORDER.some(b => s.regions[b])) return { ok: false, why: 'No region' };
+    if (!allow('expedition')) return { ok: false, why: lockSub() };
+    if (!D.BIOME_ORDER.some(b => s.regions[b] && allow('expedition', b))) return { ok: false, why: 'No region' };
     if (out >= E.maxExp(s)) return { ok: false, why: 'Convoy is out' };
     if (!E.freeStaff(s).length) return { ok: false, why: 'No one free' };
     return { ok: true, why: 'Ready' };
@@ -279,7 +329,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     let img = null, name = info.detail;
     if (p.type === 'hire') { img = pUrl('headhunter', 2); name = info.detail || 'Hiring'; }
     else if (p.type === 'campaign') { img = iUrl('rep', 3); name = p.name; }
-    else if (p.type === 'expedition') { img = pUrl(lead ? lead.role : 'explorer', 2); name = shortRegion(p.region); }
+    else if (p.type === 'expedition') { img = pUrl(lead ? lead.role : 'explorer', 2); name = p.star ? [shortRegion(p.region), ' ', String(p.star), symS('star-on', 'Stars')] : shortRegion(p.region); }
     else if (p.type === 'breed') { const a = E.animal(s, p.a); img = a ? aUrl(a, 2) : null; name = a ? E.sp(a).name : info.detail; }
     else { img = iUrl('ready-event', 3); name = D.THEMES[p.theme] ? D.THEMES[p.theme].name : info.detail; }
     const b = el('button', { type: 'button', cls: 'row mn-r mn-run tappable' + (info.choice ? ' mn-hot' : '') },
@@ -296,10 +346,10 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       const evWhy = evs.length ? (!free ? 'No one' : s.money < cost ? needMoney(cost) : '') : (habs().length ? 'None' : 'No habitat');
       const camps = E.campaigns(s), runningC = camps.filter(c => c.weeksLeft > 0).length;
       const g = fitGrid([
-        { icon: pUrl('explorer', 4), label: 'Expedition', sub: ex.ok ? '' : ex.why.replace('Convoy is out', 'Out').replace('No one free', 'No one'), disabled: !ex.ok, onTap: expStart },
-        { icon: iUrl('ready-breed', 4), label: 'Breeding', sub: pairs.length ? pairs.length + ' ready' : 'None', disabled: !pairs.length || !free, onTap: breedPairs },
-        { icon: iUrl('ready-event', 4), label: 'Event', sub: evWhy || evs.length + ' ready', disabled: !!evWhy, onTap: eventHabsScreen },
-        { icon: iUrl('rep', 4), label: 'Advertise', sub: !open ? 'No habitat' : runningC ? runningC + ' on' : '', disabled: !open, onTap: campaignScreen }
+        { icon: pUrl('explorer', 4), label: 'Expedition', sub: ex.ok ? '' : typeof ex.why === 'string' ? ex.why.replace('Convoy is out', 'Out').replace('No one free', 'No one') : ex.why, disabled: !ex.ok, onTap: expStart },
+        { icon: iUrl('ready-breed', 4), label: 'Breeding', sub: !allow('breed') ? lockSub() : pairs.length ? pairs.length + ' ready' : 'None', disabled: !pairs.length || !free || !allow('breed'), onTap: breedPairs },
+        { icon: iUrl('ready-event', 4), label: 'Event', sub: !allow('event') ? lockSub() : evWhy || evs.length + ' ready', disabled: !!evWhy || !allow('event'), onTap: eventHabsScreen },
+        { icon: iUrl('rep', 4), label: 'Advertise', sub: !allow('campaign') ? lockSub() : !open ? 'No habitat' : runningC ? runningC + ' on' : '', disabled: !open || !allow('campaign'), onTap: campaignScreen }
       ], 2, 84, true);
       body.appendChild(g);
       const hot = [];
@@ -329,13 +379,13 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   }
 
   // ----- expedition planner: region, team, budget, confirm
-  function expStart() { const rs = D.BIOME_ORDER.filter(b => S().regions[b]); if (rs.length === 1) expTeam(rs[0]); else expRegion(); }
+  function expStart() { const rs = D.BIOME_ORDER.filter(b => S().regions[b] && allow('expedition', b)); if (rs.length === 1) expTeam(rs[0]); else expRegion(); }
   function expRegion() {
     push({ id: 'exp-region', title: 'Where to?', render(body) {
       const s = S();
-      const list = D.BIOME_ORDER.filter(b => s.regions[b]).map(b => {
+      const list = D.BIOME_ORDER.filter(b => s.regions[b] && allow('expedition', b)).map(b => {
         const top = Math.max.apply(null, D.SPECIES_LIST.filter(x => x.biome === b).map(x => x.rarity));
-        return row({ img: tUrl('hab:' + b, 1), title: D.BIOMES[b].region, sub: wkc(D.BIOMES[b].weeks), extra: starsOn(top), right: mny(E.expCost(b, 0)), tap: () => expTeam(b) });
+        return row({ img: tUrl('hab:' + b, 1), title: D.BIOMES[b].region, sub: wkc(D.BIOMES[b].weeks), extra: starsOn(top), right: mny(E.expCost(b)), tap: () => expTeam(b) });
       });
       body.appendChild(rows(list, 'No region yet.'));
     } });
@@ -347,40 +397,48 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       const staff = s.staff.slice().sort((a, b) => (busy[a.id] ? 1 : 0) - (busy[b.id] ? 1 : 0) || b.exp - a.exp);
       if (sel === null) sel = staff.filter(x => !busy[x.id]).slice(0, 1).map(x => x.id);
       sel = sel.filter(id => !busy[id]);
-      const power = E.teamPower(s, sel, 1), lvl = fitLevel(E.expOdds(s, region, power).ratio);
+      const power = E.teamPower(s, sel), lvl = fitLevel(E.expOdds(s, region, power).ratio);
       const head = el('div', { cls: 'mn-sticky' });
       head.appendChild(el('div', { cls: 'mn-kv' }, span('k', 'Strength'), span('v', sel.length ? ui.sign(lvl) : '-')));
       head.appendChild(ui.btn('Next', () => expConfirm(region, sel.slice()), { cls: 'primary big', disabled: !sel.length, sub: sel.length ? wkc(E.expWeeks(s, region, sel)) : 'pick 1 to 3' }));
       body.appendChild(head);
       body.appendChild(el('div', { cls: 'list' }, staff.map(st => {
         const on = sel.indexOf(st.id) >= 0, b = !!busy[st.id];
-        return row({ img: pUrl(st.role, 3), title: st.name, sub: D.ROLES[st.role].name + ' · Lv ' + st.lvl, extra: el('span', { cls: 'mn-cl' }, [K('exp', st.exp), K('care', st.care)]),
+        return row({ img: pUrl(st.role, 3), title: st.name, sub: [D.ROLES[st.role].name, ' ', lvBox(st.lvl)], extra: el('span', { cls: 'mn-cl' }, [K('exp', st.exp), K('care', st.care)]),
           right: b ? imgEl(iUrl('busy', 3), 'mn-mini') : on ? ui.sym('ok', { scale: 3, label: 'In' }) : null, off: b, cls: on ? 'mn-on' : '',
           tap: () => { if (on) sel = sel.filter(x => x !== st.id); else if (sel.length < 3) sel.push(st.id); else { ui.toast('Three at most.'); return; } Core.rerender(); } });
       })));
     } });
   }
-  function expBudget(region, team) {
-    push({ id: 'exp-budget', title: 'Budget', render(body) {
-      const s = S(), names = ['Lean', 'Standard', 'Lavish'];
-      body.appendChild(ui.choices([0, 1, 2].map(b => {
-        const o = E.expOdds(s, region, E.teamPower(s, team, b));
-        return { label: names[b], note: 'Strength ' + fmt.signs(fitLevel(o.ratio)), cost: E.expCost(region, b) };
-      }), i => expConfirm(region, team, i)));
-    } });
-  }
+  // The Send out page: pick a star level (1 to 5), see its price, weeks and odds, Send. Everything fits one screen.
+  const lastStar = {};
   function expConfirm(region, team) {
-    let budget = 1;
+    let star = null;
     push({ id: 'exp-confirm', title: 'Send out?', render(body, api) {
-      body.appendChild(ui.tabs([{ id: '0', label: 'Lean' }, { id: '1', label: 'Standard' }, { id: '2', label: 'Lavish' }], String(budget), id => { budget = +id; api.rerender(); }));
-      const s = S(), power = E.teamPower(s, team, budget), o = E.expOdds(s, region, power), cost = E.expCost(region, budget);
-      body.appendChild(el('div', { cls: 'mn-team' }, team.map(id => { const st = E.staffer(s, id); return st ? imgEl(pUrl(st.role, 3)) : null; })));
-      body.appendChild(el('div', { cls: 'mn-big' }, D.BIOMES[region].region));
-      body.appendChild(kv('Strength', ui.sign(fitLevel(o.ratio))));
-      body.appendChild(kv('Time', wkc(E.expWeeks(s, region, team))));
-      body.appendChild(ui.section('Chance to find'));
-      Object.keys(o.byRarity).map(Number).sort((a, b) => a - b).forEach(r => { const p = o.byRarity[r]; if (p < 0.005) return; body.appendChild(el('div', { cls: 'mn-odd' }, starsOn(r), ui.bar(p, { cls: 'gold' }), span('p', pct(p)))); });
-      body.appendChild(ui.btn('Send', guard(() => { const r = Core.act('startExpedition', region, team, budget); if (r.ok) { later(() => Core.popAll()); ui.toast('Expedition sent', 'good'); } }), { cls: 'primary big', sub: money(cost), disabled: s.money < cost, onDisabled: () => ui.toast(needMoney(cost), 'bad') }));
+      body.classList.add('mn-tight'); body.style.overflowY = 'hidden';
+      const s = S(), list = (E.expStars ? E.expStars(s, region, team) : []) || [], open = list.filter(x => x.unlocked);
+      if (!open.some(x => x.star === star)) {
+        const pref = open.find(x => x.star === lastStar[region]), easy = open.filter(x => x.cost * 2 <= s.money);
+        star = pref ? pref.star : easy.length ? easy[easy.length - 1].star : open.length ? open[0].star : null;
+      }
+      const cur = list.find(x => x.star === star) || null;
+      body.appendChild(el('div', { cls: 'mn-xhead' }, imgEl(tUrl('hab:' + region, 1), 'mn-xreg'), span('mn-xname', shortRegion(region)),
+        el('span', { cls: 'mn-xteam' }, team.map(id => { const st = E.staffer(s, id); return st ? imgEl(pUrl(st.role, 2)) : null; })), cur ? ui.sign(fitLevel(cur.ratio)) : null));
+      body.appendChild(el('div', { cls: 'mn-xstars', role: 'tablist' }, list.map(x => {
+        const b = el('button', { type: 'button', cls: 'mn-xs' + (x.star === star ? ' on' : '') + (x.unlocked ? '' : ' off'), 'data-star': x.star, 'aria-label': x.star + ' star' + (x.unlocked ? '' : ', locked: ' + x.lock) },
+          span('n', String(x.star), symS('star-on', 'Stars')),
+          x.unlocked ? null : span('lk', symS('lock', 'Locked'), /^Rank/.test(x.lock) ? [symS('rep', 'Zoo rank'), String(x.rank)] : symS('no', x.lock)));
+        b.addEventListener('click', guard(() => { if (!x.unlocked) { ui.toast(x.lock || 'Locked', 'bad'); return; } star = x.star; api.rerender(); }));
+        return b;
+      })));
+      if (cur) {
+        body.appendChild(el('div', { cls: 'mn-xinfo' }, span('c xc', symS('coin', 'Money', 3), ' ' + fmt.num(cur.cost)), span('c xw', symS('time', 'Weeks', 3), ' ' + cur.weeks)));
+        const od = el('div', { cls: 'mn-xodds' });
+        Object.keys(cur.odds).map(Number).sort((a, b) => a - b).forEach(r => { const p = cur.odds[r]; if (p < 0.005) return; od.appendChild(el('div', { cls: 'mn-odd' + (r === cur.star ? ' me' : '') }, starsOn(r), ui.bar(p, { cls: 'gold' }), span('p', pct(p)))); });
+        body.appendChild(od);
+      }
+      const cost = cur ? cur.cost : 0;
+      body.appendChild(ui.btn('Send', guard(() => { const r = Core.act('startExpedition', region, team, star); if (r.ok) { lastStar[region] = star; later(() => Core.popAll()); ui.toast('Expedition sent', 'good'); } }), { cls: 'primary big mn-send', sub: cur ? money(cost) : lockSub(), disabled: !cur || s.money < cost, onDisabled: () => ui.toast(cur ? needMoney(cost) : 'Locked', 'bad') }));
     } });
   }
 
@@ -413,40 +471,35 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     } });
   }
 
-  // ----- event planner: habitat, theme, lead, confirm
+  // ----- event planner: habitat (skipped with one habitat), then ONE screen for host, theme and Start
+  const shortEvWhy = t => (/quiet/i.test(t) ? ['Rest ', clk((/(\d+)/.exec(t) || [])[1] || '')] : /no animals/i.test(t) ? 'No animals' : /well enough/i.test(t) ? 'All unwell' : /already/i.test(t) ? 'Event running' : t.split(' ').slice(0, 4).join(' '));
   function eventHabsScreen() {
+    const all = eventHabs();
+    if (all.length === 1 && !all[0].why) { eventSetup(all[0].hab.id); return; }
     push({ id: 'event-habs', title: 'Which habitat?', render(body) {
       const s = S(), cost = E.eventCost(s);
-      body.appendChild(rows(eventHabs().map(x => row({ img: itemUrl(x.hab), title: E.habName(s, x.hab), sub: x.why ? null : cnt('m-animals', E.inHab(s, x.hab.id).length), extra: x.why ? why(shortEvWhy(x.why)) : null, right: x.why ? null : mny(cost), off: !!x.why, tap: () => eventTheme(x.hab.id) })), 'No habitats yet.'));
+      body.appendChild(rows(eventHabs().map(x => row({ img: itemUrl(x.hab), title: E.habName(s, x.hab), sub: x.why ? null : cnt('m-animals', E.inHab(s, x.hab.id).length), extra: x.why ? why(shortEvWhy(x.why)) : null, right: x.why ? null : mny(cost), off: !!x.why, tap: () => eventSetup(x.hab.id) })), 'No habitats yet.'));
     } });
   }
-  const shortEvWhy = t => (/quiet/i.test(t) ? ['Rest ', clk((/(\d+)/.exec(t) || [])[1] || '')] : /no animals/i.test(t) ? 'No animals' : /well enough/i.test(t) ? 'All unwell' : /already/i.test(t) ? 'Event running' : t.split(' ').slice(0, 4).join(' '));
-  function eventTheme(habId) {
-    push({ id: 'event-theme', title: 'Which theme?', render(body) {
-      const s = S(), h = E.item(s, habId); if (!h) { Core.pop(); return; }
+  function eventSetup(habId) {
+    let host = null, theme = null;
+    push({ id: 'event-setup', title: 'Event', render(body, api) {
+      body.classList.add('mn-tight'); body.style.overflowY = 'hidden';
+      const s = S(), h = E.item(s, habId); if (!h) { api.pop(); return; }
+      const busy = E.busyStaff(s), staff = s.staff.filter(x => !busy[x.id]).sort((x, y) => y.charm - x.charm).slice(0, 8);
       const list = D.THEME_ORDER.filter(t => (s.research['theme:' + t] || !D.THEMES[t].rp) && (!D.THEMES[t].needs || s.regions[D.THEMES[t].needs])).map(t => ({ t, fit: E.themeFit(s, h.t, t) }));
       list.sort((a, b) => (b.fit == null ? 1.5 : b.fit) - (a.fit == null ? 1.5 : a.fit));
-      body.appendChild(rows(list.map(x => row({ img: iUrl('ready-event', 4), title: D.THEMES[x.t].name, sub: x.fit == null ? 'Untried' : E.fitWord(x.fit) + (h.lastTheme === x.t ? ' · done last' : ''), right: ui.sign(x.fit), tap: () => (E.freeStaff(S()).length === 1 ? eventConfirm(habId, x.t, E.freeStaff(S())[0].id) : eventLead(habId, x.t)) }))));
-    } });
-  }
-  function eventLead(habId, theme) {
-    push({ id: 'event-lead', title: 'Who hosts?', render(body) {
-      const s = S(), busy = E.busyStaff(s);
-      const staff = s.staff.filter(x => !busy[x.id]).sort((x, y) => y.charm - x.charm);
-      body.appendChild(rows(staff.map(st => row({ img: pUrl(st.role, 3), title: st.name, sub: D.ROLES[st.role].name, right: K('charm', st.charm), tap: () => eventConfirm(habId, theme, st.id) })), 'No one is free.'));
-    } });
-  }
-  function eventConfirm(habId, theme, leadId) {
-    push({ id: 'event-confirm', title: 'Hold it?', render(body) {
-      const s = S(), h = E.item(s, habId), lead = E.staffer(s, leadId); if (!h || !lead) { Core.pop(); return; }
-      const fit = E.themeFit(s, h.t, theme), cost = E.eventCost(s);
-      body.appendChild(el('div', { cls: 'mn-team' }, imgEl(pUrl(lead.role, 3))));
-      body.appendChild(el('div', { cls: 'mn-big' }, D.THEMES[theme].name));
-      body.appendChild(kv('Where', E.habName(s, h)));
-      body.appendChild(kv('Host', lead.name));
-      body.appendChild(kv('Fit', fit == null ? 'Untried' : span('', ui.sign(fit), ' ', E.fitWord(fit))));
-      body.appendChild(kv('Time', wkc(3)));
-      body.appendChild(ui.btn('Start', guard(() => { const r = Core.act('startEvent', habId, theme, leadId); if (r.ok) { later(() => Core.popAll()); ui.toast('Event started', 'good'); } }), { cls: 'primary big', sub: money(cost), disabled: s.money < cost, onDisabled: () => ui.toast(needMoney(cost), 'bad') }));
+      if (!staff.some(x => x.id === host)) host = staff.length ? staff[0].id : null;
+      if (!list.some(x => x.t === theme)) theme = list.length ? list[0].t : null;
+      const cost = E.eventCost(s);
+      body.appendChild(el('div', { cls: 'mn-xhead' }, imgEl(itemUrl(h), 'mn-xreg'), span('mn-xname', E.habName(s, h)), cnt('m-animals', E.inHab(s, h.id).length)));
+      body.appendChild(el('div', { cls: 'mn-pick hosts', 'data-n': staff.length }, staff.map(st => el('button', { type: 'button', cls: 'mn-pk host' + (st.id === host ? ' on' : ''), 'data-host': st.id, 'aria-label': 'Host ' + st.name, tap: guard(() => { host = st.id; api.rerender(); }) },
+        imgEl(pUrl(st.role, 2)), K('charm', st.charm)))));
+      if (!staff.length) body.appendChild(el('div', { cls: 'empty' }, 'No one is free.'));
+      body.appendChild(el('div', { cls: 'mn-pick themes' + (list.length > 8 ? ' c3' : '') }, list.map(x => el('button', { type: 'button', cls: 'mn-pk theme' + (x.t === theme ? ' on' : ''), 'data-theme': x.t, tap: guard(() => { theme = x.t; api.rerender(); }) },
+        span('tn', D.THEMES[x.t].name), span('fs', ui.sign(x.fit), h.lastTheme === x.t ? symS('time', 'Done last time') : null)))));
+      body.appendChild(ui.btn('Start', guard(() => { const r = Core.act('startEvent', habId, theme, host); if (r.ok) { later(() => Core.popAll()); ui.toast('Event started', 'good'); } }),
+        { cls: 'primary big mn-send', sub: [mny(cost), ' ', wkc(3)], disabled: !host || !theme || s.money < cost, onDisabled: () => ui.toast(!host ? 'No one is free.' : needMoney(cost), 'bad') }));
     } });
   }
 
@@ -484,27 +537,112 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     if (!window.ZRender || !ZRender.startPlacement) { ui.toast('Placing needs the floor.', 'bad'); return false; }
     return ZRender.startPlacement(spec, { onPlace, onDone() { /* back on the floor, time runs */ }, onCancel() { if (!Core.stack().length && back) openAt(back); } });
   }
-  function buildScreen() {
-    push({ id: 'build', title: 'Build', render(body) { body.classList.add('mn-tight');
-      const s = S(), nl = E.nextLand(s);
-      body.appendChild(fitGrid([
-        { icon: tUrl('hab:savanna', 2), label: 'Habitats', onTap: habitatList },
-        { icon: bUrl('snack', 3), label: 'Facilities', onTap: facilityList },
-        { icon: pixIcon('move', '#4aa3df', 4), label: 'Move', onTap: moveList },
-        { icon: pixIcon('remove', '#e0584a', 4), label: 'Remove', onTap: removeList },
-        { icon: pixIcon('up', '#58b84a', 5), label: 'Upgrade', onTap: upgradeList },
-        { icon: tUrl('locked', 2), label: 'Buy land', sub: nl ? money(nl.cost) : 'All owned', onTap: landScreen }
-      ], 2));
-    } });
+  // ------------------------------------------------------------------ EDIT MODE (replaces the Build lists and the Move screen)
+  // A solid strip (#edit-bar) docked at the bottom of the floor: symbol tabs for the groups, ONE sideways-scrolling row of things to add, Done.
+  // Tapping a placed thing on the map (the renderer calls editPick) swaps the strip for Move / Upgrade / Sell.
+  const edit = { on: false, grp: 'hab', sel: null, sig: '', want: null, wantKey: '', wantDone: false };
+  const R = () => window.ZRender || null;
+  const hasEdit = () => { const r = R(); return !!(r && typeof r.startEdit === 'function'); };
+  const placingNow = () => { const r = R(); try { return !!(r && r.placing && r.placing()); } catch (e) { return false; } };
+  const EGROUPS = [['hab', 'habitat', 'Habitats'], ['shop', 'coin', 'Shops'], ['fun', 'heart', 'Fun'], ['sci', 'rp', 'Science'], ['mark', 'trophy', 'Landmarks'], ['own', 'move', 'Placed']];
+  const facGroup = F => (F.landmark ? 'mark' : F.spend ? 'shop' : (F.rpw || F.vet || F.learn) ? 'sci' : 'fun');
+  const refundOf = it => Math.round((it.k === 'hab' ? D.BIOMES[it.t].hab : D.FAC[it.t].cost) * 0.5);
+  function editCards(grp) {
+    const s = S(), out = [];
+    if (grp === 'hab') {
+      D.BIOME_ORDER.filter(b => s.regions[b] && allow('biome', b)).forEach(b => {
+        const c = E.habBuildCost(s, b), first = b === 'savanna' && !isOpen(s), no = allowMsg('hab', b), poor = !first && s.money < c;
+        out.push({ key: 'hab:' + b, img: tUrl('hab:' + b, 1), name: D.BIOMES[b].name, price: c, lock: !!no, why: no || (poor ? needMoney(c) : ''), tap: () => placeHab(b) });
+      });
+      const nl = E.nextLand(s);
+      if (nl && allow('land')) { const low = E.rank(s) < nl.rank; out.push({ key: 'land', img: iUrl('land', 4), name: 'More land', price: nl.cost, lock: low, lockN: low ? nl.rank : 0, why: low ? 'Needs rank ' + nl.rank : s.money < nl.cost ? needMoney(nl.cost) : '', tap: buyLand }); }
+    } else if (grp === 'own') {   // only when the renderer cannot pick from the map yet: the placed things, to select one
+      if (!hasEdit()) s.items.slice().sort((a, b) => (a.k === b.k ? 0 : a.k === 'hab' ? -1 : 1)).forEach(it => out.push({ key: 'own:' + it.id, img: itemUrl(it), name: itemName(it), own: true, why: '', tap: () => editPick(it) }));
+    } else {
+      D.FAC_ORDER.filter(x => (!D.FAC[x].rp || s.research['fac:' + x]) && facGroup(D.FAC[x]) === grp).forEach(x => {
+        const F = D.FAC[x], c = E.facCost(s, x), have = s.items.filter(i => i.k === 'fac' && i.t === x).length, full = !!(F.limit && have >= F.limit);
+        out.push({ key: 'fac:' + x, img: bUrl(x, 2), name: F.name, price: c, lock: full, why: full ? 'Limit reached' : s.money < c ? needMoney(c) : '', tap: () => placeFac(x) });
+      });
+    }
+    return out;
   }
-  function habitatList() {
-    push({ id: 'build-habs', title: 'Habitats', render(body) {
-      const s = S();
-      body.appendChild(rows(D.BIOME_ORDER.filter(b => s.regions[b]).map(b => {
-        const c = E.habBuildCost(s, b), poor = s.money < c && !(b === 'savanna' && !(E.isOpen ? E.isOpen(s) : habs().length));
-        return row({ img: tUrl('hab:' + b, 1), title: D.BIOMES[b].name, sub: D.SHAPE_NAME[b], extra: poor ? why(needMoney(c)) : null, right: mny(c), off: poor, tap: () => placeHab(b) });
-      }), 'No habitats yet.'));
-    } });
+  function editCard(c) {
+    const b = el('button', { type: 'button', cls: 'mn-ec' + (c.why ? ' off' : ''), 'data-key': c.key, 'aria-label': c.name + (c.why ? ' (' + c.why + ')' : '') },
+      el('span', { cls: 'im' }, imgEl(c.img)),
+      c.own ? null : el('span', { cls: 'pr' }, c.lock ? [symS('lock', 'Locked'), c.lockN ? [symS('rep', 'Zoo rank'), String(c.lockN)] : null] : [symS('coin', 'Money'), short(c.price)]));
+    b.addEventListener('click', guard(() => { if (c.why) { ui.toast(c.why, 'bad'); return; } c.tap(); }));
+    return b;
+  }
+  function editBar() {
+    let bar = document.getElementById('edit-bar');
+    if (!bar) { const host = document.getElementById('floor-wrap'); if (!host) return null; bar = el('div', { id: 'edit-bar', role: 'toolbar', 'aria-label': 'Edit' }); bar.hidden = true; host.appendChild(bar); }
+    return bar;
+  }
+  function editRender() {
+    const bar = editBar(), s = S(); if (!bar || !s) return;
+    const old = bar.querySelector('.mn-es'), keep = old && old.dataset.grp === edit.grp ? old.scrollLeft : 0;
+    bar.textContent = '';
+    let it = edit.sel != null ? E.item(s, edit.sel) : null; if (!it) edit.sel = null;
+    if (it) {   // actions for the thing picked on the map
+      const isHab = it.k === 'hab', busy = isHab && E.habStatus(s, it).busy, back = refundOf(it);
+      const act = (cls, label, kids, fn, off) => { const b = el('button', { type: 'button', cls: 'mn-ea ' + cls + (off ? ' off' : ''), 'aria-label': label }, kids); b.addEventListener('click', guard(fn)); return b; };
+      bar.appendChild(el('div', { cls: 'mn-eact' },
+        el('span', { cls: 'mn-ewho' }, imgEl(itemUrl(it)), isHab ? cnt('m-animals', E.inHab(s, it.id).length + '/' + E.habCap(it)) : null),
+        act('move', 'Move', symS('move', 'Move', 4), () => editMove(it)),
+        isHab ? upgBtn(it, () => editRender()) : null,
+        act('sell', 'Sell', [symS('sell', 'Sell', 4), span('pr', '+', symS('coin', 'Money'), short(back))], () => { if (busy) { ui.toast('Project running', 'bad'); return; } editSell(it); }, busy),
+        act('back', 'Back to adding', imgEl(pixIcon('left', '#6b5a3c', 3)), () => editPick(null))));
+    } else {
+      const groups = EGROUPS.map(g => ({ id: g[0], icon: g[1], name: g[2], cards: editCards(g[0]) })).filter(g => g.cards.length);
+      if (!groups.some(g => g.id === edit.grp)) edit.grp = groups.length ? groups[0].id : 'hab';
+      const cur = groups.find(g => g.id === edit.grp) || { cards: [] }, want = edit.want;
+      const tabs = el('div', { cls: 'mn-etabs', role: 'tablist' }, groups.map(g => { const b = el('button', { type: 'button', cls: 'mn-et' + (g.id === edit.grp ? ' on' : '') + (want && want[0] === g.id && g.id !== edit.grp ? ' mn-glow' : ''), 'data-grp': g.id, 'aria-label': g.name }, symS(g.icon, g.name, 3)); b.addEventListener('click', guard(() => { edit.grp = g.id; editRender(); })); return b; }));
+      const done = el('button', { type: 'button', cls: 'mn-et done' + (edit.wantDone ? ' mn-glow' : ''), 'aria-label': 'Done' }, symS('ok', 'Done', 3), 'Done'); done.addEventListener('click', guard(() => editStop()));
+      tabs.appendChild(done); bar.appendChild(tabs);
+      const strip = el('div', { cls: 'mn-es', 'data-grp': edit.grp }, cur.cards.map(editCard)); bar.appendChild(strip);
+      const glow = want && want[0] === edit.grp ? strip.querySelector('[data-key="' + want[1] + '"]') : null;
+      if (glow) { glow.classList.add('mn-glow'); strip.scrollLeft = Math.max(0, glow.offsetLeft - 60); } else strip.scrollLeft = keep;
+    }
+    edit.sig = editSig();
+  }
+  const editSig = () => { const s = S(); return s ? [Math.floor(s.money), s.items.length, s.items.reduce((n, i) => n + (i.lvl || 0), 0), edit.sel, edit.grp, E.rank(s), s.rows, edit.wantKey, edit.wantDone, Object.keys(s.research).length, s.projects.length].join('|') : ''; };
+  function editSel(id) { const r = R(); try { if (r && r.select) r.select(id == null ? null : id); } catch (e) { /* ignore */ } }
+  function editPick(it) { if (!edit.on) return; edit.sel = it && it.id != null && (it.k === 'hab' || it.k === 'fac') ? it.id : null; editSel(edit.sel); editRender(); }
+  function editArm() { const r = R(); if (hasEdit()) { try { r.startEdit({ onPick: editPick, onExit: () => editStop(true) }); } catch (e) { /* ignore */ } } }
+  function editMode(grp) {
+    if (!S()) return false; Core.popAll();
+    if (!editBar()) { ui.toast('Editing needs the floor.', 'bad'); return false; }
+    edit.on = true; edit.sel = null; if (typeof grp === 'string') edit.grp = grp; else if (edit.want) edit.grp = edit.want[0];
+    editArm(); editRender(); editSync(); return true;
+  }
+  function editStop(fromRenderer) {
+    if (!edit.on) return; edit.on = false; edit.sel = null; editSel(null);
+    const r = R(); if (!fromRenderer && r && r.stopEdit) { try { r.stopEdit(); } catch (e) { /* ignore */ } }
+    editSync();
+  }
+  // Keeps the strip in step with the game: hidden while a screen is open or the renderer's own Place / Rotate / Cancel bar is up, back afterwards.
+  function editSync() {
+    const bar = document.getElementById('edit-bar'); if (!bar) return;
+    const s = S(), st = Core.stack();
+    if (edit.on && (!s || st[0] === 'menu' || st[0] === 'title')) { edit.on = false; edit.sel = null; editSel(null); const r = R(); if (r && r.stopEdit) { try { r.stopEdit(); } catch (e) { /* ignore */ } } }
+    const show = edit.on && !st.length && !placingNow();
+    if (show) { const r = R(); if (hasEdit() && r.editing && !r.editing()) { editArm(); if (edit.sel != null) editSel(edit.sel); } if (edit.sig !== editSig() || !bar.firstChild) editRender(); }
+    if (bar.hidden === show) { bar.hidden = !show; document.body.classList.toggle('mn-editing', show); }
+  }
+  function editPlace(spec, onPlace) {
+    const r = R(); if (!r || !r.startPlacement) { ui.toast('Placing needs the floor.', 'bad'); return false; }
+    Core.popAll(); const out = r.startPlacement(spec, { onPlace, onDone() { editSync(); }, onCancel() { editSync(); } }); editSync(); return out;
+  }
+  function editMove(it) { editPlace({ kind: it.k, t: it.t, moveId: it.id, label: itemName(it) }, (q, r, rot) => { return Core.act('move', it.id, q, r, rot); }); }
+  function editSell(it) {
+    const n = it.k === 'hab' ? E.inHab(S(), it.id).length : 0;
+    ui.confirm('Sell ' + itemName(it) + ' for ' + money(refundOf(it)) + '?' + (n ? ' Its animals go to the pen.' : ''), () => {
+      const r = Core.act('remove', it.id); if (r && r.ok) { edit.sel = null; editSel(null); editRender(); }
+    }, { danger: true, yes: 'Sell' });
+  }
+  function buyLand() {
+    const nl = E.nextLand(S()); if (!nl) return;
+    ui.confirm('Buy more land for ' + money(nl.cost) + '?', () => { const r = Core.act('buyLand'); if (r && r.ok) editRender(); }, { yes: 'Buy' });
   }
   // The upgrade button: up arrow, the new capacity and the price; grey with a short reason when it cannot be done; gold when the habitat is full.
   function upgInfo(h) {
@@ -515,11 +653,11 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   function upgBtn(h, after) {
     const s = S(), u = upgInfo(h), full = E.inHab(s, h.id).length >= E.habCap(h);
     const b = el('button', { type: 'button', cls: 'mn-up' + (u.reason ? ' off' : full ? ' gold' : ''), 'aria-label': 'Upgrade ' + E.habName(s, h) },
-      u.reason ? [imgEl(pixIcon('up', '#6b5a3c', 2)), u.reason] : [imgEl(pixIcon('up', '#2f8a3a', 2)), String(u.nx), ' ', mny(u.c)]);
+      u.reason ? [imgEl(pixIcon('up', '#6b5a3c', 2)), span('rs', u.reason)] : [imgEl(pixIcon('up', '#2f8a3a', 2)), span('nx', String(u.nx)), ' ', mny(u.c)]);
     b.addEventListener('click', guard(() => {
       if (u.reason) { ui.toast(u.reason, 'bad'); return; }
       const r = Core.act('upgrade', h.id);
-      if (r && r.ok) { ui.toast('Room for ' + u.nx, 'good'); if (after) after(r); else { try { Core.rerender(); } catch (e) { /* ignore */ } } if (movableIds(h.id).length) moveInPrompt(h.id, true); }
+      if (r && r.ok) { if (!edit.on) ui.toast('Room for ' + u.nx, 'good'); if (after) after(r); else { try { Core.rerender(); } catch (e) { /* ignore */ } } if (movableIds(h.id).length) moveInPrompt(h.id, true); }
     }));
     return b;
   }
@@ -541,80 +679,34 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     }, 450);
   }
   function placeHab(b) {
-    place({ kind: 'hab', t: b, label: D.BIOMES[b].name }, (q, r, rot) => {
+    editPlace({ kind: 'hab', t: b, label: D.BIOMES[b].name }, (q, r, rot) => {
       const res = Core.act('build', 'hab', b, q, r, rot);
-      if (res && res.ok) { ui.toast(D.BIOMES[b].name + ' built', 'good'); moveInHandled = false; moveInPrompt(res.id); }
+      if (res && res.ok) { moveInHandled = false; moveInPrompt(res.id); }
       return res;
-    }, buildScreen);
+    });
   }
-  function facTag(F) {
-    const t = [];
-    if (F.spend) t.push('Shop'); if (F.adjDraw) t.push('Draw +' + Math.round(F.adjDraw * 100) + '%'); if (F.adjSpend) t.push('Shops +' + Math.round(F.adjSpend * 100) + '%');
-    if (F.crowd) t.push('Visitors +' + Math.round(F.crowd * 100) + '%'); if (F.rpw) t.push('Research'); if (F.repw) t.push('Fame'); if (F.vet) t.push('Breeding'); if (F.learn) t.push('Learning');
-    return t.join(' · ');
-  }
-  function facilityList() {
-    push({ id: 'build-facs', title: 'Facilities', render(body) {
-      const s = S();
-      const list = D.FAC_ORDER.filter(f => !D.FAC[f].rp || s.research['fac:' + f]).map(f => {
-        const F = D.FAC[f], c = E.facCost(s, f), have = s.items.filter(i => i.k === 'fac' && i.t === f).length;
-        const reason = F.limit && have >= F.limit ? 'Limit reached' : s.money < c ? needMoney(c) : '';
-        return row({ img: bUrl(f, 2), title: F.name, sub: facTag(F), extra: reason ? why(reason) : null, right: mny(c), off: !!reason, tap: () => placeFac(f) });
-      });
-      body.appendChild(rows(list));
-    } });
-  }
-  function placeFac(f) {
-    place({ kind: 'fac', t: f, repeat: true, label: D.FAC[f].name }, (q, r, rot) => {
-      const res = Core.act('build', 'fac', f, q, r, rot);
-      if (res && res.ok) ui.toast(D.FAC[f].name + ' built', 'good');
+  function placeFac(x) {
+    editPlace({ kind: 'fac', t: x, repeat: true, label: D.FAC[x].name }, (q, r, rot) => {
+      const res = Core.act('build', 'fac', x, q, r, rot);
       return res;
-    }, buildScreen);
-  }
-  function itemRows(onTap, extraFn) {
-    return S().items.slice().sort((a, b) => (a.k === b.k ? 0 : a.k === 'hab' ? -1 : 1)).map(it => row({ img: itemUrl(it), title: itemName(it), sub: it.k === 'hab' ? D.BIOMES[it.t].name : null, extra: extraFn ? extraFn(it) : null, off: !!(extraFn && extraFn(it)), tap: () => onTap(it) }));
-  }
-  function moveList() {
-    push({ id: 'build-move', title: 'Move', render(body) { body.appendChild(rows(itemRows(it => place({ kind: it.k, t: it.t, moveId: it.id, label: itemName(it) }, (q, r, rot) => { const res = Core.act('move', it.id, q, r, rot); if (res && res.ok) ui.toast('Moved', 'good'); return res; }, buildScreen)), 'Nothing to move.')); } });
-  }
-  function removeList() {
-    push({ id: 'build-remove', title: 'Remove', render(body, api) {
-      const s = S();
-      body.appendChild(rows(itemRows(it => ui.confirm('Remove ' + itemName(it) + '? Half the price comes back.' + (it.k === 'hab' ? ' Its animals move out.' : ''), () => {
-        const r = Core.act('remove', it.id); if (r.ok) { ui.toast('Removed. ' + money(r.refund) + ' back', 'good'); api.rerender(); }
-      }, { danger: true, yes: 'Remove' }), it => (it.k === 'hab' && E.habStatus(s, it).busy ? 'Project running' : null)), 'Nothing to remove.'));
-    } });
-  }
-  function upgradeList() {
-    push({ id: 'build-upgrade', title: 'Upgrade', render(body, api) {
-      const s = S();
-      body.appendChild(rows(habs().map(h => row({ img: itemUrl(h), title: E.habName(s, h), sub: [cnt('m-animals', E.inHab(s, h.id).length + '/' + E.habCap(h)), ' · Lv ' + h.lvl], act: upgBtn(h, () => api.rerender()) })), 'No habitats yet.'));
-    } });
-  }
-  function landScreen() {
-    push({ id: 'build-land', title: 'Buy land', render(body, api) {
-      const s = S(), nl = E.nextLand(s);
-      if (!nl) { body.appendChild(el('div', { cls: 'empty' }, 'You own it all.')); return; }
-      body.appendChild(el('div', { cls: 'mn-pic one' }, imgEl(tUrl('locked', 3)))); body.appendChild(kv('Rows now', s.rows)); body.appendChild(kv('Rows after', nl.rows)); body.appendChild(kv('Price', money(nl.cost)));
-      const reason = E.rank(s) < nl.rank ? 'Needs rank ' + nl.rank : s.money < nl.cost ? needMoney(nl.cost) : '';
-      body.appendChild(ui.btn('Buy', guard(() => { const r = Core.act('buyLand'); if (r.ok) { ui.toast('New land at the back', 'good'); api.rerender(); } }), { cls: 'primary big', sub: reason || money(nl.cost), disabled: !!reason }));
-    } });
+    });
   }
 
   // ------------------------------------------------------------------ ANIMALS
   let animalTab = 'zoo';
   const ageText = a => { const s = S(); if (E.isJuv(s, a)) return 'Baby'; if (a.born == null) return 'Adult'; const y = Math.floor((s.week - a.born) / D.WPY); return y < 1 ? 'Young' : y + 'y'; };
   const ageSym = a => { const s = S(); if (E.isJuv(s, a)) return [' ', ui.sym('juv', { scale: 2, label: 'Baby', text: 'baby' })]; if (a.born == null) return null; const y = Math.floor((s.week - a.born) / D.WPY); return y >= 1 ? ' ' + y + 'y' : null; };
+  const crown = a => { try { return E.bestOf && E.bestOf(S(), a) ? ui.sym('best', { scale: 2, label: 'Best of its kind', text: '', cls: 'mn-best' }) : null; } catch (e) { return null; } };
   function animalTile(a) {
     const s = S(), sick = E.isSick(s, a) ? imgEl(iUrl('sick', 2), 'mn-mini') : null;
     return el('button', { type: 'button', cls: 'mn-at', 'data-aid': a.id, tap: guard(() => animalScreen(a.id)), 'aria-label': (a.name || '') + ' ' + E.animalLabel(a) },
       el('span', { cls: 'pt' }, imgEl(aUrl(a, 2))),
-      el('span', { cls: 'inf' }, el('span', { cls: 'c3' }, [A('charm', a.charm), A('vigor', a.vigor), A('wit', a.wit)]), el('span', { cls: 'c2' }, sexSym(a), ageSym(a), ui.grade(E.grade(E.avg(a))), sick)));
+      el('span', { cls: 'inf' }, el('span', { cls: 'c3' }, [A('charm', a.charm), A('vigor', a.vigor), A('wit', a.wit)]), el('span', { cls: 'c2' }, sexSym(a), ageSym(a), ui.grade(E.grade(E.avg(a))), crown(a), sick)));
   }
   function animalRow(a, o) {
     const s = S();
     const sick = E.isSick(s, a) ? imgEl(iUrl('sick', 3), 'mn-mini') : null;
-    if (o && o.act) { const rw = row({ img: aUrl(a, 2), title: [E.animalLabel(a), ' ', sexSym(a), ageSym(a)], line: animalChips(a), tap: () => animalScreen(a.id), act: o.act }); rw.setAttribute('data-aid', a.id); return rw; }
+    if (o && o.act) { const rw = row({ img: aUrl(a, 2), title: [E.animalLabel(a), ' ', sexSym(a), ageSym(a), crown(a)], line: animalChips(a), tap: () => animalScreen(a.id), act: o.act }); rw.setAttribute('data-aid', a.id); return rw; }
     return row({ img: aUrl(a, 2), title: [E.animalLabel(a), ' ', sexSym(a), ageSym(a), sick], right: animalChips(a), tap: () => animalScreen(a.id) });
   }
   // ---- arrivals waiting for a sell-or-keep decision (engine S.arrivals)
@@ -765,7 +857,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       const s = S(), a = E.animal(s, id); if (!a) { api.pop(); return; }
       animalCard(body, a);
       const h = a.hab == null ? null : E.item(s, a.hab);
-      body.appendChild(el('div', { cls: 'center' }, sexSym(a), ageSym(a), ' · ', h ? E.habName(s, h) : [ui.sym('pen', { scale: 2, label: 'Pen', text: 'Pen' }), ' Pen'], E.isSick(s, a) ? [' ', ui.sym('sick', { scale: 2, label: 'Unwell', text: '+' })] : null));
+      body.appendChild(el('div', { cls: 'center' }, sexSym(a), ageSym(a), crown(a), ' · ', h ? E.habName(s, h) : [ui.sym('pen', { scale: 2, label: 'Pen', text: 'Pen' }), ' Pen'], E.isSick(s, a) ? [' ', ui.sym('sick', { scale: 2, label: 'Unwell', text: '+' })] : null));
       if (!h) { const best = E.bestHab(s, a); body.appendChild(ui.btn('House', () => { const r = Core.act('autoHouse', id); if (r.ok) { ui.toast('Housed', 'good'); later(() => api.pop()); } }, { cls: 'primary big', disabled: !best, sub: best ? E.habName(s, best) : 'No room' })); }
       const inProj = !!E.busyAnimals(s)[id];
       body.appendChild(ui.btn('Choose habitat', () => habChooser(id), { cls: 'big', disabled: inProj, sub: inProj ? 'In a project' : '' }));
@@ -825,31 +917,30 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     push({ id: 'staff', title: 'Staff', render(body, api) {
       const s = S(), busy = E.busyStaff(s), cap = E.staffCap(s);
       body.appendChild(staffCapChip()); body.appendChild(hireOptions(api));
-      if (s.candidates && s.candidates.length) body.appendChild(ui.btn('Who turned up', candidatesScreen, { cls: 'blue', sub: s.candidates.length + ' waiting' }));
+      if (s.candidates && s.candidates.length) body.appendChild(ui.btn('Who turned up', candidatesScreen, { cls: 'blue', alert: true, sub: String(s.candidates.length) }));
       if (s.headhunt) {
         const h = s.headhunt, fee = E.headhuntFee(h);
         body.appendChild(ui.section('Headhunter'));
-        body.appendChild(row({ img: pUrl(h.role, 3), title: h.name, sub: D.ROLES[h.role].name + ' · Lv ' + h.lvl, line: staffChips(h), act: ui.btn('Hire', guard(() => { const r = Core.act('hireHeadhunt'); if (r.ok) { ui.toast(h.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', sub: money(fee), disabled: s.money < fee || s.staff.length >= cap, sub: s.staff.length >= cap ? 'Staff full' : mny(fee) }) }));
+        body.appendChild(row({ img: pUrl(h.role, 3), title: h.name, sub: [D.ROLES[h.role].name, ' ', lvBox(h.lvl)], line: staffChips(h), act: ui.btn('Hire', guard(() => { const r = Core.act('hireHeadhunt'); if (r.ok) { ui.toast(h.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', sub: money(fee), disabled: s.money < fee || s.staff.length >= cap, sub: s.staff.length >= cap ? 'Staff full' : mny(fee) }) }));
       }
-      body.appendChild(ui.section('Team')); body.appendChild(keyRow('s'));
-      body.appendChild(el('div', { cls: 'list' }, s.staff.map(st => row({ img: pUrl(st.role, 3), title: st.name, sub: D.ROLES[st.role].name + ' · Lv ' + st.lvl + ' · ' + money(E.salary(st)) + '/wk', extra: staffChips(st), right: busy[st.id] ? imgEl(iUrl('busy', 3), 'mn-mini') : null, tap: () => staffDetail(st.id) }))));
+      body.appendChild(el('div', { cls: 'list' }, s.staff.map(st => row({ img: pUrl(st.role, 3), title: st.name, sub: [D.ROLES[st.role].name, ' ', lvBox(st.lvl), ' ', money(E.salary(st)) + '/wk'], extra: staffChips(st), right: busy[st.id] ? imgEl(iUrl('busy', 3), 'mn-mini') : null, tap: () => staffDetail(st.id) }))));
     } });
   }
   function staffDetail(id) {
     push({ id: 'staff-one', title: 'Staff', render(body, api) {
       const s = S(), st = E.staffer(s, id); if (!st) { api.pop(); return; }
-      const R = D.ROLES[st.role], busy = !!E.busyStaff(s)[id];
+      const R = D.ROLES[st.role], busy = !!E.busyStaff(s)[id];   // (R here is the job, not the renderer)
       body.appendChild(el('div', { cls: 'mn-pic one' }, imgEl(pUrl(st.role, 6))));
       body.appendChild(el('div', { cls: 'mn-big' }, st.name));
-      body.appendChild(el('div', { cls: 'center' }, R.name + ' · Level ' + st.lvl));
-      body.appendChild(ui.bar(Math.min(1, st.xp / (40 + st.lvl * 30)), { cls: 'blue', label: 'XP' }));
-      body.appendChild(el('div', { cls: 'mn-capwrap' }, SKILLS.map(k => capChip(kIcon(k), (D.SKILL && D.SKILL[k] && D.SKILL[k].name) || k, st[k]))));
+      body.appendChild(el('div', { cls: 'center' }, R.name, ' ', lvBox(st.lvl)));
+      body.appendChild(ui.bar(Math.min(1, st.xp / (40 + st.lvl * 30)), { cls: 'blue' }));
+      body.appendChild(el('div', { cls: 'mn-capwrap mn-bigchips' }, SKILLS.map(k => K(k, st[k]))));
       body.appendChild(kv('Pay', mny(E.salary(st))));
       if (busy) body.appendChild(kv('Status', 'On a project'));
       const wait = E.trainWait(s, st);
       body.appendChild(ui.btn('Train', () => trainScreen(id), { cls: 'primary big', sub: wait > 0 ? [ui.sym('time', { scale: 2, label: 'Wait', text: '' }), ' ' + wait] : mny(E.trainCost(st)) }));
       const lowLv = st.lvl < D.JOB_LEVEL;
-      body.appendChild(ui.btn('Change job', () => jobScreen(id), { cls: 'big', disabled: lowLv || busy, sub: lowLv ? 'Level ' + D.JOB_LEVEL + ' needed' : busy ? 'On a project' : '' }));
+      body.appendChild(ui.btn('Change job', () => jobScreen(id), { cls: 'big', disabled: lowLv || busy, sub: lowLv ? [lockSub(), ' ', lvBox(D.JOB_LEVEL)] : busy ? 'On a project' : '' }));
       body.appendChild(ui.btn('Let go', () => ui.confirm('Let ' + st.name + ' go for good?', () => { const r = Core.act('fire', id); if (r.ok) { ui.toast(st.name + ' left'); later(() => api.pop()); } }, { danger: true, yes: 'Let go' }), { cls: 'danger', disabled: busy, sub: busy ? 'On a project' : '' }));
     } });
   }
@@ -880,7 +971,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     } });
   }
   function hireOptions(api) {
-    const s = S(), full = s.staff.length >= E.staffCap(s), out = s.hiring ? (E.hiringInfo ? E.hiringInfo(s) : null) : null;
+    const s = S(), full = s.staff.length >= E.staffCap(s) || !allow('hire'), out = s.hiring ? (E.hiringInfo ? E.hiringInfo(s) : null) : null;
     if (s.hiring) return row({ img: pUrl('headhunter', 3), title: out ? out.detail : 'Advert', sub: out ? wkc(out.weeksLeft) : 'Out', extra: ui.bar(out ? out.progress : 0), tap: () => ui.toast('Applicants arrive soon.') });
     return ui.choices(E.hireTiers(s).map(t => ({ label: t.name, note: full ? 'Staff room full' : t.lock ? 'Needs ' + t.lock : [t.note, t.weeks ? ' · ' : '', t.weeks ? ui.sym('time', { scale: 2, label: 'Weeks', text: 'wk' }) : null, t.weeks ? ' ' + t.weeks : ''], cost: t.cost, disabled: full || !!t.lock })), i => {
       const r = Core.act('advertise', i); if (!r.ok) return;
@@ -900,24 +991,28 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   }
   function candidatesDef() {
     return { id: 'staff-candidates', title: 'Who turned up', render(body, api) {
-      const s = S(), full = s.staff.length >= E.staffCap(s); body.appendChild(staffCapChip()); body.appendChild(keyRow('s'));
-      body.appendChild(rows((s.candidates || []).map((c, i) => row({ img: pUrl(c.role, 3), title: c.name, sub: D.ROLES[c.role].name + ' · Lv ' + c.lvl, line: el('span', { cls: 'mn-cl' }, [c.star ? ui.sym('star', { scale: 2, label: 'Standout', text: '*' }) : null].concat(SKILLS.map(k => K(k, c[k])))),
+      const s = S(), full = s.staff.length >= E.staffCap(s); body.appendChild(staffCapChip());
+      body.appendChild(rows((s.candidates || []).map((c, i) => row({ img: pUrl(c.role, 3), title: c.name, sub: [D.ROLES[c.role].name, ' ', lvBox(c.lvl)], line: el('span', { cls: 'mn-cl' }, [c.star ? ui.sym('star', { scale: 2, label: 'Standout', text: '*' }) : null].concat(SKILLS.map(k => K(k, c[k])))),
         act: ui.btn('Hire', guard(() => { const r = Core.act('hireCandidate', i); if (r.ok) { ui.toast(c.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', disabled: full, sub: full ? 'Staff full' : money(E.salary(c)) + '/wk' }) })), 'Nobody left.'));
     } };
   }
   function candidatesScreen() { push(candidatesDef()); }
 
   // ------------------------------------------------------------------ RESEARCH
+  const RGROUPS = [['Regions', 'Regions', () => pUrl('explorer', 5)], ['Know-how', 'Know-how', () => iUrl('m-research', 6)], ['Facilities', 'Facilities', () => bUrl('gift', 3)], ['Event themes', 'Themes', () => iUrl('ready-event', 6)], ['Landmarks', 'Landmarks', () => bUrl('gate', 3)]];
+  const researchItems = () => { const s = S(); return E.researchList(s).filter(x => allow('research', x.id)); };
+  const researchReady = () => { try { const s = S(); return researchItems().filter(x => !x.done && !x.lock && x.rp <= s.rp).length; } catch (e) { return 0; } };
   function researchScreen() {
     push({ id: 'research', title: 'Research', render(body) { body.classList.add('mn-tight');
-      const s = S(), all = E.researchList(s), groups = [['Regions', 'Regions', pUrl('explorer', 5)], ['Know-how', 'Know-how', iUrl('m-research', 6)], ['Facilities', 'Facilities', bUrl('gift', 3)], ['Event themes', 'Themes', iUrl('ready-event', 6)], ['Landmarks', 'Landmarks', bUrl('gate', 3)]];
+      const s = S(), all = researchItems();
       body.appendChild(el('div', { cls: 'mn-kv' }, span('k', ui.sym('rp', { scale: 3, label: 'Research', text: 'RP' })), span('v', rpc(s.rp))));
-      body.appendChild(fitGrid(groups.map(g => { const items = all.filter(x => x.group === g[0]), n = items.filter(x => !x.done && !x.lock && x.rp <= s.rp).length; return { icon: g[2], label: g[1], sub: items.filter(x => x.done).length + '/' + items.length, badge: n || false, onTap: () => researchGroup(g[0], g[1]) }; }), 2));
+      const boxes = RGROUPS.map(g => { const items = all.filter(x => x.group === g[0]), n = items.filter(x => !x.done && !x.lock && x.rp <= s.rp).length; return items.length ? { icon: g[2](), label: g[1], sub: items.filter(x => x.done).length + '/' + items.length, alert: n > 0, onTap: () => researchGroup(g[0], g[1]) } : null; }).filter(Boolean);
+      body.appendChild(fitGrid(boxes, 2));
     } });
   }
   function researchGroup(group, label) {
     push({ id: 'research-list', title: label, render(body, api) {
-      const s = S(), items = E.researchList(s).filter(x => x.group === group);
+      const s = S(), items = researchItems().filter(x => x.group === group);
       items.sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0));
       body.appendChild(el('div', { cls: 'mn-kv' }, span('k', ui.sym('rp', { scale: 3, label: 'Research', text: 'RP' })), span('v', rpc(s.rp))));
       body.appendChild(rows(items.map(x => {
@@ -932,16 +1027,16 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   // ------------------------------------------------------------------ INFO
   function infoScreen() {
     push({ id: 'info', title: 'Info', render(body) { body.classList.add('mn-tight');
-      const s = S();
+      const s = S(), ch = inCh();   // a challenge has no years, awards, rankings or secret places
       body.appendChild(fitGrid([
         { icon: iUrl('m-info', 6), label: 'Book', sub: E.speciesCount(s) + ' found', onTap: bookScreen },
         { icon: iUrl('star', 6), label: 'Combos', sub: comboFound() + '/' + D.COMBOS.length, onTap: comboScreen },
         { icon: iUrl('heart', 6), label: 'Fits', onTap: fitScreen },
-        { icon: iUrl('choice', 6), label: 'Rumors', onTap: rumorScreen },
-        { icon: iUrl('rep', 6), label: 'Ranks', sub: E.rankings(s).place + ' of ' + E.rankings(s).of, onTap: rankScreen },
-        { icon: iUrl('rp', 6), label: 'Years', sub: s.history.length ? String(s.history.length) : '', onTap: yearsScreen },
-        { icon: iUrl('coin', 6), label: 'Awards', onTap: awardsScreen },
-        Core.devTools ? { icon: iUrl('m-system', 6), label: 'Log', onTap: () => Core.screens.log() } : null
+        ch ? null : { icon: iUrl('choice', 6), label: 'Rumors', onTap: rumorScreen },
+        ch ? null : { icon: iUrl('rep', 6), label: 'Ranks', sub: E.rankings(s).place + ' of ' + E.rankings(s).of, onTap: rankScreen },
+        ch ? null : { icon: iUrl('rp', 6), label: 'Years', sub: s.history.length ? String(s.history.length) : '', onTap: yearsScreen },
+        ch ? null : { icon: iUrl('coin', 6), label: 'Awards', onTap: awardsScreen },
+        Core.devTools ? { icon: iUrl('m-system', 6), label: 'Log', onTap: logScreen } : null
       ].filter(Boolean), 2));
     } });
   }
@@ -1013,15 +1108,28 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     } });
   }
 
-  // ----- rumors
+  // ----- rumors: one short screen. Each secret place is a row of tick boxes; the special visitors are a grid of faces. Tap for the hint.
   function rumorScreen() {
-    push({ id: 'rumors', title: 'Rumors', render(body) {
+    push({ id: 'rumors', title: 'Rumors', render(body) { body.classList.add('mn-tight');
       const s = S();
-      body.appendChild(rows(E.secretHints(s).map(x => el('div', { cls: 'row', style: { flexDirection: 'column', alignItems: 'stretch', gap: '4px' } },
-        el('span', { cls: 't' }, x.done ? x.name : 'An unmarked place'), x.steps.map(st => el('div', { cls: 'mn-lg' }, el('i', { cls: 'mn-box' + (st.ok ? ' ok' : '') }), span('', st.t + (st.prog ? ' ' + st.prog : ''))))))));
-      if (s.fragments) body.appendChild(el('div', { cls: 'mn-pips' }, [1, 2, 3, 4].map(i => el('i', { cls: i <= s.fragments ? 'on' : '' }))));
-      body.appendChild(ui.section('Special visitors'));
-      body.appendChild(rows(D.VIPS.map(v => row({ img: pUrl('vip', 3), title: s.vips[v.id] != null ? v.name : 'After ' + v.when, sub: s.vips[v.id] != null ? 'Visited' : null, off: s.vips[v.id] == null }))));
+      body.appendChild(el('div', { cls: 'list' }, E.secretHints(s).map(x => {
+        const next = x.steps.find(st => !st.ok), marks = x.steps.map(st => {
+          const m = /^(\d+)\/(\d+)$/.exec(st.prog || '');
+          if (m && +m[2] <= 6) return el('span', { cls: 'mn-pips sm' }, Array.from({ length: +m[2] }, (_, i) => el('i', { cls: i < +m[1] ? 'on' : '' })));
+          return span('mn-stp', el('i', { cls: 'mn-box' + (st.ok ? ' ok' : '') }), st.prog ? ' ' + st.prog : '');
+        });
+        return row({ img: ui.sym(x.done ? 'ok' : 'lock', { scale: 4, label: x.done ? 'Found' : 'Hidden' }), title: x.done ? x.name : '?', extra: el('span', { cls: 'mn-steps' }, marks), tap: () => ui.toast(x.done ? x.name : next ? next.t : '?') });
+      })));
+      body.appendChild(el('div', { cls: 'mn-vips' }, D.VIPS.map(v => { const seen = s.vips[v.id] != null;
+        return el('button', { type: 'button', cls: 'mn-vip' + (seen ? ' seen' : ''), 'aria-label': seen ? v.name : 'Not yet', tap: guard(() => ui.toast(seen ? v.name : 'After ' + v.when)) }, imgEl(pUrl('vip', 3), seen ? '' : 'mn-sil'), seen ? symS('ok', 'Visited') : span('q', '?')); })));
+    } });
+  }
+  // ----- log: just the copy button (the play log is pasted into a chat to tune the game) and a file copy
+  function logScreen() {
+    push({ id: 'log', title: 'Log', render(body) { body.classList.add('mn-tight');
+      let kb = 0; try { kb = Math.ceil(Core.logText().length / 1024); } catch (e) { /* ignore */ }
+      body.appendChild(ui.btn('Copy', () => Core.copyLog(), { cls: 'primary big mn-copy', icon: iUrl('m-info', 3), sub: kb + ' KB' }));
+      body.appendChild(ui.btn('Save as file', () => Core.downloadLog(), { cls: 'big' }));
     } });
   }
 
@@ -1062,30 +1170,35 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       body.appendChild(el('div', { cls: 'btnrow' },
         ui.btn('Save now', () => { const ok = Core.save(); ui.toast(ok === false ? 'Not saved' : 'Saved', ok === false ? 'bad' : 'good'); }, { cls: 'primary big', icon: iUrl('m-system', 3) }),
         ui.btn('Title screen', toTitle, { cls: 'big' })));
+      const ch = inCh();
       body.appendChild(el('div', { cls: 'mn-setrow' }, span('mn-lab', 'Speed'), ui.tabs([{ id: '1', label: '1x' }, { id: '2', label: '2x' }], String(Core.speed), id => { Core.setSpeed(+id); api.rerender(); })));
       if (window.ZRender && ZRender.getZoom) body.appendChild(el('div', { cls: 'mn-setrow' }, span('mn-lab', 'Zoom'), ui.tabs([{ id: '1', label: 'Close' }, { id: '0', label: 'Far' }], String(ZRender.getZoom()), id => { ZRender.setZoom(+id); api.rerender(); })));
-      body.appendChild(el('div', { cls: 'btnrow' }, ui.btn('How to play', howScreen, { cls: 'big' }), ui.btn('Replay tutorial', () => { startTutorial(); Core.popAll(); }, { cls: 'big' })));
+      body.appendChild(el('div', { cls: 'btnrow' }, ui.btn('How to play', howScreen, { cls: 'big' }), ch
+        ? ui.btn('Restart level', () => ui.confirm('Restart this level from the beginning?', () => { Core.startChallenge(Core.challengeId); }, { danger: true, yes: 'Restart' }), { cls: 'big warn', icon: iUrl('level', 3) })
+        : ui.btn('Replay tutorial', () => { startTutorial(); Core.popAll(); }, { cls: 'big' })));
       if (Core.devTools && Core.screens && Core.screens.screenCheck) body.appendChild(ui.btn('Screen check', () => Core.screens.screenCheck(), { cls: 'ghost' }));
     } });
   }
   function toTitle() {
+    if (inCh()) { editStop(); if (Core.leaveChallenge) Core.leaveChallenge(); else Core.toTitle(); return; }   // saves the run so it can be continued; zoo slots untouched
+    editStop();
     try { Core.save(); } catch (e) { /* ignore */ }
     recordLegacy();
     if (Core.toTitle) Core.toTitle(); else ui.toast('No title screen yet', 'bad');
   }
   function howScreen() {
     push({ id: 'how', title: 'How to play', render(body) {
-      const L = [['m-system', 'Tap the zoo for the menu. Time stops.'], ['m-animals', 'Expeditions bring animals. House them.'], ['ready-breed', 'Heart: a pair can breed.'], ['ready-event', 'Flag: an event can start.'], ['choice', '!: something needs you.'], ['m-build', 'Build, then tap a hex and Place.'], ['star', 'You cannot lose. 20 years, then a score.']];
+      const L = [['m-system', 'Tap the zoo for the menu. Time stops.'], ['m-animals', 'Expeditions bring animals. House them.'], ['ready-breed', 'Heart: a pair can breed.'], ['ready-event', 'Flag: an event can start.'], ['choice', '!: something needs you.'], ['edit', 'Edit: add, move or sell things.'], ['star', 'You cannot lose. 20 years, then a score.']];
       body.appendChild(rows(L.map(l => row({ img: iUrl(l[0], 4), title: l[1] }))));
       const lg = (icon, word) => el('div', { cls: 'lg' }, typeof icon === 'string' ? ui.sym(icon, { scale: 3, label: word, text: word.slice(0, 2) }) : icon, span('', word));
       const nm = (tbl, k, d) => (tbl && tbl[k] && tbl[k].name) || d;
-      const badge = el('span', { cls: 'badge', style: { position: 'static', display: 'inline-block' } }, '2');
+      const waiting = el('span', { cls: 'mn-albox alert' });   // the gold pulsing frame that marks a button with something waiting
       const grp = (t, items) => { body.appendChild(ui.section(t)); body.appendChild(el('div', { cls: 'mn-legend' }, items)); };
       grp('Symbols', [].concat(ASTATS.map(k => lg(aIcon(k), nm(D.ASTAT, k, k))), SKILLS.map(k => lg(kIcon(k), nm(D.SKILL, k, k))),
-        [lg('sex-m', 'Male'), lg('sex-f', 'Female'), lg('juv', 'Baby'), lg('new', 'New'), lg('ok', 'Done'), lg('lock', 'Locked'), lg('odds', 'Odds'), lg('time', 'Weeks')],
+        [lg('sex-m', 'Male'), lg('sex-f', 'Female'), lg('juv', 'Baby'), lg('new', 'New'), lg('ok', 'Done'), lg('lock', 'Locked'), lg('odds', 'Odds'), lg('time', 'Weeks'), lg('best', 'Best of kind'), lg(lvBox(3), 'Staff level')],
         ['d', 'c', 'b', 'a', 's', 'ss'].map(g => lg('grade-' + g, 'Grade ' + g.toUpperCase()))));
       grp('Zoo', [lg('coin', 'Money'), lg('rp', 'Research'), lg('rep', 'Fame'), lg('visitors', 'Visitors'), lg(ui.stars(3, 3), 'Rank'), lg(ui.flames(2, 3), 'Buzz'), lg('habitat', 'Habitat'), lg('pen', 'Pen'), lg('land', 'Land'), lg('trophy', 'Trophy'), lg('star', 'Rarity'),
-        lg('medal-gold', 'Gold'), lg('medal-silver', 'Silver'), lg('medal-bronze', 'Bronze'), lg(badge, 'Needs you')]);
+        lg('medal-gold', 'Gold'), lg('medal-silver', 'Silver'), lg('medal-bronze', 'Bronze'), lg(waiting, 'Needs you'), lg('edit', 'Edit'), lg('move', 'Move'), lg('sell', 'Sell'), lg('level', 'Challenge')]);
       grp('Buying', [lg('new', 'New species'), lg(span('mn-cmp', sexSym({ sex: 'F' }), '+'), 'Other sex'), lg(imgEl(pixIcon('up', '#58b84a', 2)), 'Better'), lg(imgEl(pixIcon('down', '#e0584a', 2)), 'Worse'), lg(span('mn-cmp', '+-'), 'Mixed')]);
       grp('On the floor', [lg('ready-event', 'Event ready'), lg('ready-breed', 'Pair ready'), lg('busy', 'Working'), lg('sick', 'Unwell'), lg('choice', 'Answer me'), lg(el('span', { style: { width: '40px' } }, ui.bar(0.6)), 'Progress'), lg('flame', 'Buzz')]);
       body.appendChild(ui.note('-- - + ++ : poor to great.'));
@@ -1094,7 +1207,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
 
   // ----- legacy and new zoo
   function recordLegacy() {
-    const s = S(); if (!s || !s.finished || !s.score) return false;
+    const s = S(); if (!s || !s.finished || !s.score || inCh() || s.ch) return false;
     s.flags = s.flags || {}; if (s.flags.legacySaved) return false;
     s.flags.legacySaved = true;
     const L = Core.legacy, last = s.history[s.history.length - 1];
@@ -1132,7 +1245,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
       body.classList.add('mn-tight');
       body.appendChild(el('div', { cls: 'mn-logo' }, imgEl(logoUrl('WILDSIDE', 6, '#ffcf33', '#fff2a8'), 'lg1'), imgEl(logoUrl('ZOO', 9, '#58b84a', '#a8f08c'), 'lg2')));
       body.appendChild(el('div', { cls: 'mn-scene' }, ['zebra', 'giraffe', null, 'lion', 'elephant'].map(id => (id ? imgEl(spUrl(id, {}, 2)) : imgEl(gateUrl())))));
-      body.appendChild(el('div', { cls: 'mn-slots' }, (() => { const all = Core.slots(), used = all.filter(x => !x.empty), best = used.length ? used.reduce((a, b) => ((b.savedAt || 0) > (a.savedAt || 0) ? b : a)) : null; return all.map(sl => slotCard(sl, api, best && sl.slot === best.slot)); })()));
+      body.appendChild(el('div', { cls: 'mn-slots' }, (() => { const all = Core.slots(), used = all.filter(x => !x.empty), best = used.length ? used.reduce((a, b) => ((b.savedAt || 0) > (a.savedAt || 0) ? b : a)) : null; return all.map(sl => slotCard(sl, api, best && sl.slot === best.slot)).concat([challengeEntry()]); })()));
     } });
   }
   function slotCard(sl, api, recent) {
@@ -1145,6 +1258,43 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
           el('span', { cls: 'mn-sline' }, ui.stars(sl.rankStars || 1, 10), ' ', [cnt('m-animals', sl.animals || 0)], sl.finished ? ' · Done' : ''))),
       el('button', { type: 'button', cls: 'mn-del', 'aria-label': 'Delete slot ' + sl.slot, tap: guard(() => ui.confirm('Delete "' + sl.zooName + '" for good?', () => { Core.deleteSlot(sl.slot); if (Core.stack().slice(-1)[0] === 'title') api.rerender(); }, { danger: true, yes: 'Delete' })) }, imgEl(pixIcon('remove', '#9a8a70', 2))));
     return card;
+  }
+  // ----- challenges: a fourth entry on the title, then the line of levels
+  const levels = () => (Array.isArray(D.LEVELS) ? D.LEVELS : []);
+  const chStars = () => { try { return (Core.challengeStars && Core.challengeStars()) || {}; } catch (e) { return {}; } };
+  const chSaved = () => { try { return (Core.challengeSaved && Core.challengeSaved()) || null; } catch (e) { return null; } };
+  const star3 = n => el('span', { cls: 'mn-s3', 'aria-label': n + ' of 3 stars' }, [0, 1, 2].map(i => ui.sym(i < n ? 'star-on' : 'star-off', { scale: 2, label: '', text: i < n ? '*' : '.' })));
+  function challengeEntry() {
+    const L = levels(); if (!L.length || !Core.startChallenge) return null;
+    const st = chStars(), got = L.reduce((n, lv) => n + Math.min(3, st[lv.id] || 0), 0), sv = chSaved();
+    return el('button', { type: 'button', cls: 'mn-slot mn-chal', 'aria-label': 'Challenges', tap: guard(challengesScreen) }, imgEl(iUrl('level', 3), 'mn-chi'), span('mn-new', 'Challenges'),
+      sv ? span('mn-cont', 'Continue') : null, span('mn-chs', symS('star-on', 'Stars'), ' ' + got + '/' + L.length * 3));
+  }
+  // One level as a card: its number, the goal (symbol and number), what is different about it (symbols), the stars earned.
+  function levelCard(lv, open, stars, on, tap) {
+    const g = lv.goal || {}, line = (...k) => el('span', { cls: 'ln' }, ...k);
+    const gv = g.kind === 'bred' ? ui.sym('grade-' + String(E.grade(g.target)).toLowerCase(), { scale: 2, label: 'Grade', text: String(E.grade(g.target)) }) : g.kind === 'rank' ? [String(g.target), symS('star-on', 'Stars')] : short(g.target);
+    const lines = [line(symS('time', 'Weeks'), String(lv.weeks)), line(symS('coin', 'Start money'), short(lv.money)), line(symS('land', 'Map rows'), String(lv.rows))];
+    if (lv.biomes) lines.push(line(symS('lock', 'Only'), lv.biomes.map(b => imgEl(tUrl('hab:' + b, 1), 'tile'))));
+    if (lv.maxHabs) lines.push(line(symS('habitat', 'Habitats at most'), String(lv.maxHabs)));
+    (lv.no || []).forEach(n => lines.push(line(symS('no', 'No ' + n), n === 'expedition' ? imgEl(pUrl('explorer', 1), 'tile') : n)));
+    if (lv.animals && lv.animals.length) lines.push(line(symS('m-animals', 'Animals to start'), String(lv.animals.length)));
+    return el('button', { type: 'button', cls: 'mn-lvc' + (on ? ' on' : '') + (open ? '' : ' off'), 'data-level': lv.id, 'aria-label': 'Level ' + lv.n + (open ? '' : ' locked'), tap: guard(tap) },
+      span('num', String(lv.n)), el('span', { cls: 'goal' }, symS((D.GOAL_ICON && D.GOAL_ICON[g.kind]) || 'goal', 'Goal', 3), span('gv', gv)), el('span', { cls: 'rs' }, lines), open ? star3(stars) : el('span', { cls: 'mn-s3 lk' }, symS('lock', 'Locked')));
+  }
+  function challengesScreen() {
+    let pick = null;
+    push({ id: 'challenges', title: 'Challenges', render(body, api) {
+      body.classList.add('mn-tight');
+      const L = levels(), st = chStars(), sv = chSaved(), open = i => i === 0 || (st[L[i - 1].id] || 0) >= 1;
+      if (pick == null || !open(L.findIndex(x => x.id === pick))) { const idx = L.map((x, i) => i).filter(open), fresh = idx.find(i => !(st[L[i].id] > 0)); pick = sv && L.some(x => x.id === sv.levelId) ? sv.levelId : L[fresh != null ? fresh : idx[idx.length - 1]].id; }
+      const cur = L.find(x => x.id === pick);
+      body.appendChild(el('div', { cls: 'mn-lvline' }, L.map((lv, i) => levelCard(lv, open(i), Math.min(3, st[lv.id] || 0), lv.id === pick, () => { if (!open(i)) { ui.toast('Finish level ' + i + ' first', 'bad'); return; } pick = lv.id; api.rerender(); }))));
+      const svL = sv ? L.find(x => x.id === sv.levelId) : null;
+      if (svL) body.appendChild(ui.btn('Continue', () => { if (!Core.resumeChallenge()) ui.toast('Could not open that level', 'bad'); }, { cls: 'blue big mn-chcont', icon: iUrl('level', 3), sub: [String(svL.n), ' ', symS('time', 'Week'), ' ' + sv.week] }));
+      const go = () => { Core.startChallenge(cur.id); };
+      body.appendChild(ui.btn('Start', () => { if (svL && !sv.over) ui.confirm('Start level ' + cur.n + ' from the beginning? The level in progress is lost.', go, { yes: 'Start' }); else go(); }, { cls: 'primary big mn-chstart', icon: iUrl('level', 3), sub: String(cur.n) }));
+    } });
   }
   const nz = { slot: 1, name: 'Wildside Zoo', tut: true, staff: null, animal: null };
   function newZooName(slot) {
@@ -1169,7 +1319,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     if (!(L.runs && L.carry && ((L.carry.staff && L.carry.staff.length) || (L.carry.animals && L.carry.animals.length)))) { startNewZoo(); return; }
     push({ id: 'newzoo-carry', modal: true, title: 'Bring along', render(body, api) {
       body.appendChild(kv('Start money', '+' + money(Math.min(L.runs, 5) * 6000))); body.appendChild(kv('Research', '+' + Math.min(5, L.runs) * 10 + '%'));
-      if (L.carry.staff && L.carry.staff.length) body.appendChild(el('div', { cls: 'list' }, L.carry.staff.map((st, i) => row({ img: pUrl(st.role, 3), title: st.name, sub: D.ROLES[st.role].name + ' · Lv ' + st.lvl, cls: nz.staff === i ? 'mn-on' : '', tap: () => { nz.staff = nz.staff === i ? null : i; api.rerender(); } }))));
+      if (L.carry.staff && L.carry.staff.length) body.appendChild(el('div', { cls: 'list' }, L.carry.staff.map((st, i) => row({ img: pUrl(st.role, 3), title: st.name, sub: [D.ROLES[st.role].name, ' ', lvBox(st.lvl)], cls: nz.staff === i ? 'mn-on' : '', tap: () => { nz.staff = nz.staff === i ? null : i; api.rerender(); } }))));
       if (L.carry.animals && L.carry.animals.length) body.appendChild(el('div', { cls: 'list' }, L.carry.animals.map((a, i) => row({ img: spUrl(a.sp, { variant: !!a.variant }, 2), title: a.name, sub: E.animalLabel(a), cls: nz.animal === i ? 'mn-on' : '', tap: () => { nz.animal = nz.animal === i ? null : i; api.rerender(); } }))));
       body.appendChild(el('div', { cls: 'btnrow' }, ui.btn('Back', () => api.pop(), { cls: 'ghost big' }), ui.btn('Start', startNewZoo, { cls: 'primary big' })));
     } });
@@ -1188,20 +1338,21 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   const count = (s, t) => s.items.filter(i => i.t === t).length;
   const isOpen = s => (E.isOpen ? E.isOpen(s) : s.items.some(i => i.k === 'hab'));
   const habCount = s => s.items.filter(i => i.k === 'hab').length;
-  const BLANK_GLOW = { menu: 'Build', build: 'Habitats', 'build-habs': 'Savanna' };   // the obvious first move on bare land, tutorial or not
+  const BLANK_GLOW = { menu: 'Edit' }, BLANK_EDIT = ['hab', 'hab:savanna'];   // the obvious first move on bare land, tutorial or not
   const TUT = [
-    { text: 'Tap your land to open the menu.', done: () => Core.stack().length > 0, glow: BLANK_GLOW },
-    { text: 'Build, Habitats: place a Savanna home.', done: (s, b) => habCount(s) > (b.hab || 0) && (moveInHandled || !s.items.some(i => i.k === 'hab' && movableIds(i.id).length)), glow: BLANK_GLOW, hold: 2600 },
-    { text: 'Now place a Snack Stand.', done: (s, b) => count(s, 'snack') > (b.snack || 0), glow: { menu: 'Build', build: 'Facilities', 'build-facs': 'Snack Stand' } },
-    { text: 'Place a Bench next to the stand.', done: (s, b) => count(s, 'bench') > (b.bench || 0), glow: { menu: 'Build', build: 'Facilities', 'build-facs': 'Garden Bench' } },
-    { text: 'Flag on the habitat: hold an event.', done: (s, b) => didN(s, 'startEvent') > (b.startEvent || 0), glow: { menu: 'Projects', projects: 'Event', 'event-habs': 'Savanna', 'event-theme': 'Feeding' } },
+    { text: 'Tap your land to open the menu.', done: () => Core.stack().length > 0 || edit.on, glow: BLANK_GLOW, edit: BLANK_EDIT },
+    { text: 'Edit: place a Savanna home.', done: (s, b) => habCount(s) > (b.hab || 0) && (moveInHandled || !s.items.some(i => i.k === 'hab' && movableIds(i.id).length)), glow: BLANK_GLOW, edit: BLANK_EDIT, hold: 2600 },
+    { text: 'Now place a Snack Stand.', done: (s, b) => count(s, 'snack') > (b.snack || 0), glow: { menu: 'Edit' }, edit: ['shop', 'fac:snack'] },
+    { text: 'Place a Bench near the stand.', done: (s, b) => count(s, 'bench') > (b.bench || 0), glow: { menu: 'Edit' }, edit: ['fun', 'fac:bench'] },
+    { text: 'Flag on the habitat: hold an event.', done: (s, b) => didN(s, 'startEvent') > (b.startEvent || 0), glow: { menu: 'Projects', projects: 'Event', 'event-habs': 'Savanna', 'event-setup': 'Start' } },
     { text: "That's it. Tap the zoo any time.", auto: 7000 }
   ];
+  const setWant = w => { edit.wantDone = false; const k = w ? w.join() : ''; if (k !== edit.wantKey) { edit.want = w || null; edit.wantKey = k; if (w && edit.on && edit.sel == null) edit.grp = w[0]; } };
   const PLACE_TEXT = 'Tap a spot, then Place.';
   let holdUntil = 0;
   let coachEl = null, coachSince = 0, coachStep = -1, tutTimer = 0;
   function startTutorial() {
-    const s = S(); if (!s) return;
+    const s = S(); if (!s || inCh()) return;
     s.ui = s.ui || {};
     s.ui.tutorial = { on: true, step: 0, b: { startExpedition: didN(s, 'startExpedition'), startEvent: didN(s, 'startEvent'), bench: count(s, 'bench'), snack: count(s, 'snack'), hab: habCount(s) } };
     try { Core.save(); } catch (e) { /* ignore */ }
@@ -1215,7 +1366,8 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
   }
   function tutTick() {
     const s = S(), t = s && s.ui && s.ui.tutorial;
-    if (!t || !t.on) { coachRemove(); applyGlow(s && !isOpen(s) ? BLANK_GLOW : null); return; }
+    if (s && inCh()) { coachRemove(); applyGlow(null); setWant(null); return; }   // no tutorial inside a challenge
+    if (!t || !t.on) { coachRemove(); applyGlow(s && !isOpen(s) ? BLANK_GLOW : null); setWant(s && !isOpen(s) ? BLANK_EDIT : null); return; }
     const stackNow = Core.stack();
     if (stackNow.indexOf('title') >= 0) { coachRemove(); return; }
     let changed = false, g = 0;
@@ -1227,7 +1379,8 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     }
     if (t.on && TUT[t.step] && TUT[t.step].auto) { if (!coachSince) coachSince = Date.now(); if (Date.now() - coachSince > TUT[t.step].auto && !Core.busy) { t.on = false; changed = true; } }
     if (changed) { try { Core.save(); } catch (e) { /* ignore */ } }
-    if (!t.on) { coachRemove(); return; }
+    if (!t.on) { coachRemove(); setWant(null); return; }
+    setWant(TUT[t.step].edit || null); edit.wantDone = !TUT[t.step].edit && !TUT[t.step].auto;   // nothing more to place: Done is the next tap
     const st = TUT[t.step], layers = [...document.querySelectorAll('.layer:not([hidden])')], top = layers[layers.length - 1];
     if (Core.busy || (top && top.classList.contains('modal')) || Date.now() < holdUntil) { coachRemove(); applyGlow(null); return; }   // pop-ups from the game come first; after a step the floor gets a moment to show what happened
     if (!coachEl) {
@@ -1243,20 +1396,17 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
     // keep clear of the placement note (it sits just under the top strip while placing)
     if (!panel) { let topPx = 6; const note = document.getElementById('placement-note'); if (placing && note && note.textContent) { const nr = note.getBoundingClientRect(), sr = stage.getBoundingClientRect(); topPx = Math.max(6, nr.bottom - sr.top + 6); } coachEl.style.top = topPx + 'px'; }
     applyGlow(st.glow || (!isOpen(s) ? BLANK_GLOW : null));
-    return;
-    // (old highlight code kept below for reference, unreachable)
-    const id = stackNow[stackNow.length - 1];
-    if (top && st.glow && st.glow[id]) { const want = st.glow[id]; [...top.querySelectorAll('button, .row.tappable')].some(b => { if (b.textContent.trim().indexOf(want) === 0 && !b.classList.contains('disabled')) { b.classList.add('mn-glow'); return true; } return false; }); }
   }
-  function startTicker() { if (!tutTimer) tutTimer = setInterval(() => { try { tutTick(); } catch (e) { /* never break play */ } }, 300); }
+  function startTicker() { if (!tutTimer) tutTimer = setInterval(() => { try { tutTick(); } catch (e) { /* never break play */ } try { editSync(); } catch (e) { /* never break play */ } }, 300); }
   startTicker();
 
   // ------------------------------------------------------------------ public
   window.ZMenus = {
     open, title, startTutorial, init() { /* nothing to register */ }, recordLegacy,
-    screens: { main: open, projects: projectsScreen, build: buildScreen, animals: () => animalsScreen('zoo'), staff: staffScreen, research: researchScreen, info: infoScreen, system: systemScreen,
-      book: bookScreen, combos: comboScreen, fits: fitScreen, rumors: rumorScreen, ranks: rankScreen, years: yearsScreen, awards: awardsScreen, how: howScreen, newZoo: () => newZooName(1),
+    edit: editMode, stopEdit: editStop, editing: () => edit.on,
+    screens: { main: open, projects: projectsScreen, animals: () => animalsScreen('zoo'), staff: staffScreen, research: researchScreen, info: infoScreen, system: systemScreen,
+      book: bookScreen, combos: comboScreen, fits: fitScreen, rumors: rumorScreen, ranks: rankScreen, years: yearsScreen, awards: awardsScreen, how: howScreen, log: logScreen, challenges: challengesScreen, newZoo: () => newZooName(1),
       candidates: candidatesScreen, whoTurnedUp: candidatesScreen, expedition: expStart, breeding: breedPairs, event: eventHabsScreen, campaigns: campaignScreen, hire: hireScreen, market: () => animalsScreen('market'), pen: () => animalsScreen('pen'), crate: crateScreen,
-      animal: animalScreen, staffer: staffDetail, habitats: habitatList, facilities: facilityList, move: moveList, remove: removeList, upgrade: upgradeList, land: landScreen, yearly: yearlyScreen, show: showScreen, decision: happeningScreen }
+      animal: animalScreen, staffer: staffDetail, yearly: yearlyScreen, show: showScreen, decision: happeningScreen }
   };
 })();

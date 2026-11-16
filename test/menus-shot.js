@@ -63,6 +63,11 @@ async function run(name) {
   async function chipCheck(label) { const r = await ev(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), cs = [...L.querySelectorAll('.row .chip:not(.grade), .mn-at .chip:not(.grade)')]; return { n: cs.length, bad: cs.filter(c => c.querySelector('b') || !/^[0-9?!*]+$/.test(c.textContent.trim()) || !c.querySelector('img.sym')).map(c => c.textContent.trim().slice(0, 12)) }; }); check(r.n > 0 && r.bad.length === 0, label + ': ' + r.n + ' chips are icon plus number, no letter labels' + (r.bad.length ? ' BAD ' + r.bad.join('|') : '')); }
   async function back() { await tap('Back'); }
 
+  // Edit mode helpers: the strip at the bottom of the floor
+  const ebar = () => ev(() => { const b = document.getElementById('edit-bar'); if (!b) return null; const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-b')) || 0, bs = [...b.querySelectorAll('button')].map(x => x.getBoundingClientRect()); return { shown: !b.hidden && b.getBoundingClientRect().height > 0, cards: [...b.querySelectorAll('.mn-ec')].map(x => x.dataset.key + (x.classList.contains('off') ? '!' : '')), acts: [...b.querySelectorAll('.mn-ea, .mn-eact .mn-up')].map(x => x.getAttribute('aria-label')), small: bs.filter(r => r.width < 43.5 || r.height < 43.5).length, below: bs.filter(r => r.bottom > innerHeight - inset + 0.5).length, glow: [...b.querySelectorAll('.mn-glow')].map(x => x.dataset.key || x.dataset.grp || x.getAttribute('aria-label')) }; });
+  const etap = async (sel, wait) => { const q = await ev(sel => { const e = document.querySelector('#edit-bar ' + sel); if (!e) return null; const st = e.closest('.mn-es'); if (st) st.scrollLeft = Math.max(0, e.offsetLeft - 80); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, sel); if (!q) throw new Error('no edit-bar ' + sel); await page.touchscreen.tap(q.x, q.y); await sleep(wait || 450); };
+  const epick = async id => { if (await ev(() => !!(window.ZRender && ZRender.startEdit))) { const q = await ev(id => { const it = ZE.item(ZT.S, id); ZRender.centerOn(it.q, it.r, true); return new Promise(res => setTimeout(() => { const c = ZRender.hexToClient(it.q, it.r); res({ x: c.x, y: c.y }); }, 400)); }, id); await page.touchscreen.tap(q.x, q.y); await sleep(500); } else { await etap('.mn-et[data-grp="own"]'); await etap('.mn-ec[data-key="own:' + id + '"]', 500); } };
+
   await page.goto(URL); await page.waitForFunction(() => window.ZT && document.documentElement.dataset.ready && window.ZMenus, null, { timeout: 8000 });
   await ev(() => { ZCore.onReport('*', (r, done) => done()); ZT.WEEK_MS[1] = 1e9; ZT.WEEK_MS[2] = 1e9; ZT.S.money = 60000; });
   await sleep(500);
@@ -71,7 +76,7 @@ async function run(name) {
   await page.touchscreen.tap(195, 330); await sleep(500);
   check(await stack() === 'menu', 'tapping the floor opens the main menu (' + await stack() + ')');
   await screen('menu');
-  for (const b of ['Projects', 'Build', 'Animals', 'Staff', 'Research', 'Info', 'System']) check(await ev(b => [...document.querySelectorAll('.layer:not([hidden]) .gbox')].some(x => x.textContent.startsWith(b)), b), 'main menu has ' + b);
+  for (const b of ['Projects', 'Edit', 'Animals', 'Staff', 'Research', 'Info', 'System']) check(await ev(b => [...document.querySelectorAll('.layer:not([hidden]) .gbox')].some(x => x.textContent.startsWith(b)), b), 'main menu has ' + b);
 
   // ---------------------------------------------------------------- staff: hire through an advert, then the rest of the team screens
   await tap('Staff'); await screen('staff'); await chipCheck('staff list');
@@ -101,10 +106,8 @@ async function run(name) {
 
   // event: a habitat with animals, a theme, a host
   await ev(() => { ZT.S.items.forEach(i => { if (i.k === 'hab') i.eventAt = -99; }); });
-  await openMenu(); await tap('Projects'); await tap('Event'); await screen('event-habs');
-  await tap('Savanna'); await screen('event-theme');
-  await tap('Feeding'); await screen('event-lead');
-  await tap(await ev(() => ZT.S.staff.find(s => !ZE.busyStaff(ZT.S)[s.id]).name)); await screen('event-confirm');
+  await openMenu(); await tap('Projects'); await tap('Event'); await screen('event-setup');
+  check((await stack()) === 'menu>projects>event-setup' && await ev(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(); return L.querySelectorAll('.mn-pk.host').length >= 1 && L.querySelectorAll('.mn-pk.theme').length >= 2 && !!L.querySelector('.mn-send'); }), 'event: host, theme and Start are on one screen (' + await stack() + ')');
   await tap('Start', { wait: 600 });
   check(await ev(() => ZT.S.projects.some(p => p.type === 'event')), 'event started');
 
@@ -120,7 +123,7 @@ async function run(name) {
   await openMenu(); await tap('Projects');
   await tap('Savanna'); await screen('project-detail'); await back();
   await ev(() => { const p = ZT.S.projects.find(p => p.type === 'breed'); ZT.S.projects.forEach(x => { x.choice = null; }); p.choice = { key: 'vet', title: 'Call the vet?', text: 'A check-up would help.', who: 'keeper', def: 1, options: [{ label: 'Call the vet', note: 'Better odds, stronger baby', cost: 300 }, { label: 'Wait and see' }] }; });
-  await ev(() => ZT.popAll()); await openMenu(); await screen('menu-badge'); await tap('Projects'); await screen('projects-choice');
+  await ev(() => ZT.popAll()); await openMenu(); await screen('menu-alert'); check(await ev(() => { const g = [...document.querySelectorAll('.layer:not([hidden]) .gbox')].find(x => x.textContent.trim().startsWith('Projects')); return g.classList.contains('alert') && document.querySelectorAll('.badge').length === 0; }), 'a waiting choice puts the gold frame on the Projects box, with no red number box'); await tap('Projects'); await screen('projects-choice');
   await tap('Zebra'); await screen('choice-fallback', 'choice');
   const usedMoments = await ev(() => !!(window.ZMoments && ZMoments.showChoice));
   if (!usedMoments) { await tap('Wait and see'); await sleep(300); check(await ev(() => !ZT.S.projects.some(p => p.choice)), 'pending choice answered from Projects (fallback screen)'); await tap('Tap to continue', { wait: 100 }).catch(() => 0); }
@@ -171,44 +174,47 @@ async function run(name) {
       return new Promise(res => setTimeout(() => { const p = ZRender.hexToClient(q, r); res({ x: p.x, y: p.y, q, r }); }, 350));
     }, { kind, t });
   }
-  await openMenu(); await tap('Build'); await screen('build');
-  await tap('Habitats'); await screen('build-habs');
+  // Edit mode replaces the Build lists and the Move screen (Update 7): the same things are checked through the strip on the map.
+  await openMenu(); await tap('Edit', { wait: 600 }); await shot('edit');
+  let eb = await ebar(); check((await stack()) === '' && eb && eb.shown && eb.small === 0 && eb.below === 0, 'Edit closes the menu and shows the strip, every button at least 44 px (' + JSON.stringify(eb && { small: eb.small, below: eb.below }) + ')');
   const habsBefore = await S(() => ZT.S.items.filter(i => i.k === 'hab').length);
-  await tap('Rainforest', { wait: 700 });
-  check(await ev(() => ZRender.placing() && ZT.stack().length === 0), 'picking a habitat closes the menu and starts placement');
+  await etap('.mn-et[data-grp="hab"]'); await etap('.mn-ec[data-key="hab:jungle"]', 700);
+  check(await ev(() => ZRender.placing() && ZT.stack().length === 0) && !(await ebar()).shown, 'picking a habitat from the strip starts placement');
   await shot('placing-hab');
   let h = await freeHex('hab', 'jungle'); await page.touchscreen.tap(h.x, h.y); await sleep(300);
   await page.tap('#placement-bar .zr-place'); await sleep(500);
   check(await S(() => ZT.S.items.filter(i => i.k === 'hab').length) === habsBefore + 1, 'habitat built through placement');
-  await shot('built-hab');
+  await shot('built-hab'); await sleep(400);
+  check((await ebar()).shown && await ev(() => ZMenus.editing()), 'after the habitat is placed the Edit strip is back');
 
-  await openMenu(); await tap('Build'); await tap('Facilities'); await screen('build-facs');
   const facBefore = await S(() => ZT.S.items.filter(i => i.k === 'fac').length);
-  await tap('Garden Bench', { wait: 700 });
-  for (let i = 0; i < 2; i++) { h = await freeHex('fac', 'bench'); await page.touchscreen.tap(h.x, h.y); await sleep(250); await page.tap('#placement-bar .zr-place'); await sleep(450); }
+  await etap('.mn-et[data-grp="fun"]'); await shot('edit-fun'); await etap('.mn-ec[data-key="fac:bench"]', 700);
+  for (let i = 0; i < 2; i++) { h = await freeHex('fac', 'bench'); await page.touchscreen.tap(h.x, h.y); await sleep(250); await page.tap('#placement-bar .zr-place'); await sleep(450); await dismiss(); }   // a bench can complete a combo: its card is tapped away first
   check(await S(() => ZT.S.items.filter(i => i.k === 'fac').length) === facBefore + 2 && await ev(() => ZRender.placing()), 'two benches built in repeat mode and placement stays on');
   const lbl = await ev(() => document.querySelector('#placement-bar .zr-cancel').textContent.trim()); console.log('  third button after a placement says: ' + lbl);
-  await page.tap('#placement-bar .zr-cancel'); await sleep(500);
-  if (/Done/i.test(lbl)) check((await stack()) === '' && await ev(() => ZT.running()), 'Done returns to the floor with time running'); else check((await stack()) === 'menu>build', 'Cancel returns to Build (renderer still says Cancel)');
-  await openMenu(); await tap('Build'); await tap('Facilities'); await tap('Garden Bench', { wait: 700 });
-  await page.tap('#placement-bar .zr-cancel'); await sleep(500);
-  check((await stack()) === 'menu>build', 'Cancel before placing anything returns to the Build screen (' + await stack() + ')');
-  await tap('Move'); await screen('build-move');
+  await page.tap('#placement-bar .zr-cancel'); await sleep(600);
+  check((await stack()) === '' && (await ebar()).shown && !(await ev(() => ZRender.placing())), 'Done after placing returns to the Edit strip');
+  await etap('.mn-ec[data-key="fac:bench"]', 700); await page.tap('#placement-bar .zr-cancel'); await sleep(600);
+  check((await stack()) === '' && (await ebar()).shown, 'Cancel before placing anything returns to the Edit strip (' + await stack() + ')');
   const benchPos = () => ev(() => JSON.stringify(ZT.S.items.filter(i => i.t === 'bench').map(i => [i.id, i.q, i.r]))); const bp0 = await benchPos();
-  await tap('Garden Bench', { wait: 700 }); h = await freeHex('fac', 'bench');
-  await page.touchscreen.tap(h.x, h.y); await sleep(250); await page.tap('#placement-bar .zr-place'); await sleep(500);
+  const benchId = await ev(() => ZT.S.items.filter(i => i.t === 'bench').pop().id);
+  await epick(benchId); await shot('edit-picked'); eb = await ebar();
+  check(eb.acts.includes('Move') && eb.acts.includes('Sell') && eb.small === 0, 'tapping a thing on the map shows Move and Sell (' + eb.acts.join(', ') + ')');
+  await etap('.mn-ea.move', 700); h = await freeHex('fac', 'bench');
+  await page.touchscreen.tap(h.x, h.y); await sleep(250); await page.tap('#placement-bar .zr-place'); await sleep(600);
   check(await benchPos() !== bp0, 'moved a facility by placement');
-  await openMenu(); await tap('Build'); await tap('Remove'); await screen('build-remove');
+  if (!(await ebar()).acts.includes('Sell')) await epick(benchId);
   const nItems = await S(() => ZT.S.items.length);
-  await tap('Garden Bench'); await screen('remove-confirm', false); await tap('Remove', { nth: 0, wait: 500 });
-  check(await S(() => ZT.S.items.length) === nItems - 1, 'removed a facility after a confirm');
-  await tap('Back');
-  await tap('Upgrade'); await screen('build-upgrade');
-  { const q = await ev(() => { const b = document.querySelector('.layer:not([hidden]) .mn-up'); b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }); await page.touchscreen.tap(q.x, q.y); await sleep(600); }
+  await etap('.mn-ea.sell', 500); await screen('remove-confirm', false); check(await S(() => ZT.S.items.length) === nItems, 'Sell asks first'); await tap('Sell', { nth: 0, wait: 500 });
+  check(await S(() => ZT.S.items.length) === nItems - 1, 'sold (removed) a facility after a confirm');
+  await epick(await ev(() => ZT.S.items.find(i => i.t === 'savanna').id)); await shot('edit-picked-hab');
+  await etap('.mn-eact .mn-up', 700);
   check(await S(() => ZT.S.items.find(i => i.t === 'savanna').lvl) >= 2, 'upgraded a habitat');
-  await back(); await tap('Buy land'); await screen('build-land');
-  const rows0 = await S(() => ZT.S.rows); await tap('Buy', { wait: 500 });
+  for (let i = 0; i < 3 && (await stack()) !== ''; i++) await tap('Not now', { wait: 500 }).catch(() => ev(() => ZT.popAll()));
+  await etap('.mn-ea.back'); await etap('.mn-et[data-grp="hab"]');
+  const rows0 = await S(() => ZT.S.rows); await etap('.mn-ec[data-key="land"]', 500); await screen('land-confirm', false); await tap('Buy', { wait: 500 });
   check(await S(() => ZT.S.rows) > rows0, 'bought land');
+  await etap('.mn-et.done', 500); check(!(await ebar()).shown && !(await ev(() => ZMenus.editing())), 'Done leaves Edit mode');
 
   // ---------------------------------------------------------------- animals
   await ev(() => ZT.popAll()); await openMenu(); await tap('Animals'); await screen('animals-zoo'); await chipCheck('animal list');
@@ -284,11 +290,11 @@ async function run(name) {
   await ev(() => { ZT.S.regions.paleo = false; });
   await back(); await tap('Combos'); await screen('combos'); await back();
   await tap('Fits'); await screen('fits'); await back();
-  await tap('Rumors'); await screen('rumors'); await back();
+  await tap('Rumors'); await screen('rumors'); check(await ev(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), b = L.querySelector('.pbody'); return b.scrollHeight <= b.clientHeight + 1 && L.querySelectorAll('.mn-vip').length === ZD.VIPS.length && b.textContent.trim().length < 60; }), 'Rumors is one short screen of symbols with no scrolling'); await back();
   await tap('Ranks'); await screen('ranks'); await back();
   await tap('Years'); await screen('years-empty'); await back();
   await tap('Awards'); await screen('awards'); await back();
-  await tap('Log'); await screen('log'); check((await stack()).endsWith('info>log') || (await stack()).includes('log'), 'Log opens the game log screen (' + await stack() + ')'); await back();
+  await tap('Log'); await screen('log'); check((await stack()).endsWith('info>log') && await ev(() => { const L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), b = L.querySelector('.pbody'); return !!L.querySelector('.mn-copy') && b.scrollHeight <= b.clientHeight + 1 && L.querySelectorAll('textarea').length === 0; }), 'Log is one short screen that keeps the Copy button (' + await stack() + ')'); await back();
 
   // ---------------------------------------------------------------- system
   await ev(() => ZT.popAll()); await openMenu(); await tap('System'); await screen('system');
@@ -316,8 +322,10 @@ async function run(name) {
   await ev(() => { document.querySelector('.layer:not([hidden]) .pbody').scrollTop = 700; }); await shot('late-book-scrolled'); await back();
   await tap('Fits'); await screen('late-fits'); await back(); await tap('Combos'); await screen('late-combos'); await back(); await back();
   await tap('Research'); await tap('Know-how'); await screen('late-research'); await back(); await back();
-  await tap('Build'); await tap('Habitats'); await screen('late-habs'); await back(); await tap('Facilities'); await screen('late-facs');
-  await ev(() => { document.querySelector('.layer:not([hidden]) .pbody').scrollTop = 500; }); await shot('late-facs-scrolled'); await back(); await tap('Buy land'); await screen('late-land'); await back(); await back();
+  await tap('Edit', { wait: 600 }); await shot('late-edit-habs');
+  for (const g of ['shop', 'fun', 'sci', 'mark']) { await etap('.mn-et[data-grp="' + g + '"]'); await shot('late-edit-' + g); const e2 = await ebar(); if (e2.small || e2.below) small.push('edit strip ' + g + ': ' + e2.small + ' small, ' + e2.below + ' below the inset'); }
+  check(await ev(() => { const s = document.querySelector('#edit-bar .mn-es'); return s.scrollHeight <= s.clientHeight + 1; }), 'late game: the Edit strip never scrolls up and down');
+  await etap('.mn-et.done', 500); await openMenu();
   await tap('Projects'); await screen('late-projects'); await tap('Expedition'); await screen('late-exp-region');
   await ev(() => ZT.popAll());
   // a year passes: reports are skipped, then the history shows
@@ -327,6 +335,7 @@ async function run(name) {
   check(consoleErrors.length === 0, 'no console errors' + (consoleErrors.length ? ': ' + consoleErrors.slice(0, 4).join(' || ') : ''));
   const ze = await ev(() => ZT.errors.slice());
   check(ze.length === 0, 'no captured game errors' + (ze.length ? ': ' + ze.slice(0, 4).join(' || ') : ''));
+  check(await ev(() => document.querySelectorAll('.badge').length) === 0, 'no .badge element is left on the page');
   check(small.length === 0, 'no tappable thing under 44 px' + (small.length ? ': ' + small.slice(0, 8).join(' || ') : ''));
   check(overflow.length === 0, 'no sideways overflow, Back always visible' + (overflow.length ? ': ' + overflow.slice(0, 6).join(' || ') : ''));
   await browser.close();

@@ -4,6 +4,66 @@ One IIFE, one global: `ZMenus`. Loaded after `core.js`, before `moments.js`. Bui
 Every state change goes through `ZCore.act`. Checks: `node test/menus-shot.js [chromium|webkit]` (headless, writes `test/shots/menus-*.png`),
 `node test/menus-sheet.js <name> <shot> <shot> ...` puts shots side by side, `node test/menus-dbg.js <screen>` lists anything wider than the phone.
 
+## Update 7 (2026-11-15): read this first; it wins over anything older below
+
+Checks: `node test/menus-u7.js [chromium|webkit]` (Edit mode, Send out page, one-screen event, best crown, gold frames and no `.badge`, challenges),
+plus the updated `menus-shot`, `menus-title`, `menus-fit`, `menus-hire`, `menus-drag`.
+
+### Edit mode (replaces the Build lists and the Move screen)
+- The main-menu box is **Edit** (symbol `edit`). `ZMenus.edit(group?)` starts it, `ZMenus.stopEdit()` ends it, `ZMenus.editing()` says whether it is on.
+  `ZMenus.screens.build / habitats / facilities / move / remove / upgrade / land` are gone.
+- Menus creates `#edit-bar` inside `#floor-wrap` (solid, docked at the bottom, padded by the bottom inset, `hidden` = `display:none`). It is shown only while
+  Edit mode is on, no screen is open and `ZRender.placing()` is false; `body.mn-editing` is set while it shows. A 300 ms ticker (`editSync`) keeps it in step.
+- Add view: a row of symbol tabs (`.mn-et[data-grp]`: `hab` habitats and more land, `shop`, `fun`, `sci`, `mark` landmarks; empty groups are hidden;
+  `own` = "placed things" appears only if the renderer has no `startEdit`) plus a green Done (`.mn-et.done`), then ONE sideways-scrolling strip (`.mn-es`) of cards
+  (`.mn-ec[data-key="hab:savanna" | "fac:bench" | "land"]`): picture and price; greyed (`.off`) with a padlock or a red price when locked or too dear (a tap says why);
+  left out when a challenge forbids the biome (`ZE.allowed(S,'biome',b)`), greyed when it forbids more habitats (`ZE.allowed(S,'hab',b)`); no land card when `ZE.nextLand` is null.
+  A card calls `ZRender.startPlacement` (facilities with `repeat`); nothing is toasted over the strip.
+- Picked view (`onPick(item)` from `ZRender.startEdit`, then `ZRender.select(id)`): `.mn-eact` with the thing's picture, Move (`.mn-ea.move`, `startPlacement({moveId})`),
+  Upgrade for habitats (the usual `.mn-up` button), Sell (`.mn-ea.sell`, shows the money back, asks once, then `remove`), and a back arrow (`.mn-ea.back`) to the add view.
+  `onPick(null)` also returns to the add view. Done calls `ZRender.stopEdit()` and returns to the floor.
+- Menus needs from the Renderer exactly the contract in `docs/UPDATE-7.md`; from the Shell that the clock is paused while `ZRender.editing()` (done).
+- Money back on Sell is worked out here as half the list price (same as `ZE.remove`); a lookup `ZE.removeRefund(S, id)` would be cleaner.
+
+### Tutorial through Edit mode
+Steps: 1 "Tap your land to open the menu." > 2 "Edit: place a Savanna home." > 3 "Now place a Snack Stand." > 4 "Place a Bench near the stand." >
+5 "Flag on the habitat: hold an event." > 6 "That's it. Tap the zoo any time." The Edit box glows on the menu; inside Edit mode the wanted card glows (the strip jumps to
+its group), and when nothing more is to be placed Done glows. Bare land glows the same way without the tutorial. No tutorial, hint or glow inside a challenge.
+
+### Gold frames instead of red boxes
+Nothing in menus.js makes a `.badge`. The Shell's `.alert` frame is used on: main menu Projects / Animals / Staff / Research (something waiting, animals in the pen,
+applicants or headhunter, affordable research), Research group boxes with something affordable, Staff's "Who turned up" button. The legend shows a sample frame.
+
+### Events: one screen
+Projects > Event > (`event-habs` only when there is more than one habitat) > **`event-setup`**: free people as portrait buttons with their Hosting number
+(`.mn-pk.host`, up to 8, best first, best preselected), themes as a grid with their fit sign (`.mn-pk.theme`, 2 columns, 3 when more than 8; best known fit preselected,
+a clock marks the theme used last time), and Start with price and weeks. No scrolling at 375x667 with 12 themes and 8 people. `event-theme`, `event-lead`, `event-confirm` are gone.
+
+### Best of its kind
+`ZE.bestOf` puts the `best` crown (`.mn-best`) on the animal tile (Animals > Zoo), the pen row and the animal screen.
+
+### Send out page (`exp-confirm`)
+Built from `ZE.expStars(S, region, team)`: a header (region picture and name, team, strength sign), five star buttons (`.mn-xs[data-star]`; locked = grey with padlock,
+rank medal and the rank number; a tap says why), cost and weeks of the chosen star (`.mn-xinfo .xc / .xw`), its odds rows (`.mn-xodds`), Send. The star opens on the one used
+last in that region, else the highest unlocked one costing at most half the bank. `startExpedition(region, team, star)`. Fits at 393x852 (insets 62 / 34) and 375x667.
+
+### Info trimmed
+Rumors: one row per secret place (padlock or tick, name or `?`, tick boxes / map-piece pips; a tap toasts the next hint) and a 4x2 grid of special visitors (tick or `?`;
+a tap toasts who or when). Log: Menus' own short screen `log` (`ZMenus.screens.log`): Copy (`ZCore.copyLog`, size shown) and Save as file; the note box is gone.
+
+### Staff words to symbols
+A staff level is the number in a small gold box (`.mn-lv`); the skill key line and the worded skill chips are gone (icon plus number everywhere; the legend names them).
+
+### Challenges
+- Title: a fourth entry under the slots (`.mn-slot.mn-chal`, symbol `level`, total stars `n/15`, a Continue tag on tall screens when a run is saved).
+- `challenges` screen (`ZMenus.screens.challenges`): the five `D.LEVELS` in one line (`.mn-lvc[data-level]`): number, goal symbol (`D.GOAL_ICON`) and number, limits as
+  symbol lines (clock weeks, coin start money, map rows, padlock + habitat picture = only that biome, fence + number = habitats at most, cross + explorer = no expeditions,
+  paw + number = animals to start with), three `star-on` / `star-off` from `ZCore.challengeStars()`; locked (grey, padlock) until the level before has 1 star.
+  Continue (`ZCore.resumeChallenge()`) when `ZCore.challengeSaved()`; Start (`ZCore.startChallenge(id)`; asks once if it would replace a run in progress).
+- Inside a challenge (`ZCore.inChallenge()`): Info hides Rumors, Ranks, Years, Awards; System's Title screen calls `ZCore.leaveChallenge()`, Replay tutorial is replaced by
+  Restart level (asks once); Projects greys Expedition / Breeding / Event / Advertise with a padlock when `ZE.allowed` says no; hiring tiers grey for `'hire'`;
+  Research leaves out what `ZE.allowed(S,'research',id)` refuses; Edit as above; legacy is never recorded.
+
 ## Public
 
 | Call | What it does |
