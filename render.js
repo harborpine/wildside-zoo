@@ -27,7 +27,10 @@
   const cam = { x: 0, y: 0, vx: 0, vy: 0, tx: null, ty: null, placed: false };
   let M = null, P = null, mapDirty = true, clock = 0, slowAt = 0, lastT = 0, lastWeek = null, shopTurn = 0, engineMoneyFx = false;
   let animals = {}, walkers = [], gatePeople = {}, floaters = [], statuses = {}, lastS = null, animalsSeeded = false;
-  const stats = { sprites: 0, fps: 0, frameMs: 0, frames: 0, acc: 0, accMs: 0, warned: {} };
+  const stats = { sprites: 0, fps: 0, frameMs: 0, frames: 0, acc: 0, accMs: 0, warned: {}, wtime: 0, walk: 0, walkT: 0, roam: 0, maxStep: 0, speed: 1, slice: 0 };
+  // Edit mode (E) and the selected item; barCov = buffer pixels at the bottom of the floor hidden under #placement-bar / #edit-bar
+  // while placing or editing (covE is the same number eased, so the camera limit glides instead of jumping)
+  let E = null, sel = null, barCov = 0, covE = 0, barAt = 0;
   const st = () => { try { return opts.getState ? opts.getState() : null; } catch (e) { return null; } };
 
   // ---------------------------------------------------------------- sprites: guarded access with built-in fallbacks
@@ -225,6 +228,9 @@
     cells.forEach(c => { if (c.owned && !m.occ[c.k]) m.nodes[c.k] = c; });
     if (ent && !m.nodes[ent.k] && !m.occ[ent.k]) m.nodes[ent.k] = ent;
     Object.keys(m.nodes).forEach(k => { const c = m.nodes[k]; c.nb = []; DIR6.forEach(d => { const nk = key(c.q + d[0], c.r + d[1]); if (m.nodes[nk]) c.nb.push(nk); }); });
+    // walkway rings (R7): every free owned hex bordering a habitat is walkway. The engine works them out; here they are ordinary path.
+    m.ring = {}; try { if (typeof Z.ringCells === 'function') (Z.ringCells(S) || []).forEach(c => { const k = key(c[0], c[1]); if (m.nodes[k]) m.ring[k] = 1; }); } catch (e) { m.ring = {}; }
+    for (const k in m.ring) if (!ent || k !== ent.k) m.path[k] = 1;
     // a short road leading in from outside the map
     m.road = [];
     if (ent) { // step to whichever down-screen neighbour keeps the road straight below the gate
@@ -250,7 +256,7 @@
       });
       m.dests.forEach(info => { if (!info.main) return; const seen = {}; info.stands.push(info.main); seen[info.main.k] = 1; info.cands.forEach(c => { if (m.path[c.k] && !seen[c.k]) { seen[c.k] = 1; info.stands.push(c); } }); });
     }
-    m.pathKeys = Object.keys(m.path);
+    m.pathKeys = Object.keys(m.path); m.ringN = Object.keys(m.ring).length;
     // floor canvas
     // (floor rectangle fx0, fy0, fw, fh was worked out above with the bounds)
     const fl = document.createElement('canvas'); fl.width = fw; fl.height = fh; const fc = fl.getContext('2d');
@@ -304,7 +310,7 @@
         return;
       }
       if (ent && c.k === ent.k) return;
-      if (m.path[c.k]) { if (!standKeys[c.k] && h < 0.16) addDeco(spr('deco', 'lamp', seed), c.x + (ox < 0 ? -17 : 17) * K, c.y - K, c.y - K); return; }
+      if (m.path[c.k]) { if (!standKeys[c.k] && !m.ring[c.k] && h < 0.16) addDeco(spr('deco', 'lamp', seed), c.x + (ox < 0 ? -17 : 17) * K, c.y - K, c.y - K); return; }
       let kind = h < 0.2 ? 'tree' : h < 0.38 ? 'bush' : h < 0.6 ? 'flowers' : h < 0.68 ? 'rock' : null;
       if (kind === 'tree' && builtAbove(c)) kind = 'bush';
       if (!kind) return;
@@ -363,7 +369,7 @@
       const h = M.habs[a.hab]; if (!h || !h.cells[a.cell]) return; const cnt = h.cells.map(() => 0); for (const id in animals) { const o = animals[id]; if (o !== a && o.hab === a.hab && cnt[o.cell] != null) cnt[o.cell]++; }
       const c = h.cells[a.cell], cho = [a.cell]; c.nb.forEach(j => { if (cnt[j] < CAP) cho.push(j, j); });
       placeInCell(a, h, pick(cho), false);
-    } else { a.x += dx / d * sp; a.y += dy / d * sp; if (Math.abs(dx) > 0.4) a.flip = dx < 0; a.moving = true; }
+    } else { a.x += dx / d * sp; a.y += dy / d * sp; if (Math.abs(dx) > 0.4) a.flip = dx < 0; a.moving = true; stats.roam += sp; }
   }
   function newWalker(kind, seed) { return { kind: kind, seed: seed, x: 0, y: 0, wp: [], wait: 0, t: rnd(0, 9), flip: false, moving: false, speed: rnd(11, 16) * K, ox: Math.round(rnd(-7, 7) * K), oy: Math.round(rnd(-HH * 0.25, HH * 0.25)), node: null, left: 0, last: null, dead: false, hidden: false, post: null, staff: null }; }
   function goTo(w, destKey, stand) { // queue hex-by-hex waypoints from the walker's node to destKey; optional stand = look-at spot
@@ -397,8 +403,8 @@
     if (w.wait > 0) { w.wait -= dt; w.moving = false; if (w.wait > 0) return; }
     if (!w.wp.length) { if (w.gate) return; planWalker(w); if (!w.wp.length) return; }
     const p = w.wp[0], dx = p.x - w.x, dy = p.y - w.y, d = Math.hypot(dx, dy), sp = w.speed * dt;
-    if (d <= sp) { w.x = p.x; w.y = p.y; w.wp.shift(); if (p.k) w.node = p.k; if (p.wait) { w.wait = p.wait; w.flip = !!p.face; w.moving = false; } if (p.end) w.dead = true; }
-    else { w.x += dx / d * sp; w.y += dy / d * sp; if (Math.abs(dx) > 0.4) w.flip = dx < 0; w.moving = true; }
+    if (d <= sp) { stats.walk += d; if (d > stats.maxStep) stats.maxStep = d; w.x = p.x; w.y = p.y; w.wp.shift(); if (p.k) w.node = p.k; if (p.wait) { w.wait = p.wait; w.flip = !!p.face; w.moving = false; } if (p.end) w.dead = true; }
+    else { w.x += dx / d * sp; w.y += dy / d * sp; if (Math.abs(dx) > 0.4) w.flip = dx < 0; w.moving = true; stats.walk += sp; stats.walkT += stats.slice; if (sp > stats.maxStep) stats.maxStep = sp; }
   }
   function spawnVisitor(anywhere) {
     if (!M.ent || !M.nodes[M.ent.k]) return null;
@@ -527,9 +533,36 @@
     cam.vx = cam.vy = 0; cam.tx = cam.ty = null;
   }
   function clampCam() {
-    if (!M) return; const b = M.bounds, bw = b.x1 - b.x0, bh = b.y1 - b.y0;
+    // While placing or editing, the bottom of the floor is under a bar: the camera may scroll that much further down (less the
+    // margin the map already has below its front row), and a map smaller than the view is centred in the part that shows.
+    if (!M) return; const b = M.bounds, bw = b.x1 - b.x0, bh = b.y1 - b.y0, vv = vh - Math.max(0, covE - 30 * K);
     cam.x = bw <= vw ? b.x0 - (vw - bw) / 2 : clamp(cam.x, b.x0, b.x1 - vw);
-    cam.y = bh <= vh ? b.y0 - (vh - bh) / 2 : clamp(cam.y, b.y0, b.y1 - vh);
+    cam.y = bh <= vv ? b.y0 - (vv - bh) / 2 : clamp(cam.y, b.y0, b.y1 - vv);
+  }
+  // How much of the bottom of the floor a bar covers right now, in buffer pixels: the renderer's own #placement-bar and the Menus
+  // owner's #edit-bar (which may not exist). Only counted while placing or editing. Read defensively; a missing or hidden bar is 0.
+  function measureBars() {
+    barAt = clock; let cover = 0;
+    if ((P || E) && canvas && cssH) {
+      try {
+        const fr = canvas.getBoundingClientRect();
+        ['placement-bar', 'edit-bar'].forEach(id => {
+          const el = document.getElementById(id); if (!el) return; const r = el.getBoundingClientRect(); if (!(r.height > 0 && r.width > 0)) return;
+          const cs = root.getComputedStyle ? root.getComputedStyle(el) : null; if (cs && (cs.display === 'none' || cs.visibility === 'hidden')) return;
+          if (r.bottom < fr.bottom - 4 || r.top >= fr.bottom || r.top < fr.top + fr.height * 0.35) return; // only a strip docked at the bottom of the floor
+          cover = Math.max(cover, fr.bottom - r.top);
+        });
+      } catch (e) { cover = 0; }
+      cover = cover / cssH * vh;
+    }
+    barCov = cover; return cover;
+  }
+  // glide the camera only if these hexes are not comfortably on screen, clear of the note at the top and the bar at the bottom
+  function bringIntoView(cells) {
+    if (!cells || !cells.length || !M) return; let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; cells.forEach(c => { const p = G.toScreen(c[0], c[1]); a0 = Math.min(a0, p.x); a1 = Math.max(a1, p.x); b0 = Math.min(b0, p.y); b1 = Math.max(b1, p.y); });
+    const cov = measureBars(), barH = cov > 0 ? cov + 40 / (cssH || 1) * vh : vh * 0.2, was = covE; covE = cov; // (aim with the bar's full height, then let the eased value catch up)
+    if (a0 - HW < cam.x + 4 * K || a1 + HW > cam.x + vw - 4 * K || b0 - HH - 20 * K < cam.y || b1 + HH > cam.y + vh - barH) { const ox = cam.x, oy = cam.y; cam.x = (a0 + a1) / 2 - vw / 2; cam.y = (b0 + b1) / 2 - (vh - cov) * 0.46; clampCam(); cam.tx = cam.x; cam.ty = cam.y; cam.x = ox; cam.y = oy; cam.vx = cam.vy = 0; }
+    covE = was;
   }
   function resize() {
     if (!canvas) return; const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return;
@@ -578,6 +611,7 @@
     if (!ptr.drag) {
       const h = R.clientToHex(e.clientX, e.clientY), S = st();
       if (P) { if (S && inGrid(S, h.q, h.r)) { P.q = h.q; P.r = h.r; evalPlacement(); } return; }
+      if (E) { const it = (M && M.occ[key(h.q, h.r)]) || null; if (E.cbs.onPick) { try { E.cbs.onPick(it); } catch (err) { if (!stats.warned.onPick) stats.warned.onPick = String(err && err.message || err); } } return; } // Edit mode: pick, never the normal tap
       if (opts.onTap) opts.onTap({ q: h.q, r: h.r, item: (M && M.occ[key(h.q, h.r)]) || null });
       return;
     }
@@ -611,11 +645,7 @@
     for (const k in M.cells) { const c = M.cells[k]; if (!c.owned || (skipCurrent && c.q === P.q && c.r === P.r)) continue; const d = (c.x - x) * (c.x - x) + (c.y - y) * (c.y - y) * 1.6; if (d < fd) { fd = d; fall = c; } if (d < bd && canHere(S, c.q, c.r)) { bd = d; best = c; } }
     const c = best || fall; if (c) { P.q = c.q; P.r = c.r; } return !!best;
   }
-  function showGhost() { // glide the camera only if the ghost's footprint is not comfortably on screen
-    if (!P) return; let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9; Z.cellsOf(P.spec.kind, P.spec.t, P.q, P.r, P.rot).forEach(c => { const p = G.toScreen(c[0], c[1]); a0 = Math.min(a0, p.x); a1 = Math.max(a1, p.x); b0 = Math.min(b0, p.y); b1 = Math.max(b1, p.y); });
-    const barH = P.dom && P.dom.bar ? (P.dom.bar.getBoundingClientRect().height + 40) / (cssH || 1) * vh : vh * 0.2;
-    if (a0 - HW < cam.x + 4 * K || a1 + HW > cam.x + vw - 4 * K || b0 - HH - 20 * K < cam.y || b1 + HH > cam.y + vh - barH) { const ox = cam.x, oy = cam.y; cam.x = (a0 + a1) / 2 - vw / 2; cam.y = (b0 + b1) / 2 - vh * 0.42; clampCam(); cam.tx = cam.x; cam.ty = cam.y; cam.x = ox; cam.y = oy; cam.vx = cam.vy = 0; }
-  }
+  function showGhost() { if (P) bringIntoView(Z.cellsOf(P.spec.kind, P.spec.t, P.q, P.r, P.rot).concat(P.ring || [])); }
   // Place is the one prominent (green) button, grey while the spot is invalid; Rotate and Cancel/Done are neutral. Set inline so it holds
   // whichever position each button has in the bar. Colours come from the Shell's theme variables, with fallbacks.
   function paintButtons(ok) {
@@ -626,11 +656,22 @@
   function comboNames(list) { const out = []; list.forEach(a => { const c = D.COMBOS.find(x => x.id === a.id); const n = c ? c.name : a.id; if (out.indexOf(n) < 0) out.push(n); }); return out; }
   function evalPlacement() {
     const S = st(); if (!P || !S) return; const sp = P.spec;
-    const cs = Z.cellsOf(sp.kind, sp.t, P.q, P.r, P.rot); let ok = false; try { ok = !!Z.canPlace(S, sp.kind, sp.t, P.q, P.r, P.rot, sp.moveId); } catch (e) { ok = false; }
-    let occ = null; try { occ = Z.occupancy ? Z.occupancy(S, sp.moveId) : null; } catch (e) { occ = null; }
-    let outside = false; const ent = M && M.ent;
-    P.cells = cs.map(c => { const land = !!Z.inLand(S, c[0], c[1]), free = occ ? !occ[key(c[0], c[1])] : true, gate = !ok && ent && ent.q === c[0] && ent.r === c[1]; if (!land) outside = true; return { q: c[0], r: c[1], ok: ok || (land && free && !gate) }; });
-    if (!ok && P.cells.every(c => c.ok)) P.cells.forEach(c => { c.ok = false; });
+    const cs = Z.cellsOf(sp.kind, sp.t, P.q, P.r, P.rot), mine = {}; cs.forEach(c => { mine[key(c[0], c[1])] = 1; });
+    // the engine says whether it fits, why not, and which hexes are in the way (R7: ZE.placeCheck); older engines only say yes or no
+    let chk = null; try { if (typeof Z.placeCheck === 'function') chk = Z.placeCheck(S, sp.kind, sp.t, P.q, P.r, P.rot, sp.moveId); } catch (e) { chk = null; }
+    let ok = false, why = '', msg = '', bad = [];
+    if (chk) { ok = !!chk.ok; if (!ok) { why = chk.why || ''; msg = chk.msg || 'Not possible here.'; bad = (chk.cells || []).map(c => [c[0], c[1]]); if (!bad.length) bad = cs.slice(); } }
+    else {
+      try { ok = !!Z.canPlace(S, sp.kind, sp.t, P.q, P.r, P.rot, sp.moveId); } catch (e) { ok = false; }
+      if (!ok) { let occ = null; try { occ = Z.occupancy ? Z.occupancy(S, sp.moveId) : null; } catch (e) { occ = null; } const ent = M && M.ent; let outside = false;
+        cs.forEach(c => { const land = !!Z.inLand(S, c[0], c[1]); if (!land) outside = true; if (!land || (occ && occ[key(c[0], c[1])]) || (ent && ent.q === c[0] && ent.r === c[1])) bad.push(c); });
+        if (!bad.length) bad = cs.slice(); msg = outside ? 'Outside your land.' : 'Something is in the way.'; }
+    }
+    const badSet = {}; bad.forEach(c => { badSet[key(c[0], c[1])] = 1; });
+    P.cells = cs.map(c => ({ q: c[0], r: c[1], ok: !badSet[key(c[0], c[1])] }));
+    P.bad = bad; P.why = why;
+    // the walkway ring this habitat would get (free owned hexes round it), shown as part of the ghost
+    P.ring = []; if (sp.kind === 'hab' && typeof Z.ringAt === 'function') { try { P.ring = (Z.ringAt(S, sp.t, P.q, P.r, P.rot, sp.moveId) || []).filter(c => !mine[key(c[0], c[1])]).sort((a, b) => G.toScreen(a[0], a[1]).y - G.toScreen(b[0], b[1]).y); } catch (e) { P.ring = []; } }
     P.ok = ok; P.makes = []; P.breaks = [];
     if (ok) {
       try {
@@ -641,11 +682,12 @@
       } catch (e) { /* no preview */ }
     }
     P.state = !ok ? 'bad' : P.makes.length ? 'combo' : P.breaks.length ? 'warn' : 'ok';
-    let msg = !ok ? (outside ? 'Outside your land.' : 'Something is in the way.') : '';
-    if (ok) { if (P.makes.length) msg = 'Completes ' + P.makes.join(', ') + '!'; if (P.breaks.length) msg += (msg ? ' ' : '') + 'Breaks ' + P.breaks.join(', ') + '.'; if (!msg) msg = 'Fits here.'; }
+    if (ok) { msg = ''; if (P.makes.length) msg = 'Completes ' + P.makes.join(', ') + '!'; if (P.breaks.length) msg += (msg ? ' ' : '') + 'Breaks ' + P.breaks.join(', ') + '.'; if (!msg) msg = 'Fits here.'; }
     if (P.fail) { msg = P.fail; P.state = 'bad'; P.fail = null; }
     P.msg = msg;
     P.outline = outlineSprite(cs, P.state === 'bad' ? '#ff4a3a' : P.state === 'combo' ? '#ffd84a' : P.state === 'warn' ? '#ffb056' : '#5ad65a', '#ffffff', { lw: 2 * K, blink: true });
+    // hexes in the way that are not under the ghost itself (the habitat it would touch, say) get their own red outline
+    const far = bad.filter(c => !mine[key(c[0], c[1])]); P.badOutline = far.length ? outlineSprite(far, '#ff4a3a', '#ffffff', { lw: 2 * K, blink: true }) : null;
     if (P.dom) { P.dom.note.textContent = (sp.label && (sp.label + msg).length <= 34 ? sp.label + ': ' : '') + msg; P.dom.note.setAttribute('data-state', P.state); if (P.dom.place) { P.dom.place.setAttribute('aria-disabled', ok ? 'false' : 'true'); paintButtons(ok); } }
   }
   R.startPlacement = function (spec, cbs) {
@@ -656,7 +698,6 @@
     if (moved) { if (!P.spec.kind) P.spec.kind = moved.k; if (!P.spec.t) P.spec.t = moved.t; }
     // start on a VALID hex: the one nearest the middle of the screen (a moved item starts where it stands), so the first Place normally works
     if (moved && spec.rot == null) { P.q = moved.q; P.r = moved.r; } else seekValid(cam.x + vw / 2, cam.y + vh * 0.42, false);
-    showGhost();
     dom.bar.textContent = '';
     const b = (label, cls, fn) => { const el = document.createElement('button'); el.type = 'button'; el.textContent = label; el.className = 'zr-btn ' + cls; el.style.minHeight = (root.innerHeight && root.innerHeight < 480 ? 44 : 56) + 'px'; el.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); fn(); }); dom.bar.appendChild(el); return el; };
     // Rotate only exists when turning changes the footprint (not for single-hex facilities or fully round habitats)
@@ -676,10 +717,29 @@
     dom.note.style.whiteSpace = 'nowrap'; dom.note.style.overflow = 'hidden'; dom.note.style.textOverflow = 'ellipsis';
     dom.note.style.top = '8px'; dom.note.style.bottom = 'auto'; // at the top of the floor during placement, clear of the Shell's toasts above the buttons
     dom.bar.classList.add('zr-on'); dom.note.classList.add('zr-on');
-    evalPlacement(); return true;
+    evalPlacement(); showGhost(); return true;
   };
-  R.stopPlacement = function () { if (!P) return; const d = P.dom; P = null; if (d) { d.bar.classList.remove('zr-on'); d.note.classList.remove('zr-on'); d.bar.textContent = ''; d.note.textContent = ''; d.note.style.top = ''; d.note.style.bottom = ''; } };
+  R.stopPlacement = function () { if (!P) return; const d = P.dom; P = null; barAt = -1; if (d) { d.bar.classList.remove('zr-on'); d.note.classList.remove('zr-on'); d.bar.textContent = ''; d.note.textContent = ''; d.note.style.top = ''; d.note.style.bottom = ''; } };
   R.placing = () => !!P;
+
+  // ---------------------------------------------------------------- Edit mode (the map stays as it is; taps pick things; see docs/API-renderer.md)
+  function leaveEdit(tell) { const e = E; E = null; sel = null; barAt = -1; if (e && tell && e.cbs.onExit) { try { e.cbs.onExit(); } catch (err) { /* the caller's business */ } } }
+  R.startEdit = function (cbs) { const S = st(); if (!S) return false; if (P) R.stopPlacement(); if (!M && vw) rebuild(S); E = { cbs: cbs || {} }; sel = null; barAt = -1; return true; };
+  R.stopEdit = function () { if (P) R.stopPlacement(); leaveEdit(false); };
+  R.editing = () => !!E;
+  // select(itemId) puts the blinking outline round that item (habitat or facility) and glides it into clear view; select(null) clears it
+  R.select = function (id) {
+    const S = st(), it = id == null || !S ? null : (S.items || []).find(i => i.id === id);
+    if (!it) { sel = null; return id == null; }
+    sel = { id: it.id, sig: null, o: null }; if (!M && vw) rebuild(S); if (M && !P) bringIntoView(itemCells(it));
+    return true;
+  };
+  R.selected = () => (sel ? sel.id : null);
+  function selOutline(S) { // the outline follows the item (it is rebuilt when the item moves or turns) and goes when the item is sold
+    if (!sel) return null; const it = (S.items || []).find(i => i.id === sel.id); if (!it) { sel = null; return null; }
+    const sig = it.q + ',' + it.r + ',' + (it.rot || 0) + ',' + it.t; if (sel.sig !== sig) { sel.sig = sig; sel.o = outlineSprite(itemCells(it), '#35e6ff', '#ffffff', { lw: 3 * K, blink: true }); }
+    return sel.o;
+  }
 
   // ---------------------------------------------------------------- drawing
   const list = [], over = []; let penHidden = false;
@@ -705,7 +765,7 @@
     if (!started) return; root.requestAnimationFrame(frame);
     const t0 = now(), dt = clamp((t - lastT) / 1000 || 0, 0, 0.1); lastT = t;
     const S = st(); if (!S || !ctx) return;
-    if (S !== lastS) { if (lastS) { clearActors(); if (P) R.stopPlacement(); } lastS = S; }
+    if (S !== lastS) { if (lastS) { clearActors(); if (P) R.stopPlacement(); if (E) leaveEdit(true); sel = null; } lastS = S; }
     if (!vw) resize(); if (!vw) return;
     clock += dt;
     if (mapDirty || !M || clock >= slowAt) {
@@ -715,16 +775,24 @@
     // camera
     if (cam.tx != null) { const k = 1 - Math.exp(-dt * 9); cam.x += (cam.tx - cam.x) * k; cam.y += (cam.ty - cam.y) * k; if (Math.abs(cam.tx - cam.x) + Math.abs(cam.ty - cam.y) < 0.4 * K) { cam.x = cam.tx; cam.y = cam.ty; cam.tx = cam.ty = null; } }
     else if (ptr.id == null && (cam.vx || cam.vy)) { cam.x += cam.vx * dt; cam.y += cam.vy * dt; const f = Math.exp(-dt * 5.5); cam.vx *= f; cam.vy *= f; if (Math.hypot(cam.vx, cam.vy) < 6 * K) cam.vx = cam.vy = 0; }
+    if ((P || E || barCov) && (barAt < 0 || clock - barAt > 0.3)) measureBars(); // the bars can change height at any time (the Menus strip swaps its content)
+    if (covE !== barCov) { covE += (barCov - covE) * (1 - Math.exp(-dt * 10)); if (Math.abs(covE - barCov) < 0.5) covE = barCov; }
     clampCam();
-    // world
+    // world: stepped in game time. Speed 2 (opts.getSpeed, from the Shell) moves animals, people and pop-ups twice as fast; the
+    // camera, placement and the blinks stay on real time. Big steps are cut into slices of at most 1/30 s so movement stays smooth
+    // and nobody skips past a waypoint (walkers go hex centre to hex centre, so a bigger step can never cut through a fence).
     if (running) {
       consumeFx(S);
       if (lastWeek != null && S.week !== lastWeek) { if (S.week > lastWeek) weeklyCoins(S); syncStatus(S); }
       lastWeek = S.week;
-      for (const id in animals) stepAnimal(animals[id], dt);
-      for (let i = 0; i < walkers.length; i++) stepWalker(walkers[i], dt);
-      for (const k in gatePeople) stepWalker(gatePeople[k], dt);
-      for (let i = floaters.length - 1; i >= 0; i--) { floaters[i].t += dt; if (floaters[i].t > 1.7) floaters.splice(i, 1); }
+      let spd = 1; try { const v = opts.getSpeed ? +opts.getSpeed() : 1; if (v > 0 && isFinite(v)) spd = clamp(v, 0.25, 4); } catch (e) { spd = 1; }
+      const wdt = dt * spd, n = Math.max(1, Math.ceil(wdt / 0.034)), h = wdt / n; stats.speed = spd; stats.wtime += wdt; stats.slice = h / spd;
+      for (let s = 0; s < n; s++) {
+        for (const id in animals) stepAnimal(animals[id], h);
+        for (let i = 0; i < walkers.length; i++) stepWalker(walkers[i], h);
+        for (const k in gatePeople) stepWalker(gatePeople[k], h);
+      }
+      for (let i = floaters.length - 1; i >= 0; i--) { floaters[i].t += wdt; if (floaters[i].t > 1.7) floaters.splice(i, 1); }
     }
     if (P) P.t += dt;
     draw(S);
@@ -741,9 +809,13 @@
     list.length = 0; over.length = 0;
     if (P && P.cells) { // the ghost is drawn solid; fits / does not fit shows only in the blinking outline (and red crosses)
       const sp = P.spec;
+      // the walkway ring the habitat would get: path tiles (only the top face, so no lip spills onto the hex in front), back to front
+      if (P.ring && P.ring.length) { const tl = spr('tile', 'path', 0), th = Math.min(tl.c.height, Math.round(tl.ay) + HH); P.ring.forEach(rc => { const p = G.toScreen(rc[0], rc[1]); c.drawImage(tl.c, 0, 0, tl.c.width, th, Math.round(p.x - tl.ax) - cx, Math.round(p.y - tl.ay) - cy, tl.c.width, th); }); }
       if (sp.kind === 'hab') P.cells.forEach(cell => { const p = G.toScreen(cell.q, cell.r), tl = spr('tile', 'hab:' + sp.t, 0); c.drawImage(tl.c, Math.round(p.x - tl.ax) - cx, Math.round(p.y - tl.ay) - cy); });
-      c.drawImage(P.outline.f[Math.floor(P.t * 3) & 1].c, P.outline.x - cx, P.outline.y - cy);
-      P.cells.forEach(cell => { if (cell.ok) return; const p = G.toScreen(cell.q, cell.r); over.push({ s: crossSprite(), x: p.x, y: p.y }); }); // blocked hexes: a solid red cross on top
+      const bl = Math.floor(P.t * 3) & 1;
+      c.drawImage(P.outline.f[bl].c, P.outline.x - cx, P.outline.y - cy);
+      if (P.badOutline) over.push({ s: { c: P.badOutline.f[bl].c, ax: 0, ay: 0 }, x: P.badOutline.x, y: P.badOutline.y }); // the things in the way: red outline on top
+      (P.bad || []).forEach(bc => { const p = G.toScreen(bc[0], bc[1]); over.push({ s: crossSprite(), x: p.x, y: p.y }); }); // and a solid red cross on each hex in the way
       if (sp.kind === 'hab') {
         const set = {}; P.cells.forEach(cell => { set[key(cell.q, cell.r)] = 1; });
         P.cells.forEach(cell => { const p = G.toScreen(cell.q, cell.r); G.EDGES.forEach((e, ei) => { if (set[key(cell.q + e[0][0], cell.r + e[0][1])]) return; const s = spr('fence', sp.t, ei); list.push({ s: s, x: p.x, y: p.y, key: G.depth(cell.q, cell.r, M.fenceDy(s, ei)) + 0.01, a: 1 }); }); });
@@ -751,7 +823,7 @@
     }
     // one depth-sorted list
     const L = cx - 40 * K, Rr = cx + bw + 40 * K, T = cy - 10 * K, B = cy + bh + 60 * K, moveId = P ? P.spec.moveId : null;
-    let under = null; if (P && P.cells) { under = {}; P.cells.forEach(cell => { under[key(cell.q, cell.r)] = 1; }); P.cells.forEach(cell => DIR6.forEach(d => { const k2 = key(cell.q + d[0], cell.r + d[1]); if (G.toScreen(d[0], d[1]).y > 0 && !under[k2]) under[k2] = 2; })); } // (2 = the hex is just in front of the ghost: only tall things there are hidden) // decorations under the ghost are hidden so they never fight a placement
+    let under = null; if (P && P.cells) { under = {}; P.cells.forEach(cell => { under[key(cell.q, cell.r)] = 1; }); (P.ring || []).forEach(rc => { under[key(rc[0], rc[1])] = 1; }); P.cells.forEach(cell => DIR6.forEach(d => { const k2 = key(cell.q + d[0], cell.r + d[1]); if (G.toScreen(d[0], d[1]).y > 0 && !under[k2]) under[k2] = 2; })); } // (2 = the hex is just in front of the ghost: only tall things there are hidden) // decorations under the ghost are hidden so they never fight a placement
     for (let i = 0; i < M.statics.length; i++) { const e = M.statics[i]; if (e.x < L || e.x > Rr || e.y < T || e.y > B) continue; if (under && e.ck && under[e.ck] && (under[e.ck] === 1 || e.tall)) continue; if (moveId != null && e.id === moveId) continue; /* the item being moved is shown only as the ghost (nothing see-through) */ list.push(e); }
     const AF = frames('ANIMAL_FRAMES'), PF = frames('PERSON_FRAMES');
     for (const id in animals) {
@@ -780,6 +852,8 @@
     stats.sprites = list.length; stats.animalAlpha = animalAlpha;
     // (the combo outlines are drawn once, solid, on the ground layer; fences and sprites in front simply cover them)
     if (stats.verifyNext) { stats.verifyNext = false; stats.actorCheck = verifyAnimals(c, cx, cy, bw, bh); }
+    // Edit mode: the selected thing's outline, solid, blinking cyan / white, drawn over the sprites so fences never hide it
+    if (sel && !P) { const o = selOutline(S); if (o && o.x - cx < bw && o.y - cy < bh && o.x + o.w > cx && o.y + o.h > cy) c.drawImage(o.f[Math.floor(clock * 3) & 1].c, o.x - cx, o.y - cy); }
     // quiet on-floor icons and progress bars
     const bar = (x, y, p) => { c.fillStyle = '#1d1a22'; c.fillRect(x - 10 * K - cx, y - cy, 20 * K, 4 * K); c.fillStyle = '#4a4458'; c.fillRect(x - 9 * K - cx, y + K - cy, 18 * K, 2 * K); c.fillStyle = '#7be36a'; c.fillRect(x - 9 * K - cx, y + K - cy, Math.round(18 * K * clamp(p || 0, 0, 1)), 2 * K); };
     for (const id in M.habs) {
@@ -826,13 +900,13 @@
   // renderer's own baked pictures (combo and placement outlines, pop-up digits, the red cross)
   R.watchAlpha = function (on) { stats.alphaWatch = !!on; if (on) { stats.alphaMin = 1; stats.alphaDraws = 0; stats.alphaOps = 0; } };
   R.alphaReport = function () {
-    const own = []; if (M) M.combos.forEach(o => o.f.forEach(f => own.push(f))); if (P && P.outline) P.outline.f.forEach(f => own.push(f)); for (const k in textCache) own.push(textCache[k]); if (crossS) own.push(crossS);
+    const own = []; if (M) M.combos.forEach(o => o.f.forEach(f => own.push(f))); if (P && P.outline) P.outline.f.forEach(f => own.push(f)); if (P && P.badOutline) P.badOutline.f.forEach(f => own.push(f)); if (sel && sel.o) sel.o.f.forEach(f => own.push(f)); for (const k in textCache) own.push(textCache[k]); if (crossS) own.push(crossS);
     let partial = 0; own.forEach(sp => { const d = sp.c.getContext('2d').getImageData(0, 0, sp.c.width, sp.c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i] > 0 && d[i] < 255) partial++; });
     return { minAlpha: stats.alphaMin, draws: stats.alphaDraws, blendOps: stats.alphaOps, ownPartialPixels: partial, ownPictures: own.length };
   };
   R.checkAnimals = function () { stats.actorCheck = null; stats.verifyNext = true; }; // test hook: the next frame checks every animal is drawn solid (see verifyAnimals); read debug().animalCheck
   R.mapChanged = function () { mapDirty = true; };
-  R.reset = function () { clearActors(); if (P) R.stopPlacement(); }; // a new or loaded game: forget every actor and re-aim the camera
+  R.reset = function () { clearActors(); if (P) R.stopPlacement(); if (E) leaveEdit(true); sel = null; }; // a new or loaded game: forget every actor and re-aim the camera
   R.centerOn = function (q, r, instant) {
     const S = st(); if (!M && S && vw) rebuild(S); if (!M) return;
     const p = G.toScreen(q, r), ox = cam.x, oy = cam.y; cam.x = p.x - vw / 2; cam.y = p.y - vh / 2; clampCam(); cam.vx = cam.vy = 0;
@@ -852,7 +926,12 @@
       gate: Object.keys(gatePeople).length, gateKinds: Object.keys(gatePeople).map(k => gatePeople[k].kind), gateArrived: Object.keys(gatePeople).filter(k => !gatePeople[k].wp.length).length, gateMarks: Object.keys(gatePeople).filter(k => gatePeople[k].mark).map(k => gatePeople[k].kind),
       icons: (() => { const o = {}; for (const id in statuses) if (id !== '_exp') { const s2 = statuses[id]; o[id] = iconsOf(s2).concat(s2.busy && s2.progress != null ? ['bar'] : []); } return o; })(), moving: (() => { const o = {}; for (const id in animals) if (animals[id].moving) o[animals[id].hab] = (o[animals[id].hab] || 0) + 1; return o; })(), floaters: floaters.length, combos: M ? M.combos.length : 0, statics: M ? M.statics.length : 0, paths: M ? M.pathKeys.length : 0,
       animalAlpha: stats.animalAlpha, animalCheck: stats.actorCheck || null,
-      placement: P ? { q: P.q, r: P.r, rot: P.rot, ok: P.ok, state: P.state, msg: P.msg, makes: P.makes, breaks: P.breaks } : null };
+      ring: M ? M.ringN : 0, ringPath: M ? Object.keys(M.ring).filter(k => M.path[k] && M.cells[k] && M.cells[k].tile === 'path').length : 0, ringDeco: M ? M.statics.filter(e => e.ck && (M.ring[e.ck] || (() => { const a = G.toAxial(e.x, e.y); return M.ring[key(a.q, a.r)]; })())).length : 0,
+      speed: stats.speed, worldTime: stats.wtime, clock: clock, walked: stats.walk, walkSecs: stats.walkT, roamed: stats.roam, maxStep: stats.maxStep,
+      offPath: M ? walkers.filter(w => { if (w.hidden) return false; const a = G.toAxial(w.x, w.y), c = M.cells[key(a.q, a.r)]; return !!M.occ[key(a.q, a.r)] || (c && c.grid && !M.nodes[c.k]); }).length : 0,
+      onRing: M ? walkers.filter(w => { const a = G.toAxial(w.x, w.y); return !w.hidden && M.ring[key(a.q, a.r)]; }).length : 0,
+      editing: !!E, selected: sel ? sel.id : null, barCover: Math.round(barCov), bounds: M ? M.bounds : null,
+      placement: P ? { q: P.q, r: P.r, rot: P.rot, ok: P.ok, state: P.state, msg: P.msg, why: P.why || '', bad: P.bad || [], ring: P.ring || [], makes: P.makes, breaks: P.breaks } : null };
   };
   root.ZRender = R;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1,5 +1,78 @@
 # render.js -> `ZRender`: API as built (Renderer)
 
+## Update 7 (2026-11-15): walkway ring, speed 2, Edit mode, challenge maps
+
+Where this section disagrees with older text further down, this section wins. Checks: `node test/render-shot.js both`,
+`node test/render-edit.js both` (new; add `floor` or `challenge` to run one half), `node test/render-alphaprobe.js`.
+
+### New and changed calls
+
+| Call | What it does |
+|---|---|
+| `ZRender.init(canvas, { getState, onTap, getSpeed })` | `getSpeed` (optional) returns how many times faster the floor should move (the Shell passes `ZCore.floorSpeed`, 1 or 2). Read every frame; missing, zero or broken = 1; kept between 0.25 and 4. |
+| `ZRender.startEdit({ onPick, onExit })` | Turns Edit mode on. Returns `true` (`false` only if there is no game state). The zoo keeps its normal look, the camera still drags, zoom still works. Leaves any open placement first. Calling it again just replaces the callbacks and clears the selection. |
+| `onPick(item)` | Called for every TAP while editing (not for drags): `item` is the engine item on that hex (a habitat, from any of its hexes, or a facility), or `null` for empty ground, the gate, forest, anything else. The normal `onTap` is never called while editing. The renderer does NOT select by itself: call `select`. |
+| `onExit()` | Called only when the renderer has to end Edit mode by itself: a new or loaded game (`getState()` starts returning another state) or `ZRender.reset()`. Not called by `stopEdit()`. |
+| `ZRender.stopEdit()` | Leaves Edit mode: clears the selection, leaves an open placement (without calling `onCancel`), gives the floor its full height back. Does not call `onExit`. Safe when not editing. |
+| `ZRender.editing()` | `true` while Edit mode is on (also while a placement started from it is open). |
+| `ZRender.select(itemId or null)` | Puts the outline round that item and glides the camera only if it is not already in clear view (clear of the note line at the top and of `#edit-bar` at the bottom). Returns `true` if the item exists (or for `null`), `false` for an unknown id (which also clears the selection). The outline follows the item when it is moved or turned, and goes by itself when the item is sold. Works outside Edit mode too, but `stopEdit`, a new game and `reset()` clear it. |
+| `ZRender.selected()` | The selected item id or `null`. |
+| `ZRender.startPlacement(spec, cbs)` | Unchanged, and works from inside Edit mode for adding (`{kind, t, repeat}`) and moving (`{moveId}`). While it is open, taps move the ghost (no `onPick`), the selection outline is hidden (only the ghost shows), and when it ends in any way (placed, Done, Cancel, `stopPlacement()`) Edit mode is still on with the same selection. |
+| `ZRender.debug()` | New fields: `editing`, `selected`, `barCover` (buffer px of floor allowed for the bottom bar), `ring`, `ringPath`, `ringDeco`, `onRing`, `offPath` (people standing on a built hex; must be 0), `speed`, `worldTime`, `clock`, `walked`, `walkSecs`, `roamed`, `maxStep`, `bounds`; `placement` also has `why`, `bad` (the hexes in the way) and `ring` (the ring the ghost would get). |
+
+### The selection outline
+Solid cyan `#35e6ff` blinking to solid white three times a second, 3 art pixels wide with a dark rim, round the outside of every hex
+of the selected thing. It is drawn over the sprites (fences and animals never hide it) and blinks on real time, also while the game is
+paused. Full alpha, no half-clear pixels (`alphaReport()` includes it).
+
+### Room for `#edit-bar`
+While editing or placing, the renderer measures `#placement-bar` and `#edit-bar` about three times a second (and at once on
+`select` and `startPlacement`). A bar counts when it exists, is displayed, has a size and is docked at the bottom of the floor (its
+bottom edge at the canvas's bottom edge, its top in the lower two thirds). The taller of the two is the allowance. With it: the
+ghost and the selected item are brought into view above the bar, the camera may scroll further down so the front row and the gate
+clear the bar (gate about 140 px above a 150 px strip at the limit), and a map shallower than the screen is centred in the part
+that shows. The allowance eases in and out, so nothing jumps. If `#edit-bar` does not exist nothing happens.
+**Menus:** keep `#edit-bar` inside `#floor-wrap`, docked at the bottom, and hide it (`display:none`) while `ZRender.placing()`: it
+would otherwise cover the Place / Rotate / Cancel bar. The strip may change height at any time.
+
+### Walkway ring (note 7)
+- Every hex of `ZE.ringCells(S)` is laid as ordinary walkway (same path tile) and is part of the walk graph like any path, so
+  visitors and staff walk round habitats and stop anywhere on the ring to look in. The trunk paths from the gate reuse ring hexes.
+- No decoration of any kind stands on a ring hex (no trees, bushes, flowers, rocks, and no lamps either). The holding-pen crate
+  keeps off them as it does off every path.
+- Placement uses `ZE.placeCheck`. The note line shows the engine's own `msg` (`Leave a walkway between habitats.`,
+  `Leave room for its walkway.`, `Keep the walkway clear.`, `That spot is taken.`, `That is off your land.`,
+  `Keep the entrance clear.`); the old `Something is in the way.` / `Outside your land.` wording is only a fallback for an engine
+  without `placeCheck`. Every hex in `cells` gets the solid red cross, and hexes in the way that are not under the ghost (the
+  habitat it would touch, say) also get their own blinking red outline, drawn on top.
+- A habitat ghost shows the ring it would get (`ZE.ringAt`, with `moveId` as `ignoreId`) as walkway tiles round it, and the
+  decorations on those hexes step aside while the ghost is there. The ring is shown for refused spots too.
+
+### Speed 2
+Animals, visitors, staff, gate people, the arrival hop and the floating pop-ups run on game time = real time x `getSpeed()`; walk
+and leg animation speed up with them. The camera, placement, the outline blinks, the marker bobbing and the map refresh stay on
+real time. Each frame's game time is cut into slices of at most 1/30 s, so the biggest single step anyone takes is about 1 buffer
+pixel at any speed, and people still go hex centre to hex centre, so they cannot cut through a fence. A pop-up lasts 1.7 s at
+speed 1 and 0.85 s at speed 2.
+
+### Challenge maps (`S.rows` 4 to 8)
+Nothing special-cased: the scroll limit is the owned land plus a margin, so on a 393x852 phone a 4-row map shows its whole depth at
+once and does not scroll up or down (it is centred), 6 and 8 rows scroll a little, and sideways the land edge stops 44 px inside
+the screen at each end. The gate starts on screen in the lower part. Behind the last owned row is forest. The first habitat ghost
+starts legal and in clear view. Measured in `render-edit.js` on levels `tiny` (4 rows), `small` (6) and `broke` (8).
+On the 4-row map the owned land is a band across the middle (about a third of the view); the rest is forest.
+
+### Flat symbols (Artist's redraw)
+Checked on the floor: markers above habitats sit inside their dark pill (symbols are 18 to 22 px wide and 19 to 24 px tall at
+density 2; the pill allows 24 x 30 per symbol), pop-up symbols sit beside their digits, the gate mark sits above the head.
+No change was needed.
+
+### Test files added
+`test/render-edit.js` (ring, refusals, ghost ring, speed, Edit mode, challenge maps; screenshots `test/shots/render-r7-*.png`) and
+`test/render-setup.js` (page-side helpers: the demo facilities one hex out across the walkway, pixel helpers).
+`test/render-floor.html` still tries its old "touching a habitat" facility spots, which the engine now refuses (it logs
+`no spot for ...`); the tests build those five facilities themselves through `render-setup.js`.
+
 ## Where it differs from the contract (read this first)
 
 1. **No separate stub sprites file.** The throwaway `test/render-stub-sprites.js` was not needed: the flat fallback shapes live inside

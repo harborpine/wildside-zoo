@@ -2,7 +2,7 @@
    Usage (Git Bash):  node test/render-shot.js [chromium|webkit|both] [--stub]
    Screenshots go to test/shots/render-*.png (Chromium) and render-*-webkit.png (WebKit). Exit code 1 if any check fails. */
 const path = require('path'), fs = require('fs');
-const pw = require('./pw.js');
+const pw = require('./pw.js'), rsetup = require('./render-setup.js');
 const root = path.resolve(__dirname, '..'), shots = path.join(__dirname, 'shots');
 fs.mkdirSync(shots, { recursive: true });
 const args = process.argv.slice(2), which = args.find(a => /^(chromium|webkit|both)$/.test(a)) || 'both';
@@ -28,11 +28,14 @@ async function run(name) {
   const lastTap = () => page.evaluate(() => RT.taps[RT.taps.length - 1] || null);
   const tapCount = () => page.evaluate(() => RT.taps.length);
 
+  // Update 7: nothing may stand against a habitat (walkway ring), so the harness's own "touching" facility spots are refused by the
+  // engine now. The five demo facilities are built here instead, one hex out across the walkway, through the real engine.
+  { const built = await page.evaluate(rsetup.facSetup); ok(built.length === 5, 'the five demo facilities should all find a legal spot one hex out from a habitat, built: ' + JSON.stringify(built)); notes.push('demo facilities built across the walkway: ' + built.join(', ')); }
   await page.evaluate(() => ZRender.watchAlpha(true)); // nothing on the floor may be drawn see-through (checked at the end)
   await sleep(3500);
   const d0 = await dbg(), K = await page.evaluate(() => ZGeo.DENSITY || 1); // K = buffer pixels per old art pixel (2 with the style-D art)
   notes.push('sprites: ' + (d0.realSprites ? 'REAL sprites.js' : 'built-in stub shapes') + (Object.keys(d0.spriteErrors).length ? ' (sprite errors: ' + JSON.stringify(d0.spriteErrors) + ')' : ''));
-  notes.push('harness log: ' + JSON.stringify(await page.evaluate(() => RT.log)));
+  notes.push('harness log (its old touching spots for facilities are refused since Update 7; see the line above): ' + JSON.stringify(await page.evaluate(() => RT.log)));
   notes.push('density ' + K + ': buffer ' + d0.buffer.w + 'x' + d0.buffer.h + ' at ' + d0.buffer.scale + ' CSS px (' + d0.buffer.deviceScale + ' device px) per buffer pixel; drawn sprites ' + d0.sprites + ', animals ' + d0.animals + ', visitors ' + d0.visitors + ', staff ' + d0.staff + ', combos outlined ' + d0.combos + ', path hexes ' + d0.paths);
   notes.push('frame cost ' + d0.frameMs + ' ms, ' + d0.fps + ' fps (headless)');
   ok(d0.buffer.deviceScale === 4 / K && Math.abs(d0.buffer.w - 195 * K) <= 1, 'buffer should be ' + 195 * K + ' wide at ' + 4 / K + ' device px (the same view as 195 old art pixels), got ' + JSON.stringify(d0.buffer));
@@ -121,7 +124,7 @@ async function run(name) {
   { const lk = await look(); ok(isGreen(lk.place) && !isGreen(lk.cancel), 'on a valid spot Place should be the green button and Cancel neutral: ' + JSON.stringify(lk)); ok(lk.noteTop >= 0 && lk.noteTop < 40 && lk.noteH < 44 && lk.noteBottom < lk.barTop - 200, 'the note should be one line at the top of the floor, well clear of the bottom controls: ' + JSON.stringify(lk)); notes.push('button colours valid: place ' + lk.place + ', cancel ' + lk.cancel + '; note ' + Math.round(lk.noteTop) + ' px from the floor top, ' + Math.round(lk.noteH) + ' px tall'); }
   ok(dp.q === spots.free.q && dp.r === spots.free.r && dp.ok, 'ghost did not move to the tapped free hex: ' + JSON.stringify(dp)); ok(/fits here/i.test(await note()), 'note on a free hex: "' + await note() + '"');
   await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 4, true), [spots.free.q, spots.free.r]); await sleep(250); await shot('place-valid'); notes.push('valid note: "' + await note() + '"');
-  await tapHex(spots.taken); dp = (await dbg()).placement; ok(!dp.ok && dp.state === 'bad', 'ghost on a built hex should be invalid'); ok(/in the way/i.test(await note()), 'note on a built hex: "' + await note() + '"');
+  await tapHex(spots.taken); dp = (await dbg()).placement; ok(!dp.ok && dp.state === 'bad', 'ghost on a built hex should be invalid'); ok(dp.why === 'taken' && dp.bad.length === 1 && dp.bad[0][0] === spots.taken.q && dp.bad[0][1] === spots.taken.r, 'a built hex should be refused as taken, with that hex marked: ' + JSON.stringify(dp)); ok(/that spot is taken/i.test(await note()), 'note on a built hex should give the reason from the engine:"' + await note() + '"');
   { const lk = await look(); ok(isGrey(lk.place) && !isGreen(lk.cancel), 'on an invalid spot Place should be grey: ' + JSON.stringify(lk)); }
   await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 4, true), [spots.taken.q, spots.taken.r]); await sleep(250); await shot('place-invalid'); notes.push('invalid note: "' + await note() + '"');
   await btn('zr-place').click({ force: true }); ok(await page.evaluate(() => RT.placed.length) === 0, 'Place on an invalid spot must not call onPlace');
