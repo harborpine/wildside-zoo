@@ -169,7 +169,8 @@ async function run(name) {
     const pb = await p.evaluate(() => [...document.querySelectorAll('#placement-bar button')].map(b => Math.round(b.getBoundingClientRect().bottom)));
     check(pb.length >= 2 && pb.every(v => v <= h - 34), 'placement buttons are fully above the inset (' + w + ': ' + pb + ')'); await p.evaluate(() => ZRender.stopPlacement());
     await p.evaluate(() => ZCore.push({ id: 'bk', title: 'T', render() {} })); await sleep(300);
-    check(await p.evaluate(() => Math.round(document.querySelector('.layer:not([hidden]) .back').getBoundingClientRect().bottom) <= innerHeight - 34), 'Back button is fully above the inset (' + w + ')'); await shot('back-inset-' + w, p); await p.evaluate(() => ZT.popAll());
+    const bk = await p.evaluate(() => { const L = document.querySelector('.layer:not([hidden])'), b = Math.round(L.querySelector('.back').getBoundingClientRect().bottom), pn = L.querySelector('.panel').getBoundingClientRect(), under = document.elementFromPoint(innerWidth / 2, innerHeight - 3); return { back: b, h: innerHeight, panelBottom: Math.round(pn.bottom), underIsPanel: !!(under && under.closest('.panel')) }; });
+    check(bk.back + 3 <= bk.h - 34 && bk.back >= bk.h - 34 - 10 && bk.panelBottom >= bk.h && bk.underIsPanel, 'update 7: the panel runs to the bottom of the screen (no zoo under it) and the Back button, outline included, ends within 10 px above the inset (' + w + ': ' + JSON.stringify(bk) + ')'); await shot('back-inset-' + w, p); await p.evaluate(() => ZT.popAll());
     await p.evaluate(() => ZCore.screens.screenCheck()); await sleep(300); await shot('screencheck-' + w, p);
     check(await p.evaluate(() => ZT.stack().join() === 'screencheck' && document.querySelector('.pbody').textContent.indexOf('safe top') >= 0), 'Screen check readout shows (' + w + ')');
     await c.close(); }
@@ -181,7 +182,9 @@ async function run(name) {
     const r = await p.evaluate(() => { const a = document.getElementById('app').getBoundingClientRect(), d = getComputedStyle(document.getElementById('s-date')), mo = getComputedStyle(document.getElementById('s-money')), h = getComputedStyle(document.documentElement), b = getComputedStyle(document.body), top = document.getElementById('s-date').getBoundingClientRect().top;
       return { appH: Math.round(a.height), screenH: screen.height, color: d.color, opacity: d.opacity, filter: d.filter, vis: d.visibility, moneyColor: mo.color, weightSame: d.fontWeight === mo.fontWeight, clipH: h.overflowY, clipB: b.overflowY, dateTop: Math.round(top), titleOn: document.body.classList.contains('title-on') }; });
     check(r.appH >= r.screenH && r.clipH === 'visible' && r.clipB === 'visible', 'short layout viewport (790 inside an 852 screen): #app is at least screen-tall and html/body do not clip (' + JSON.stringify({ appH: r.appH, clipH: r.clipH, clipB: r.clipB }) + ')');
-    check(r.color === 'rgb(255, 255, 255)' && r.opacity === '1' && r.filter === 'none' && r.vis === 'visible' && r.weightSame && !r.titleOn && r.dateTop >= 54 + 16, 'date reached through the title screen is full white, opaque, same weight as the money, and sits 16+ px below the top inset (' + JSON.stringify({ color: r.color, opacity: r.opacity, w: r.weightSame, top: r.dateTop }) + ')');
+    const tx = await p.evaluate(() => { const top = id => Math.round(document.getElementById(id).getBoundingClientRect().top * 10) / 10, st = document.getElementById('strip').getBoundingClientRect(), sr = document.querySelector('#s-stars .stars').getBoundingClientRect(); return { date: top('s-date'), money: top('s-money'), vis: top('s-vis'), stripH: Math.round(st.height), starsTop: Math.round(sr.top), starsBottom: Math.round(sr.bottom) }; });
+    check(r.color === 'rgb(255, 255, 255)' && r.opacity === '1' && r.filter === 'none' && r.vis === 'visible' && r.weightSame && !r.titleOn && tx.date >= 54 + 30 && tx.money >= 54 + 30 && tx.vis >= 54 + 30, 'update 7: every piece of TEXT in the strip (date, money, visitors) starts 30+ px below the top inset; date full white, opaque, same weight as the money (' + JSON.stringify(tx) + ')');
+    check(tx.stripH <= 54 + 62 && tx.starsTop >= 54 + 12 && tx.starsBottom <= 54 + 30, 'update 7: the strip stays compact (at most 62 px under the inset; it was 69) with only the star row in the 30 px zone (' + JSON.stringify({ stripH: tx.stripH, stars: [tx.starsTop, tx.starsBottom] }) + ')');
     await p.evaluate(() => ZCore.screens.screenCheck()); await sleep(300); await shot('screencheck-short', p);
     await c.close(); }
   { const { c, p } = await fresh({ width: 320, height: 568 }, '?play=1');
@@ -195,6 +198,69 @@ async function run(name) {
       check(cr.n === 4 && cr.one && cr.fits, 'icon chip row (3 stats + grade) fits on one line at 375 px (' + JSON.stringify(cr) + ')'); await shot('icon-chips', p); }
     console.log('  panel body at ' + w + 'x' + h + ': ' + JSON.stringify(r));
     check(r.appW === w && r.appH === h && r.x === 0, 'full screen at ' + w + 'x' + h + ': app fills the whole viewport');
+    await c.close(); }
+  // ---- update 7: strip fit, alert frame, floor speed, goal chip, challenge plumbing
+  // The engine side (ZE.nextGoal, ZE.newChallenge, ZE.challengeStatus) may not have landed: where a function is missing the test supplies a stand-in
+  // with the contract's shape (docs/UPDATE-7.md section A), so the shell is tested the same way either way. It prints which were stand-ins.
+  const standIns = () => {
+    const E = window.ZE, used = [];
+    if (typeof E.nextGoal !== 'function') { used.push('nextGoal'); E.nextGoal = S => ({ kind: 'visitors', icon: 'visitors', cur: 120, target: 300 }); }
+    if (typeof E.newChallenge !== 'function') { used.push('newChallenge'); E.newChallenge = id => { const S = E.newGame(ZCore.legacy, { starter: true }); S.ch = { id: id }; return S; }; }
+    if (typeof E.challengeStatus !== 'function') { used.push('challengeStatus'); E.challengeStatus = S => (S.ch ? { kind: 'money', icon: 'coin', cur: 12500, target: 40000, week: S.week, weeks: 60, weeksLeft: Math.max(0, 60 - S.week), starsNow: 2, done: false, failed: false } : null); }
+    return used;
+  };
+  const levelId = () => { const L = window.ZD && ZD.LEVELS; const a = Array.isArray(L) ? L : L ? Object.keys(L).map(k => L[k]) : []; return a.length ? [a[0].id, a[1] ? a[1].id : a[0].id] : ['L1', 'L2']; };
+  { const { c, p } = await fresh({ width: 375, height: 667 }, '?play=1');
+    const used = await p.evaluate(standIns); console.log('  engine stand-ins used by this test: ' + (used.length ? used.join(', ') : 'none (real engine)'));
+    const f = await p.evaluate(() => { ZT.skipReports = true; const S = ZT.S; S.money = 9999999; S.visitorsLast = 99999; S.week = 20 * 48 - 1; ZCore.updateStrip();
+      const row = document.querySelector('.srow.txt'), k = [...row.children].map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right), Math.round(r.top + r.height / 2)]; }), st = document.getElementById('strip');
+      return { money: document.getElementById('s-money').textContent, date: document.getElementById('s-date').textContent, k, n: k.length, over: st.scrollWidth > st.clientWidth, rowOver: row.scrollWidth > row.clientWidth, stripH: Math.round(st.getBoundingClientRect().height) }; });
+    check(f.money === '$9,999,999' && f.n === 3 && !f.over && !f.rowOver && f.k[0][0] >= 10 && f.k[2][1] <= 365 && f.k[0][1] + 6 <= f.k[1][0] && f.k[1][1] + 6 <= f.k[2][0] && f.k.every(x => Math.abs(x[2] - f.k[0][2]) <= 2), 'update 7: at 375 px wide the date, $9,999,999 and 99,999/wk sit on ONE row, 6+ px apart, inside the margins (' + JSON.stringify(f) + ')');
+    await shot('strip-375-max', p);
+    // goal chip (normal zoo)
+    const g = await p.evaluate(() => { ZCore.updateStrip(); const e = document.getElementById('goal'), r = e.getBoundingClientRect(), st = document.getElementById('strip').getBoundingClientRect(), fl = document.getElementById('floor').getBoundingClientRect(), cs = getComputedStyle(e), want = ZE.nextGoal(ZT.S);
+      const mid = document.elementFromPoint(fl.left + fl.width / 2, fl.top + fl.height / 2), hit = document.elementFromPoint(r.left + 10, r.top + 10);
+      return { shown: cs.display !== 'none', text: e.textContent, want: ZCore.fmt.short(want.cur) + '/' + ZCore.fmt.short(want.target), hasIcon: !!e.querySelector('.sym'), top: Math.round(r.top - st.bottom), bottom: Math.round(r.bottom - st.bottom), right: Math.round(r.right), bg: cs.backgroundColor, op: cs.opacity, mid: mid && mid.id, hit: hit && hit.id, pe: cs.pointerEvents }; });
+    check(g.shown && g.text === g.want && g.hasIcon && g.top === 0 && g.bottom <= 30 && g.right <= 375 / 2 && g.mid === 'floor' && g.hit === 'floor' && g.pe === 'none' && g.op === '1' && /^rgb\(/.test(g.bg), 'update 7: the goal chip shows ZE.nextGoal as symbol, current/target; solid, hanging just under the strip in the left corner, never over the middle, and taps pass through it (' + JSON.stringify(g) + ')');
+    await shot('goal-chip', p);
+    const g2 = await p.evaluate(() => { ZCore.push({ id: 'x', title: 'T', render() {} }); const a = getComputedStyle(document.getElementById('goal')).display; ZT.popAll(); ZT.title(); const b = getComputedStyle(document.getElementById('goal')).display; ZT.loadSlot(1); return { open: a, title: b, back: getComputedStyle(document.getElementById('goal')).display }; });
+    check(g2.open === 'none' && g2.title === 'none' && g2.back !== 'none', 'update 7: the goal chip hides while a screen is open and on the title, and returns in play (' + JSON.stringify(g2) + ')');
+    // floor speed for the Renderer
+    const sp = await p.evaluate(() => { ZCore.setSpeed(1); const a = ZCore.floorSpeed(); ZCore.setSpeed(2); const b = ZCore.floorSpeed(), b2 = ZCore.speed; ZCore.setSpeed(1); ZT.title(); const t = ZCore.floorSpeed(); ZT.loadSlot(1); return { a, b, b2, t }; });
+    check(sp.a === 1 && sp.b === 2 && sp.b2 === 2 && sp.t === 1, 'update 7: ZCore.floorSpeed() is 1 at speed 1, 2 at speed 2, and 1 on the title (' + JSON.stringify(sp) + ')');
+    // alert frame
+    await p.evaluate(() => { const u = ZCore.ui; ZCore.push({ id: 'al', title: 'Alert', render(b) { b.appendChild(u.grid([{ icon: 'm-staff', label: 'Staff', badge: 2 }, { icon: 'm-animals', label: 'Animals', alert: true }, { icon: 'm-info', label: 'Info' }])); b.appendChild(u.btn('Research', null, { cls: 'big', alert: true })); b.appendChild(u.list([{ title: 'Row', sub: 'waiting', alert: true }, { title: 'Row', sub: 'quiet' }])); b.appendChild(u.tabs([{ id: 'a', label: 'One' }, { id: 'b', label: 'Two', alert: true }], 'a')); } }); }); await sleep(300);
+    const seen = new Set(); let al = null;
+    for (let i = 0; i < 12; i++) { al = await p.evaluate(() => { const L = document.querySelector('.layer:not([hidden])'), a = [...L.querySelectorAll('.alert')], cs = getComputedStyle(a[0]), q = L.querySelectorAll('.gbox')[2];
+      return { n: a.length, badges: L.querySelectorAll('.badge').length, color: cs.outlineColor, style: cs.outlineStyle, width: cs.outlineWidth, offset: cs.outlineOffset, op: cs.opacity, timing: cs.animationTimingFunction, quiet: getComputedStyle(q).outlineStyle, red: [...L.querySelectorAll('*')].filter(e => getComputedStyle(e).backgroundColor === 'rgb(224, 88, 74)').length }; }); seen.add(al.color); await sleep(150); }
+    const cols = [...seen];
+    check(al.n === 5 && al.badges === 0 && al.red === 0 && al.style === 'solid' && al.width === '4px' && al.offset === '-4px' && al.op === '1' && /^steps/.test(al.timing) && al.quiet === 'none' && cols.length === 2 && cols.every(x => /^rgb\(\d+, \d+, \d+\)$/.test(x)), 'update 7: .alert is a 4 px solid frame inside the element, stepping between exactly two solid golds; no red number box anywhere; grid, button, row and tab all take it (' + JSON.stringify(al) + ' colours ' + cols.join(' | ') + ')');
+    await shot('alert-frame', p); await p.evaluate(() => ZT.popAll());
+    await c.close(); }
+  { // challenge plumbing: own save keys, resume, best stars, back to the title, zoo slots untouched
+    const { c, p } = await fresh({ width: 393, height: 852 }, '?standalone=1&inset=34&insett=62');
+    await p.evaluate(standIns); const [L1, L2] = await p.evaluate(levelId);
+    const a = await p.evaluate(L1 => { ZT.skipReports = true; ZT.newGame({ slot: 2, zooName: 'Keep' }); ZT.tick(3); ZT.title(); const slotDoc = localStorage.getItem('wildside-zoo-v3-slot2'), legacy = localStorage.getItem('wildside-zoo-v3-legacy');   // toTitle saves, so read the slot after it
+      const before = { inCh: ZCore.inChallenge(), stars: ZCore.challengeStars(), saved: ZCore.challengeSaved() };
+      const S = ZCore.startChallenge(L1); ZCore.WEEK_MS[1] = 600000; ZCore.WEEK_MS[2] = 600000; ZT.tick(2); ZT.save();
+      return { before, started: !!S && !!S.ch, inCh: ZCore.inChallenge(), id: ZCore.challengeId, slot: ZCore.slot, stack: ZT.stack().length, week: ZT.S.week, saved: ZCore.challengeSaved(), keyThere: !!localStorage.getItem('wildside-zoo-v3-challenge'), slotSame: localStorage.getItem('wildside-zoo-v3-slot2') === slotDoc, legacySame: localStorage.getItem('wildside-zoo-v3-legacy') === legacy, slots: ZT.slots().map(s => s.empty), newGame: ZCore.newGame({}) === null && ZCore.inChallenge() }; }, L1);
+    check(a.before.inCh === false && Object.keys(a.before.stars).length === 0 && a.before.saved === null && a.started && a.inCh && String(a.id) === String(L1) && a.slot === null && a.stack === 0 && a.keyThere && a.saved && String(a.saved.levelId) === String(L1) && a.saved.week === a.week && a.slotSame && a.legacySame && a.slots.join() === 'true,false,true' && a.newGame, 'update 7: startChallenge starts a run in its own save key; the zoo slots and carry-over record are untouched; newGame without a slot is refused inside a challenge (' + JSON.stringify(a) + ')');
+    await sleep(300); await shot('challenge-chip', p);
+    const ch = await p.evaluate(() => { const e = document.getElementById('goal'), r = e.getBoundingClientRect(), s = ZE.challengeStatus(ZT.S); return { shown: getComputedStyle(e).display !== 'none', text: e.textContent, want: ZCore.fmt.short(s.cur) + '/' + ZCore.fmt.short(s.target) + s.weeksLeft, stars: e.querySelectorAll('.star').length, lit: e.querySelectorAll('.star:not(.off)').length, starsNow: s.starsNow | 0, syms: e.querySelectorAll('.sym').length, right: Math.round(r.right), w: innerWidth }; });
+    check(ch.shown && ch.text === ch.want && ch.stars === 3 && ch.lit === ch.starsNow && ch.syms === 2 && ch.right <= ch.w * 0.62, 'update 7: in a challenge the chip shows the level goal, the weeks left and the stars on offer (' + JSON.stringify(ch) + ')');
+    // quit to the title and come back: the run resumes
+    const b = await p.evaluate(() => { const w = ZT.S.week; const left = ZCore.leaveChallenge(); const onTitle = ZT.S === null && ZCore.inChallenge() === false && ZT.stack().length === 1; const ok = ZCore.resumeChallenge(); return { left, onTitle, ok, week: ZT.S && ZT.S.week, w, inCh: ZCore.inChallenge(), hasCh: !!(ZT.S && ZT.S.ch), slot: ZCore.slot }; });
+    check(b.left && b.onTitle && b.ok && b.week === b.w && b.inCh && b.hasCh && b.slot === null, 'update 7: leaving a challenge shows the title, and resumeChallenge brings the same run back (' + JSON.stringify(b) + ')');
+    await p.reload(); await p.waitForFunction(() => window.ZT && document.documentElement.dataset.ready); await sleep(300); await p.evaluate(standIns);
+    const b2 = await p.evaluate(() => { const t = ZT.S === null; const s = ZCore.challengeSaved(); const ok = ZCore.resumeChallenge(); return { t, s, ok, week: ZT.S && ZT.S.week, inCh: ZCore.inChallenge() }; });
+    check(b2.t && b2.s && b2.ok && b2.week === b.w && b2.inCh, 'update 7: after closing and reopening the app the title shows first and the saved challenge run resumes (' + JSON.stringify(b2) + ')');
+    // the result report: best stars are kept the moment it arrives; a worse result never lowers them; a finished run is not offered for resume
+    const r1 = await p.evaluate(() => { ZT.skipReports = true; ZT.S.reports.push({ type: 'challenge', level: ZCore.challengeId, stars: 2, week: ZT.S.week }); ZT.flush(); return { stars: ZCore.challengeStars(), raw: localStorage.getItem('wildside-zoo-v3-challenge-stars') }; }); await sleep(200);
+    const r2 = await p.evaluate(L1 => { ZCore.leaveChallenge(); const savedAfter = ZCore.challengeSaved(); ZT.skipReports = true; ZCore.startChallenge(L1); ZT.S.reports.push({ type: 'challenge', level: L1, stars: 1, week: 5 }); ZT.flush(); const worse = ZCore.challengeStars()[L1]; ZCore.startChallenge(L1); ZT.S.reports.push({ type: 'challenge', level: L1, stars: 0, week: 60 }); ZT.flush(); const failed = ZCore.challengeStars()[L1]; ZCore.startChallenge(L1); ZT.S.reports.push({ type: 'challenge', level: L1, stars: 3, week: 5 }); ZT.flush(); return { savedAfter, worse, failed, better: ZCore.challengeStars()[L1] }; }, L1);
+    check(r1.stars[L1] === 2 && r1.raw && r2.savedAfter === null && r2.worse === 2 && r2.failed === 2 && r2.better === 3, 'update 7: the challenge report saves the best stars in their own key (2, then a 1 and a fail leave 2, then 3), and a finished run is cleared (' + JSON.stringify({ r1: r1.stars, r2 }) + ')');
+    const r3 = await p.evaluate(L2 => { ZCore.startChallenge(L2); ZT.tick(1); ZCore.clearChallenge(); const t = ZT.S === null && ZCore.challengeSaved() === null; const ok = ZT.loadSlot(2); return { t, ok, name: ZT.S && ZT.S.zooName, week: ZT.S && ZT.S.week, inCh: ZCore.inChallenge(), slot: ZCore.slot, stars: ZCore.challengeStars() }; }, L2);
+    check(r3.t && r3.ok && r3.name === 'Keep' && r3.week === 3 && r3.inCh === false && r3.slot === 2 && Object.keys(r3.stars).length === 1, 'update 7: clearChallenge forgets the run and shows the title; the zoo in slot 2 loads exactly as it was left (' + JSON.stringify(r3) + ')');
+    check((await p.evaluate(() => ZT.errors.length)) === 0, 'update 7: no errors during the challenge checks ' + JSON.stringify(await p.evaluate(() => ZT.errors)));
     await c.close(); }
   await browser.close();
 }

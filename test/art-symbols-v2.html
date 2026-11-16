@@ -1,0 +1,73 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Symbols v2 sample</title>
+<style>
+  html, body { margin: 0; background: #fbeccb; font-family: system-ui, "Segoe UI", sans-serif; color: #3a2a33; }
+  #page { width: 390px; padding: 10px 10px 14px; box-sizing: border-box; background: #fbeccb; }
+  h1 { font-size: 17px; margin: 0 0 2px; } .note { font-size: 11px; color: #7a6a66; margin: 0 0 6px; line-height: 1.3; }
+  .head, .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .head div { font-size: 12px; font-weight: 800; text-align: center; background: #6b5038; color: #fff; padding: 2px 0; }
+  .name { font-size: 14px; font-weight: 800; margin: 7px 0 2px; border-top: 2px solid #d9bf8a; padding-top: 4px; }
+  .cell { display: flex; align-items: center; gap: 8px; background: #fbeccb; min-height: 104px; }
+  .big { width: 104px; height: 104px; display: flex; align-items: center; justify-content: center; flex: none; }
+  img { image-rendering: pixelated; image-rendering: crisp-edges; image-rendering: pixelated; display: block; }
+  .real { display: flex; flex-direction: column; gap: 7px; align-items: flex-start; }
+  .chip { display: inline-flex; align-items: center; gap: 3px; background: #fff8e6; border: 2px solid #3a2a33; padding: 1px 5px 1px 3px; font-weight: 800; font-size: 14px; }
+  .chip.sm { font-size: 11px; padding: 0 2px 0 1px; gap: 1px; } .chip.sm img { height: 13px; width: auto; }
+  .cap { font-size: 10px; color: #7a6a66; margin: 1px 0 0; grid-column: 1 / 3; line-height: 1.25; }
+  .tag { font-size: 12px; font-weight: 800; }
+</style></head><body>
+<div id="page"></div>
+<script src="../geo.js"></script>
+<script src="../data.js"></script>
+<script src="../sprites.js"></script>
+<script src="art-symbols-v2.js"></script>
+<script>
+'use strict';
+window.__err = []; window.onerror = function (m) { window.__err.push(String(m)); };
+ZSprites.setDensity(2);
+var SHEETS = {
+  1: { title: 'New symbols, sample 1 of 3: animal stats and staff skills', rows: [
+    ['Charm', 'stat-charm', 'stat-charm', 'Pink sparkle, flat, with a small second sparkle'],
+    ['Energy', 'stat-vigor', 'stat-vigor', 'Lightning bolt with an orange stripe'],
+    ['Smarts', 'stat-wit', 'stat-wit', 'Lightbulb switched on, with glow marks'],
+    ['Care', 'skill-care', 'skill-care', 'Green heart with a paw print'],
+    ['Science', 'skill-sci', 'skill-sci', 'Three test tubes, three colours'],
+    ['Scouting', 'skill-exp', 'skill-exp', 'Compass with a red and blue needle']] },
+  2: { title: 'New symbols, sample 2 of 3: everyday symbols', rows: [
+    ['Money', 'coin', 'coin', 'Flat coin with a dollar sign'],
+    ['Time', 'time', 'time', 'Clock face with ticks and hands'],
+    ['Research points', 'rp', 'rp', 'Flask of blue liquid with bubbles'],
+    ['Visitors', 'visitors', 'visitors', 'Smiling guest holding a balloon'],
+    ['Habitat', 'habitat', 'habitat', 'Picket fence with a tree and grass behind it']] },
+  3: { title: 'New symbols, sample 3 of 3: Hosting, pick A, B or C', rows: [
+    ['Hosting, idea A', 'skill-charm', 'host-a', 'A: waving hand'],
+    ['Hosting, idea B', 'skill-charm', 'host-b', 'B: speech bubble with a smile'],
+    ['Hosting, idea C', 'skill-charm', 'host-c', 'C: megaphone']] }
+};
+function el(t, c, txt) { var e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; }
+function cell(src, w, h) {
+  var c = el('div', 'cell'), big = el('div', 'big'), k = Math.max(1, Math.floor(104 / Math.max(w, h))), im = new Image();
+  im.src = src; im.width = w * k; im.height = h * k; big.appendChild(im); c.appendChild(big);
+  var real = el('div', 'real');
+  var a = el('span', 'chip'), i1 = new Image(); i1.src = src; i1.width = w; i1.height = h; a.appendChild(i1); a.appendChild(el('span', '', '42')); real.appendChild(a);
+  var b = el('span', 'chip sm'), i2 = new Image(); i2.src = src; b.appendChild(i2); b.appendChild(el('span', '', '42')); real.appendChild(b);
+  var lone = new Image(); lone.src = src; lone.width = w; lone.height = h; real.appendChild(lone);
+  c.appendChild(real); return c;
+}
+window.__build = function (n) {
+  var sh = SHEETS[n], page = document.getElementById('page'); page.innerHTML = '';
+  page.appendChild(el('h1', '', sh.title));
+  page.appendChild(el('p', 'note', 'Big picture = enlarged. The small ones beside it are the real sizes used in the game (hold this picture at full phone width).'));
+  var head = el('div', 'head'); head.appendChild(el('div', '', 'OLD (today)')); head.appendChild(el('div', '', 'NEW')); page.appendChild(head);
+  sh.rows.forEach(function (r) {
+    page.appendChild(el('div', 'name', r[0]));
+    var row = el('div', 'row'), o = ZSprites.icon(r[1]), nw = ZSymV2.draw(r[2]);
+    row.appendChild(cell(ZSprites.iconUrl(r[1], 2), o.w, o.h)); row.appendChild(cell(nw.toDataURL('image/png'), nw.width, nw.height));
+    row.appendChild(el('div', 'cap', 'New: ' + r[3])); page.appendChild(row);
+  });
+  return Promise.all(Array.prototype.map.call(document.images, function (im) { return im.decode ? im.decode().catch(function () {}) : null; }));
+};
+// solid-pixel check for the new drawings: every pixel must be fully clear or fully solid
+window.__alphaCheck = function () { var bad = []; ZSymV2.LIST.forEach(function (id) { var c = ZSymV2.draw(id), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (var i = 3; i < d.length; i += 4) if (d[i] !== 0 && d[i] !== 255) { bad.push(id); break; } }); return bad; };
+window.__sizes = function () { return ZSymV2.LIST.map(function (id) { var c = ZSymV2.draw(id); return id + ' ' + c.width + 'x' + c.height; }); };
+</script></body></html>

@@ -86,8 +86,6 @@ body.screens-open #news, body.placing #news, body.title-on #news { visibility: h
 .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .btn.gbox { flex-direction: column; justify-content: center; min-height: 104px; padding: 10px 4px; margin: 3px; gap: 6px; font-size: 15px; }
 .gbox .ico { height: 48px; } .gbox .ico.ph { width: 48px; height: 48px; line-height: 48px; font-size: 26px; }
-.gbox .badge { position: absolute; top: -8px; right: -8px; min-width: 20px; height: 20px; padding: 0 5px; background: var(--red); color: #fff; font-size: 12px; line-height: 20px; box-shadow: 0 0 0 2px var(--bd); text-align: center; }
-.gbox .badge:empty { width: 20px; }
 
 /* ---------- list rows ---------- */
 .list { display: flex; flex-direction: column; gap: 8px; }
@@ -161,7 +159,7 @@ body.screens-open #news, body.placing #news, body.title-on #news { visibility: h
 .flip { animation: flip .35s steps(6) both; } @keyframes flip { 0% { transform: scaleX(1); } 50% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
 
 /* ---------- toast ---------- */
-#toasts { position: absolute; left: 12px; right: 12px; bottom: calc(96px + var(--safe-b)); flex-direction: column-reverse !important; z-index: 40; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+#toasts { position: absolute; left: 12px; right: 12px; bottom: calc(82px + var(--safe-b)); flex-direction: column-reverse !important; z-index: 40; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .toast { background: var(--cream); color: var(--ink); padding: 9px 14px; font-size: 14px; text-align: center; max-width: 100%; margin: 3px; animation: toastin .2s steps(4), toastout .35s steps(4) 2.05s forwards;
   box-shadow: 0 -3px 0 0 var(--bd), 0 3px 0 0 var(--bd), -3px 0 0 0 var(--bd), 3px 0 0 0 var(--bd), 0 6px 0 0 #1f160d; }
 .toast.good { background: #d8f4c2; } .toast.bad { background: #ffd9d2; animation-delay: 0s, 3.05s; }
@@ -230,3 +228,36 @@ html.sa #app { position: relative; top: auto; bottom: auto; left: auto; right: a
 .btn.disabled, .btn.disabled.primary, .btn.disabled.blue, .btn.disabled.warn, .btn.disabled.danger, .btn.disabled.back, .btn.disabled.ghost { --bd: #a89a80; --hl: #f3ecda; --sh: #d6cbb0; background: #e6dcc3 !important; color: #8a7d66 !important; filter: grayscale(1); opacity: 1; cursor: default; }
 .btn.disabled .sub, .btn.disabled .lbl { color: #8a7d66 !important; }
 .row.disabled { --line: #cfc4aa; background: #eee6d3; color: #8a7d66; filter: grayscale(1); opacity: 1; }
+
+/* ---------- update 7: top strip. The iOS status-bar fade softens TEXT for about 30 px under the top inset, so that zone holds only the star row
+   (a picture, not text); date, money and visitors share ONE row that starts 31 px under the inset. The strip is 62 px under the inset (was 69). ---------- */
+#strip { padding-top: calc(15px + var(--safe-t)); padding-bottom: 6px; }
+.srow.gfx { min-height: 13px; height: 13px; justify-content: flex-end; }
+.srow.gfx .rank, .srow.gfx .stars { display: flex; }
+.srow.gfx .stars .star { width: 13px; height: 13px; }
+.srow.txt { margin-top: 3px; min-height: 22px; flex-wrap: nowrap; white-space: nowrap; }
+.srow.txt > * { flex: none; }
+@media (max-width: 350px) { .srow.txt .date { font-size: 12px; } .srow.txt .chipm { font-size: 14px; gap: 4px; } .srow.txt { gap: 4px; } }
+
+/* ---------- update 7: next-goal chip, a solid tab hanging from the strip's left corner (never over the middle of the zoo; taps pass through) ---------- */
+#goal { position: absolute; left: calc(6px + var(--safe-l)); top: 0; z-index: 9; display: none; align-items: center; gap: 5px; height: 26px; padding: 0 8px 2px; background: var(--ink); color: #fff; font-size: 14px; font-weight: 700; line-height: 1; white-space: nowrap; pointer-events: none;
+  box-shadow: 0 3px 0 0 #000, -3px 0 0 0 #000, 3px 0 0 0 #000, -3px 3px 0 0 #000, 3px 3px 0 0 #000; }
+#goal.on { display: flex; }
+#goal .sym { height: 16px; width: auto; }
+#goal .gs { color: #c9b48a; }
+#goal .met { color: #9be37f; }
+#goal .low { color: #ff8d80; }
+#goal .gsep { width: 3px; height: 14px; background: #6b5238; margin: 0 2px; }
+#goal .stars .star { width: 11px; height: 11px; }
+body.screens-open #goal, body.title-on #goal, body.placing #goal { display: none; }
+
+/* ---------- update 7: panels run to the bottom of the screen; the Back button sits just above the home-indicator inset ---------- */
+.layer:not(.modal) { padding-bottom: 0; }
+.layer:not(.modal) > .panel { margin-bottom: 0; }
+.pfoot { padding-bottom: max(10px, calc(var(--safe-b) + 4px)); }
+
+/* ---------- update 7: the one "something is waiting here" mark. A solid gold frame drawn INSIDE the element's own edge (nothing sticks out,
+   nothing overlaps a neighbour), stepping between two solid golds. Put class "alert" on any button, grid box, row or tab. ---------- */
+.alert { outline: 4px solid var(--alert-a, #ffc400); outline-offset: -4px; animation: alertpulse .9s steps(1) infinite; }
+@keyframes alertpulse { 0% { outline-color: var(--alert-a, #ffc400); } 50% { outline-color: var(--alert-b, #e07b00); } }
+@media (prefers-reduced-motion: reduce) { .alert { animation: none; } }

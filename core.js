@@ -4,6 +4,7 @@
   'use strict';
   const D = window.ZD, E = window.ZE;
   const SAVE_KEY = 'wildside-zoo-v3', LEGACY_KEY = 'wildside-zoo-v3-legacy', PREV_LOG_KEY = 'wildside-zoo-v3-prevlog';
+  const CH_KEY = SAVE_KEY + '-challenge', CH_STARS_KEY = SAVE_KEY + '-challenge-stars';   // the one challenge run in progress, and best stars per level; both apart from the three zoo slots
   const SAVE_V = 3, LOG_FORMAT = 1;
   const STANDALONE = navigator.standalone === true || /[?&]standalone=1/.test(location.search) || !!(window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches));
   const NEWS_MS = 4000;   // how long a news line stays on the floor
@@ -14,6 +15,7 @@
   const MAX_CUR_EVENTS = 800, KEEP_DETAIL_QUARTERS = 6, MAX_ARG_LEN = 80;
 
   let S = null, ghost = null, slot = null, speed = 1, acc = 0, lastT = 0, lastRunning = null, timer = 0;
+  let chId = null, chOver = false, goalKey = null, goalErr = false;   // challenge level being played (null in a normal zoo); its result has arrived
   let busy = null;                          // the report currently on screen (or null)
   let busySince = 0, emptyStackSince = 0, token = 0;
   let lastPl = false, newsKey = null, newsTimer = 0, skipReports = false, dirtySave = false, saveTimer = 0, saveFailedToast = false;
@@ -21,7 +23,7 @@
   const errors = [];
   const handlers = {};
   const stack = [];                          // entries: {id, def, layer, panel, body, titleEl, api}
-  let $strip, $date, $stars, $money, $vis, $floor, $news, $screens, $toasts, $stage;
+  let $strip, $date, $stars, $money, $vis, $goal, $floor, $news, $screens, $toasts, $stage;
 
   // ------------------------------------------------------------------ small helpers
   const $ = id => document.getElementById(id);
@@ -37,6 +39,7 @@
   const fmt = {
     num(n) { n = Math.round(+n || 0); const a = Math.abs(n); return a >= 1e9 ? (n / 1e9).toFixed(2) + 'B' : a >= 1e7 ? (n / 1e6).toFixed(1) + 'M' : n.toLocaleString('en-US'); },
     money(n) { n = +n || 0; return (n < 0 ? '-$' : '$') + fmt.num(Math.abs(n)); },
+    short(n) { n = Math.round(+n || 0); const a = Math.abs(n), t = x => String(x).replace(/\.0$/, ''); return a >= 1e6 ? t((n / 1e6).toFixed(a >= 1e7 ? 0 : 1)) + 'M' : a >= 1e4 ? t((n / 1e3).toFixed(a >= 1e5 ? 0 : 1)) + 'K' : n.toLocaleString('en-US'); },   // 950, 9,500, 12.5K, 250K, 1.2M
     signs(level) { return level == null ? '?' : ['--', '-', '+', '++'][Math.max(0, Math.min(3, level | 0))]; },   // level 0..3 -> -- - + ++
     stars(n, max) { max = max || 5; n = Math.max(0, Math.min(max, n | 0)); return '★'.repeat(n) + '☆'.repeat(max - n); },
     date(St) { const s = E.dateStr(St || S), m = /^Year (\d+), (\w+) week (\d+)$/.exec(s); return m ? 'Y' + m[1] + ' ' + (MONTH3[m[2]] || m[2].slice(0, 3)) + ' w' + m[3] : s; },
@@ -69,7 +72,7 @@
   function img(url, opts) { opts = opts || {}; return el('img', { cls: 'px' + (opts.cls ? ' ' + opts.cls : ''), src: url, alt: opts.alt || '', width: opts.w, height: opts.h }); }
   function btn(label, onTap, o) {
     o = o || {}; let last = 0;
-    const b = el('button', { type: 'button', cls: 'btn' + (o.cls ? ' ' + o.cls : '') + (o.disabled ? ' disabled' : '') }, o.icon ? icon(o.icon, o.iconScale) : null, el('span', { cls: 'lbl' }, label), o.sub ? el('span', { cls: 'sub' }, o.sub) : null);
+    const b = el('button', { type: 'button', cls: 'btn' + (o.cls ? ' ' + o.cls : '') + (o.disabled ? ' disabled' : '') + (o.alert ? ' alert' : '') }, o.icon ? icon(o.icon, o.iconScale) : null, el('span', { cls: 'lbl' }, label), o.sub ? el('span', { cls: 'sub' }, o.sub) : null);
     if (o.disabled) b.setAttribute('aria-disabled', 'true');
     b.addEventListener('click', ev => { if (o.disabled) { if (o.onDisabled) o.onDisabled(ev); return; } const t = performance.now(); if (t - last < 220) return; last = t; if (onTap) onTap(ev); });
     return b;
@@ -77,8 +80,7 @@
   function grid(items, o) {
     o = o || {}; const g = el('div', { cls: 'grid' + (o.cls ? ' ' + o.cls : ''), style: o.cols ? { gridTemplateColumns: 'repeat(' + o.cols + ',1fr)' } : null });
     (items || []).forEach(it => {
-      const b = btn(it.label, it.onTap, { icon: it.icon, iconScale: it.iconScale || 6, sub: it.sub, disabled: it.disabled, cls: 'gbox' + (it.cls ? ' ' + it.cls : '') });
-      if (it.badge) b.appendChild(el('span', { cls: 'badge' }, it.badge === true ? '' : String(it.badge)));
+      const b = btn(it.label, it.onTap, { icon: it.icon, iconScale: it.iconScale || 6, sub: it.sub, disabled: it.disabled, alert: it.alert || it.badge, cls: 'gbox' + (it.cls ? ' ' + it.cls : '') });   // `badge` (old name) now draws the gold alert frame, no number box
       g.appendChild(b);
     });
     return g;
@@ -87,7 +89,7 @@
     const l = el('div', { cls: 'list' + (o && o.cls ? ' ' + o.cls : '') });
     (rows || []).forEach(r => {
       const left = r.img ? (r.img.nodeType ? r.img : el('span', { cls: 'portrait' }, img(r.img))) : r.icon ? el('span', { cls: 'portrait' }, icon(r.icon, 4)) : null;
-      const row = el(r.onTap ? 'button' : 'div', { cls: 'row' + (r.onTap ? ' tappable' : '') + (r.cls ? ' ' + r.cls : '') + (r.disabled ? ' disabled' : ''), type: r.onTap ? 'button' : null },
+      const row = el(r.onTap ? 'button' : 'div', { cls: 'row' + (r.onTap ? ' tappable' : '') + (r.cls ? ' ' + r.cls : '') + (r.disabled ? ' disabled' : '') + (r.alert ? ' alert' : ''), type: r.onTap ? 'button' : null },
         left, el('span', { cls: 'main' }, r.title != null ? el('span', { cls: 't' }, r.title) : null, r.sub != null ? el('span', { cls: 's' }, r.sub) : null, r.chips ? el('span', { cls: 'chips' }, r.chips) : null),
         r.right != null ? el('span', { cls: 'right' }, r.right) : null);
       if (r.onTap && !r.disabled) row.addEventListener('click', r.onTap);
@@ -130,7 +132,7 @@
   function note(text) { return el('div', { cls: 'note' }, text); }
   function tabs(items, active, onChange) {
     const w = el('div', { cls: 'tabs' });
-    items.forEach(t => { const id = typeof t === 'string' ? t : t.id, label = typeof t === 'string' ? t : t.label; w.appendChild(el('button', { type: 'button', cls: 'tab' + (id === active ? ' on' : ''), tap: () => { if (id !== active && onChange) onChange(id); } }, label)); });
+    items.forEach(t => { const id = typeof t === 'string' ? t : t.id, label = typeof t === 'string' ? t : t.label; w.appendChild(el('button', { type: 'button', cls: 'tab' + (id === active ? ' on' : '') + (t && t.alert ? ' alert' : ''), tap: () => { if (id !== active && onChange) onChange(id); } }, label)); });
     return w;
   }
   function reveal(o) {   // card for reveal sequences; whole card is a tap target
@@ -231,6 +233,7 @@
   }
   function flushReports() {
     if (!S || busy || !S.reports || !S.reports.length) return;
+    noteChallenge();
     const report = S.reports[0]; busy = report; busySince = performance.now(); const my = ++token; syncRunning();
     log('report', { type: report.type, key: report.key || report.title || undefined });
     tele('reports', report.type);
@@ -286,7 +289,7 @@
     if (!S) return '(no game)';
     const g = S.glog, p = S.play, L = [];
     L.push('WILDSIDE ZOO GAMEPLAY LOG (log format ' + LOG_FORMAT + ', save v' + SAVE_V + ')');
-    L.push('zoo: ' + S.zooName + ' | run: ' + S.runId + ' | zoo number: ' + (S.ng + 1) + ' | started: ' + new Date(S.startedAt).toISOString() + ' | now: ' + new Date().toISOString());
+    L.push('zoo: ' + S.zooName + ' | run: ' + S.runId + (chId != null ? ' | challenge level: ' + chId : '') + ' | zoo number: ' + ((S.ng || 0) + 1) + ' | started: ' + (S.startedAt ? new Date(S.startedAt).toISOString() : '?') + ' | now: ' + new Date().toISOString());
     L.push('now: week ' + S.week + ' (' + fmt.date(S) + ') | money ' + Math.round(S.money) + ' | rp ' + Math.round(S.rp) + ' | rank ' + E.rank(S) + (S.finished ? ' | finished, free play' : ''));
     L.push('real play time: ' + fmt.duration(p.sec) + ' total; paused or in a screen ' + fmt.duration(p.bySpeed[0]) + ', speed 1 ' + fmt.duration(p.bySpeed[1]) + ', speed 2 ' + fmt.duration(p.bySpeed[2]));
     if (g.notes.length) { L.push('', 'NOTES FOR CLAUDE'); g.notes.forEach(n => L.push('  w' + n.w + ': ' + n.text)); }
@@ -358,7 +361,9 @@
   }
   function makeInfo(St, at) { return Object.assign(topSpecies(St), { zooName: St.zooName, year: E.year(St), dateText: fmt.date(St), money: Math.round(St.money), rankStars: Math.max(1, E.rank(St)), animals: St.animals.length, savedAt: at || Date.now(), finished: !!St.finished, playSec: Math.round((St.play && St.play.sec) || 0) }); }
   function save() {
-    if (!S || !slot) return false;
+    if (!S) return false;
+    if (chId != null) return saveChallenge();
+    if (!slot) return false;
     try {
       const at = Date.now(), doc = { v: SAVE_V, savedAt: at, week: S.week, zoo: S.zooName, runId: S.runId, speed, json: E.serialize(S) };
       localStorage.setItem(slotKey(slot), JSON.stringify(doc)); localStorage.setItem(infoKey(slot), JSON.stringify(makeInfo(S, at))); dirtySave = false; return true;
@@ -390,11 +395,13 @@
     let St; try { St = E.deserialize(doc.json); } catch (e) { recordError(e, 'load'); return false; }
     if (!St) return false;
     if (E.SAVE_VERSION && St.v !== E.SAVE_VERSION) return false;
+    if (S && chId != null) save();   // leaving a challenge for a zoo: keep the run
+    chId = null; chOver = false;
     S = St; slot = n; ghost = null; ensureState(S); busy = null; token++; acc = 0;
     if (doc.speed === 1 || doc.speed === 2) speed = doc.speed;
     afterNewState(); return true;
   }
-  const load = () => (slot ? loadSlot(slot) : false);
+  const load = () => (chId != null ? resumeChallenge() : slot ? loadSlot(slot) : false);
   function deleteSlot(n) {
     if (!okSlot(n)) return false;
     try { localStorage.removeItem(slotKey(n)); localStorage.removeItem(infoKey(n)); } catch (e) { /* ignore */ }
@@ -402,7 +409,7 @@
   }
   function toTitle(noSave) {
     if (S && !noSave) save();
-    if (S) ghost = S; S = null; slot = null; busy = null; token++; acc = 0; lastRunning = null;
+    if (S) ghost = S; S = null; slot = null; chId = null; chOver = false; busy = null; token++; acc = 0; lastRunning = null;
     popAll(); syncRunning(); updateStrip(); showTitle();
   }
   function showTitle() {
@@ -412,12 +419,54 @@
   }
   function titleScreen() {
     return push({ id: 'title', modal: true, title: 'Wildside Zoo', render(body) {
+      const cs = challengeSaved(); if (cs) body.appendChild(btn('Continue challenge', () => resumeChallenge(), { cls: 'blue big', sub: 'week ' + cs.week }));
       slots().forEach(sl => {
         if (sl.empty) body.appendChild(btn('Slot ' + sl.slot + ': new zoo', () => newGame({ slot: sl.slot }), { cls: 'primary big' }));
         else body.appendChild(el('div', { cls: 'btnrow' }, btn(sl.zooName + ' (' + sl.dateText + ')', () => loadSlot(sl.slot), { cls: 'big', sub: fmt.money(sl.money) }), btn('Delete', () => confirm('Delete slot ' + sl.slot + '?', () => { deleteSlot(sl.slot); rerender(); }, { danger: true, yes: 'Delete' }), { cls: 'danger' })));
       });
     } });
   }
+  // ---- challenge mode: one run in progress under its own key, best stars under another; the three zoo slots and the carry-over record are never touched
+  const inChallenge = () => !!S && chId != null;
+  function challengeStars() { try { const o = JSON.parse(localStorage.getItem(CH_STARS_KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+  function challengeSaved() {
+    try { const raw = localStorage.getItem(CH_KEY), doc = raw ? JSON.parse(raw) : null; return doc && doc.v === SAVE_V && typeof doc.json === 'string' ? { levelId: doc.levelId, week: doc.week, savedAt: doc.savedAt, over: !!doc.over } : null; } catch (e) { return null; }
+  }
+  function saveChallenge() {
+    try {
+      if (chOver && !(S.reports || []).some(r => r && r.type === 'challenge')) { localStorage.removeItem(CH_KEY); dirtySave = false; return true; }   // finished and the result has been seen: nothing left to resume
+      localStorage.setItem(CH_KEY, JSON.stringify({ v: SAVE_V, savedAt: Date.now(), levelId: chId, week: S.week, over: chOver, speed, json: E.serialize(S) })); dirtySave = false; return true;
+    } catch (e) { if (!saveFailedToast) { saveFailedToast = true; toast('Could not save on this device', 'bad'); } recordError(e, 'save challenge'); return false; }
+  }
+  function noteChallenge() {   // the engine's one 'challenge' report: remember the best stars for the level the moment it arrives, even if the card is never tapped
+    if (!S || chId == null || !S.reports) return;
+    S.reports.forEach(r => {
+      if (!r || r.type !== 'challenge' || r.rec) return;
+      r.rec = 1; chOver = true; const st = Math.max(0, Math.min(3, r.stars | 0));
+      if (st > 0) { try { const all = challengeStars(); if (!(all[chId] >= st)) { all[chId] = st; localStorage.setItem(CH_STARS_KEY, JSON.stringify(all)); } } catch (e) { recordError(e, 'challenge stars'); } }
+      log('challenge-end', { level: chId, stars: st }); save();
+    });
+  }
+  function startChallenge(levelId) {
+    if (typeof E.newChallenge !== 'function') { toast('Challenges are not ready yet', 'bad'); return null; }
+    let St = null; try { St = E.newChallenge(levelId); } catch (e) { recordError(e, 'newChallenge'); }
+    if (!St) { toast('That level could not start', 'bad'); return null; }
+    if (S) save();   // whatever was in play (a zoo, or another run) is kept first
+    S = St; slot = null; ghost = null; chId = S.ch && S.ch.id != null ? S.ch.id : levelId; chOver = false; ensureState(S); acc = 0;
+    log('start', { challenge: chId }); afterNewState(); save(); return S;
+  }
+  function resumeChallenge() {
+    let doc = null; try { const raw = localStorage.getItem(CH_KEY); doc = raw ? JSON.parse(raw) : null; } catch (e) { doc = null; }
+    if (!doc || doc.v !== SAVE_V || typeof doc.json !== 'string') return false;
+    let St; try { St = E.deserialize(doc.json); } catch (e) { recordError(e, 'load challenge'); return false; }
+    if (!St || !St.ch) return false;
+    if (S && slot) save();
+    S = St; slot = null; ghost = null; chId = St.ch.id != null ? St.ch.id : doc.levelId; chOver = !!doc.over; ensureState(S); busy = null; token++; acc = 0;
+    if (doc.speed === 1 || doc.speed === 2) speed = doc.speed;
+    afterNewState(); return true;
+  }
+  function leaveChallenge() { if (!inChallenge()) return false; toTitle(); return true; }   // saves the run (so it can be resumed) and shows the title
+  function clearChallenge() { try { localStorage.removeItem(CH_KEY); } catch (e) { /* ignore */ } if (inChallenge()) { dirtySave = false; toTitle(true); } return true; }   // give up: forget the run in progress (best stars stay)
   function saveLegacy() { try { localStorage.setItem(LEGACY_KEY, JSON.stringify(legacy)); return true; } catch (e) { return false; } }
   function loadLegacy() { try { const raw = localStorage.getItem(LEGACY_KEY); if (raw) legacy = Object.assign(legacy, JSON.parse(raw)); } catch (e) { /* ignore */ } }
 
@@ -428,7 +477,11 @@
     lastRunning = null; updateStrip(); syncRunning(); setTimeout(flushReports, 0);
   }
   function newGame(opts) {
-    opts = opts || {}; const sl = okSlot(opts.slot) ? opts.slot : (slot || 1);
+    opts = opts || {};
+    if (chId != null && !okSlot(opts.slot)) { toast('Leave the challenge first', 'bad'); return null; }   // a challenge never overwrites a zoo slot by accident
+    if (S && chId != null) save();
+    chId = null; chOver = false;
+    const sl = okSlot(opts.slot) ? opts.slot : (slot || 1);
     if (S) { try { localStorage.setItem(PREV_LOG_KEY, logText()); } catch (e) { /* ignore */ } }
     S = E.newGame(legacy, opts); slot = sl; ghost = null; ensureState(S); S.ui.tutorial = { on: !!opts.tutorial, step: 0 }; S.elog = []; acc = 0;
     log('start', { zoo: S.zooName, ng: S.ng }); afterNewState(); save(); return S;
@@ -441,16 +494,37 @@
     $vis.textContent = fmt.num(S.visitorsLast || 0) + '/wk';
     const max = D.RANK_REP.length, rk = Math.max(1, E.rank(S)); const ex = $stars.getAttribute('data-n');
     if (ex !== String(rk)) { $stars.setAttribute('data-n', rk); $stars.innerHTML = ''; $stars.appendChild(stars(rk, max)); }
+    updateGoal(S0());
     const n = S.news && S.news[0], key = n ? n.w + '|' + n.msg : '';
     if (key !== newsKey) {   // new news: show the overlay for a few seconds, then fade it out
       const first = newsKey === null; newsKey = key;
       if (n && !first && S === curView() && window.__keepNews !== 0) { $news.textContent = n.msg; $news.className = 'show ' + (n.kind || ''); clearTimeout(newsTimer); newsTimer = setTimeout(() => { $news.classList.remove('show'); }, NEWS_MS); }
     }
   }
+  function goalInfo(St) {   // what the chip shows: the challenge goal with weeks left, else the engine's single next goal; null hides the chip
+    try {
+      if (St.ch && typeof E.challengeStatus === 'function') { const c = E.challengeStatus(St); if (c) return { icon: c.icon, cur: c.cur, target: c.target, left: c.weeksLeft, starsNow: c.starsNow, ch: true }; }
+      if (typeof E.nextGoal === 'function') { const g = E.nextGoal(St); if (g) return { icon: g.icon, cur: g.cur, target: g.target }; }
+    } catch (e) { if (!goalErr) { goalErr = true; recordError(e, 'goal chip'); } }
+    return null;
+  }
+  function updateGoal(St) {
+    if (!$goal) return;
+    const g = St ? goalInfo(St) : null, key = g ? JSON.stringify(g) : '';
+    if (key === goalKey) return; goalKey = key;
+    $goal.innerHTML = ''; $goal.classList.toggle('on', !!g); if (!g) return;
+    const num = v => (typeof v === 'number' ? fmt.short(v) : String(v == null ? '?' : v)), met = typeof g.cur === 'number' && typeof g.target === 'number' && g.cur >= g.target;
+    append($goal, [sym(g.icon || 'trophy', { scale: 2, label: 'Goal' }), el('span', { cls: 'gv' + (met ? ' met' : '') }, num(g.cur)), el('span', { cls: 'gs' }, '/'), el('span', { cls: 'gt' }, num(g.target))]);
+    if (g.ch) {
+      const left = +g.left || 0;
+      append($goal, [el('i', { cls: 'gsep' }), sym('time', { scale: 2, label: 'Weeks left', text: 'wk' }), el('span', { cls: 'gw' + (left <= 8 ? ' low' : '') }, String(left)), el('i', { cls: 'gsep' }), stars(Math.max(0, Math.min(3, g.starsNow | 0)), 3)]);
+    }
+    $goal.setAttribute('aria-label', 'Goal ' + num(g.cur) + ' of ' + num(g.target) + (g.ch ? ', ' + (+g.left || 0) + ' weeks left' : ''));
+  }
   function doTick() {
     if (!S) return;
     try { E.tick(S); } catch (e) { recordError(e, 'tick'); toast('Something went wrong this week', 'bad'); return; }
-    drainEngineLog(); rollQuarter(); if (S.week % 4 === 0) save();
+    noteChallenge(); drainEngineLog(); rollQuarter(); if (S.week % 4 === 0) save();
     updateStrip(); flushReports();
   }
   function act(name, ...args) {
@@ -463,7 +537,7 @@
     log('act', ev); tele('acts', name);
     if (okk) S.did[name] = (S.did[name] || 0) + 1; else { tele('fails', name + ': ' + String(res && res.msg || '').slice(0, 48)); if (res && res.msg) toast(res.msg, 'bad'); }
     if (okk && (MAP_ACTIONS[name] || (res && res.map))) { const r = R(); if (r && r.mapChanged) { try { r.mapChanged(); } catch (e) { recordError(e, 'mapChanged'); } } }
-    drainEngineLog(); updateStrip(); queueSave(); flushReports();
+    noteChallenge(); drainEngineLog(); updateStrip(); queueSave(); flushReports();
     return res;
   }
   function setSpeed(n) { n = n === 2 ? 2 : 1; if (n === speed) return speed; acc = acc * WEEK_MS[n] / WEEK_MS[speed]; speed = n; log('speed', { to: n }); tele('acts', 'speed' + n); queueSave(); return speed; }
@@ -496,7 +570,7 @@
   function onFloorTap(info) { if (stack.length || busy || placing()) return; log('tap', info && info.item ? { item: info.item.id != null ? info.item.id : undefined } : undefined); openMenu(); }
 
   function build() {
-    $strip = $('strip'); $date = $('s-date'); $stars = $('s-stars'); $money = $('s-money'); $vis = $('s-vis'); $floor = $('floor'); $news = $('news'); $screens = $('screens'); $toasts = $('toasts'); $stage = $('stage');
+    $strip = $('strip'); $date = $('s-date'); $stars = $('s-stars'); $money = $('s-money'); $vis = $('s-vis'); $goal = $('goal'); $floor = $('floor'); $news = $('news'); $screens = $('screens'); $toasts = $('toasts'); $stage = $('stage');
     if (!$strip || !$screens) throw new Error('Page markup missing (index.html)');
     $news.addEventListener('click', () => onFloorTap({}));
     document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && stack.length && !stack[stack.length - 1].modal) pop(); });
@@ -538,22 +612,26 @@
   function applyTheme() {
     try { const P = window.ZSprites && ZSprites.PALETTE; if (!P) return; const m = { blue: '--blue', blueDark: '--blue-d', gold: '--gold', goldDark: '--gold-d', bad: '--red', good: '--green', goodDark: '--green-d' }, st = document.documentElement.style; for (const k in m) if (typeof P[k] === 'string') st.setProperty(m[k], P[k]); } catch (e) { /* keep css defaults */ }
   }
+  const floorSpeed = () => (S && speed === 2 ? 2 : 1);   // how many times faster the floor should animate (the Renderer multiplies its world time step by this)
   function boot() {
     applyTheme(); build(); loadLegacy(); migrateOldSave();
     try { ghost = E.newGame(legacy, { starter: true }); ensureState(ghost); } catch (e) { recordError(e, 'ghost'); }
-    const r = R(); if (r) { try { r.init($floor, { getState: () => S || ghost, onTap: onFloorTap }); if (r.mapChanged) r.mapChanged(); } catch (e) { recordError(e, 'ZRender.init'); } }
+    const r = R(); if (r) { try { r.init($floor, { getState: () => S || ghost, onTap: onFloorTap, getSpeed: floorSpeed }); if (r.mapChanged) r.mapChanged(); } catch (e) { recordError(e, 'ZRender.init'); } }
     else { placeholderFloor(); $floor.addEventListener('click', () => onFloorTap({})); window.addEventListener('resize', placeholderFloor); }   // no renderer yet: plain green floor, tap still opens the menu
     lastT = performance.now(); lastRunning = null; updateStrip(); syncRunning();
     timer = setInterval(loop, 50); document.documentElement.setAttribute('data-ready', '1');
     const pm = /[?&]play=(1|blank)/.exec(location.search);
-    if (pm) { if (!loadSlot(1)) newGame({ slot: 1, starter: pm[1] === '1' }); } else setTimeout(showTitle, 0);
+    const cm = /[?&]challenge=([\w-]+)/.exec(location.search);   // test shortcut: ?challenge=<level id> resumes that level's saved run, else starts it fresh
+    if (cm) { if (!(resumeChallenge() && String(chId) === cm[1]) && !startChallenge(cm[1]) && !(/^\d+$/.test(cm[1]) && startChallenge(+cm[1]))) setTimeout(showTitle, 0); }
+    else if (pm) { if (!loadSlot(1)) newGame({ slot: 1, starter: pm[1] === '1' }); } else setTimeout(showTitle, 0);
   }
 
   const Core = {
     version: '0.1', devTools: DEV_TOOLS, fmt, ui, WEEK_MS, errors,
     get S() { return S; }, get slot() { return slot; }, get speed() { return speed; }, get legacy() { return legacy; }, get busy() { return !!busy; },
     newGame, save, load, slots, loadSlot, deleteSlot, toTitle, showTitle, setSpeed, act, push, pop, popAll, replace, rerender, stack: () => stack.map(e => e.id), top: () => (stack.length ? stack[stack.length - 1].api : null),
-    openMenu, onReport, flushReports, running: isRunning, saveLegacy,
+    openMenu, onReport, flushReports, running: isRunning, saveLegacy, floorSpeed,
+    startChallenge, resumeChallenge, challengeSaved, challengeStars, inChallenge, leaveChallenge, clearChallenge, get challengeId() { return chId; },
     log, logText, copyLog, downloadLog, addNote, updateStrip, weekProgress: () => (WEEK_MS[speed] ? Math.min(1, acc / WEEK_MS[speed]) : 0),
     screens: { log: logScreen, title: titleScreen, screenCheck }, toast, boot
   };
@@ -562,7 +640,7 @@
     get skipReports() { return skipReports; }, set skipReports(v) { skipReports = !!v; },
     get S() { return S; }, errors, stack: Core.stack, act, newGame: o => newGame(Object.assign({ starter: true }, o)), openMenu, running: isRunning, slots, loadSlot, deleteSlot, title: toTitle, setSpeed, WEEK_MS,
     tick(n) { for (let i = 0; i < (n || 1); i++) doTick(); return S ? S.week : 0; },
-    popAll, flush: flushReports, logText, save, load
+    popAll, flush: flushReports, logText, save, load, startChallenge, resumeChallenge, challengeStars, challengeSaved, inChallenge, leaveChallenge, clearChallenge
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();

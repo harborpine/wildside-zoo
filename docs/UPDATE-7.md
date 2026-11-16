@@ -55,6 +55,11 @@ Never weaken a check to make it pass; if a check is out of date because the desi
    - When the goal is reached or time runs out, push ONE report `{ type: 'challenge', level, stars (0 = failed), week }` and stop the level (ticks do nothing after).
    - Main-game long-term things that make no sense in a 10-minute level (yearly plan, year-end, 20-year final score, legacy) must not fire in a challenge.
    - `serialize`/`deserialize` must round-trip a challenge state.
+7. **Star-level expeditions (note 13, added after the plan).** The Lean / Standard / Lavish budget choice is REPLACED by a star level, 1 to 5, chosen per
+   expedition for the chosen biome ("a 3 star Savanna run"). A higher-star run costs more and takes longer, and mostly finds animals of that star (rarity)
+   level: the odds centre on the chosen star, with smaller chances one star either side. Higher stars unlock as the zoo grows (use an existing gate such as
+   rank or research; a new zoo can run 1 and 2 stars). The explorer's Scouting still improves the odds. Expose the odds table, cost, weeks and which stars are
+   unlocked (and why not) as a lookup for the Send out page. Keep overall pacing close to today with the bot. Old saves and running expeditions must still load.
 6. Document everything in `docs/API-rules.md` under a new "R7" section at the top, with exact names, so the other owners can code from it.
 
 ### B. Artist
@@ -90,7 +95,7 @@ move, legal or illegal shown with solid colours); small maps for challenge level
 
 ### E. Menus (after Rules and Shell report)
 Edit mode replacing the Build menu and the Move screen (note 6); gold alert frames instead of red boxes on the menu and Research (notes 2, 3); event host and
-theme on one screen (note 4); best-of-kind mark on the Animals screen (note 5); "Send out?" page without scrolling (note 10); Info screens trimmed to symbols and
+theme on one screen (note 4); best-of-kind mark on the Animals screen (note 5); "Send out?" page without scrolling, with the 1 to 5 star level picker in place of Lean / Standard / Lavish (notes 10, 13); Info screens trimmed to symbols and
 short lines; challenge level-select screen from the title (five levels in a line, stars earned, locked ones greyed) and what a challenge hides.
 
 ### F. Moments (after Rules reports)

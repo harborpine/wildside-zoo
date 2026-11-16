@@ -4,6 +4,67 @@ Global: `ZCore`. Loaded after `ZRender`, before `menus.js` and `moments.js`. `wi
 Everything below was exercised by `test/shell-shot.js` on Chromium and WebKit. Try the sample screens at `index.html?demo=1`
 (`ZDemo.show('grid' | 'list' | 'sub' | 'choice' | 'reveal' | 'reveal2' | 'misc' | 'confirm' | 'toast' | 'log')`, source `test/shell-demo.js`).
 
+## Update 7 (2026-11-15): strip, panels, alert frame, floor speed, goal chip, challenges
+
+Where this section disagrees with older text further down, this section wins.
+
+### Top strip
+* The iOS status-bar fade softens anything in about the first 30 px under the top inset. That zone now holds only the star row (`.srow.gfx`, a picture, 13 px stars,
+  15 to 28 px under the inset). Date, money and visitors share ONE text row (`.srow.txt`) that starts 31 px under the inset. Strip height is 62 px under the inset (was 69).
+* Fits at 375 px with `Y20 Feb w4`, `$9,999,999` and `99,999/wk` (tested); under 350 px wide the row uses a smaller size. Ids are unchanged: `s-date`, `s-stars`, `s-money`, `s-vis`.
+
+### Panels use the full height
+* A normal (non-modal) panel now runs to the very bottom of the screen: no gap and no zoo showing under it. Its foot (`.pfoot`) pads the home-indicator inset, so the
+  Back button's outline ends 4 px above the inset (10 px above the bottom edge when there is no inset). Modal cards are unchanged (centred, padded by the inset).
+* Gain: the body is 35 px taller than before at every size with zero inset (measured: 390x664 463, 390x753 552, 375x553 360, 375x647 446) and about 22 px taller on a phone
+  with a 34 px inset (15 from the panel, 7 from the shorter strip).
+* Toasts sit 82 px + inset above the bottom (still just above the Back button).
+
+### `.alert`: the one "something is waiting here" mark (replaces red number boxes)
+* CSS class `alert` on any element: a 4 px solid gold frame drawn INSIDE the element's own edge (`outline` with `outline-offset: -4px`: no layout change, nothing sticks
+  out, nothing can overlap a neighbour), stepping between two solid golds every 0.45 s (`#ffc400` and `#e07b00`; override with `--alert-a` / `--alert-b`). Static under reduced motion.
+* Helpers: `ui.btn(label, onTap, { alert: true })`, `ui.grid` items `{ alert: true }`, `ui.list` rows `{ alert: true }`, `ui.tabs` items `{ id, label, alert: true }`.
+  Or add the class yourself: `el.classList.toggle('alert', waiting)`.
+* The red badge is gone: the `.gbox .badge` style was deleted and `ui.grid` no longer creates a `.badge` element. For now a grid item's old `badge: true|number`
+  draws the same gold frame (no number), so existing menus change at once; please rename to `alert`.
+
+### Floor speed (speed 2 moves the board twice as fast)
+* `ZCore.floorSpeed()` returns `1` or `2` (2 only while a game is in play at speed 2). The same function is handed to the renderer as `opts.getSpeed` in
+  `ZRender.init(canvas, { getState, onTap, getSpeed })`, next to `getState`.
+* **Renderer:** in `frame()`, inside `if (running) { ... }`, step the world with `const wdt = dt * (opts.getSpeed ? opts.getSpeed() : 1);` and use `wdt` in place of `dt`
+  for `stepAnimal`, `stepWalker` (walkers and gate people) and the floaters' `t += ...`. Leave the camera, placement and `clock` on plain `dt`.
+
+### Next-goal chip
+* `#goal` is a solid dark tab hanging from the strip's left corner, over the top-left of the floor (26 px tall; taps pass through; hidden while a screen is open,
+  during placement and on the title). Refreshed by `ZCore.updateStrip()` (every tick and act).
+* Normal zoo: `ZE.nextGoal(S)` as symbol, `cur / target` (numbers through `ZCore.fmt.short`: `950`, `9,500`, `12.5K`, `250K`, `1.2M`; non-numbers shown as given;
+  `cur` turns green when it reaches the target). Challenge: `ZE.challengeStatus(S)` as symbol, `cur / target`, a clock with `weeksLeft` (red at 8 or fewer) and three
+  small stars lit to `starsNow`. If the engine function is missing or returns null the chip is hidden. An unknown `icon` key falls back to short text.
+
+### Challenge mode plumbing
+| | |
+|---|---|
+| `ZCore.startChallenge(levelId)` | Fresh run from `ZE.newChallenge(levelId)`; returns the state, or `null` (with a toast) if it cannot start. Whatever was in play is saved first. Closes every screen and starts the clock. Also the way to Retry or go to the Next level. |
+| `ZCore.inChallenge()` | true while a challenge run is in play. `ZCore.challengeId` is the level id (else `null`). `ZCore.slot` is `null` in a challenge. |
+| `ZCore.challengeStars()` | `{ levelId: bestStars }` (1..3; levels never finished are absent). Readable on the title. |
+| `ZCore.challengeSaved()` | `{ levelId, week, savedAt, over }` for the run that can be resumed, or `null`. For a "Continue" button. |
+| `ZCore.resumeChallenge()` | Loads that run and starts play; `false` if there is none. |
+| `ZCore.leaveChallenge()` | Saves the run and goes to the title (same as `ZCore.toTitle()` inside a challenge). Zoo slots untouched. |
+| `ZCore.clearChallenge()` | Give up: forgets the run in progress (best stars stay); if it is the one in play, goes to the title. |
+
+* Storage: `wildside-zoo-v3-challenge` holds the ONE run in progress (`{v, savedAt, levelId, week, over, speed, json}`); starting another level replaces it.
+  `wildside-zoo-v3-challenge-stars` holds the best stars. Neither the three slots, their summaries nor `ZCore.legacy` are read or written by a challenge.
+  `ZCore.save()` and every autosave write the challenge key while a challenge is in play.
+* Result: the moment the engine's `{ type: 'challenge', level, stars, week }` report appears (tick, act or flush), the shell stores `max(best, stars)` for the level
+  (a fail, 0, stores nothing) and marks the report `rec: 1`; this does not wait for the card. The report still goes to the normal queue: **Moments** registers
+  `ZCore.onReport('challenge', (report, done) => ...)` and its buttons call `ZCore.startChallenge(sameOrNextId)` or `done(); ZCore.leaveChallenge()`.
+  Once the result has been dismissed the finished run is removed, so it is not offered for resume; quitting while the card is still up brings the card back on resume.
+* `ZCore.newGame(opts)` without `opts.slot` is refused inside a challenge (returns `null`, toast), so a challenge can never overwrite a zoo. `loadSlot` and
+  `newGame({slot})` save the run first.
+* Start-up is unchanged: the title shows first, nothing auto-loads. The built-in fallback title shows a "Continue challenge" button when a run is saved.
+* Test shortcut: `index.html?challenge=<levelId>` resumes that level's saved run, else starts it fresh. `ZT.startChallenge`, `ZT.resumeChallenge`, `ZT.challengeStars`,
+  `ZT.challengeSaved`, `ZT.inChallenge`, `ZT.leaveChallenge`, `ZT.clearChallenge`.
+
 ## Start-up order
 
 `index.html` loads `data, engine, geo, sprites, render, core, menus, moments` (the optional ones with `onerror` so the page still loads without them).
@@ -129,7 +190,7 @@ ZCore.onReport('choice', (report, done) => {
 |---|---|
 | `el(tag, attrs, ...children)` | attrs: `cls`/`class`, `style` (object), `html`, `tap` (click handler), `dataset`, `onxxx` handlers, anything else is an attribute. Children: nodes, strings, numbers, arrays; null/false skipped. |
 | `btn(label, onTap, {icon?, sub?, disabled?, cls?, onDisabled?})` | `icon`: sprite icon name (`'m-build'`) or a data URL. `cls` words: `primary` green, `blue`, `warn`, `danger`, `ghost`, `big` (60 px), `back`. Double taps within 220 ms are ignored. |
-| `grid(items, {cols?})` | `items: [{icon, label, onTap, sub?, badge?: true\|number, disabled?, cls?}]`. 3 columns by default. Big pixel icon over one word. |
+| `grid(items, {cols?})` | `items: [{icon, label, onTap, sub?, alert?: bool, disabled?, cls?}]`. 3 columns by default. Big pixel icon over one word. `alert` draws the gold pulsing frame (the old `badge` does the same; no red box any more). |
 | `list(rows, {empty?})` | `rows: [{img: url\|node, icon?, title, sub?, chips?: [nodes], right?: node\|string\|[nodes], onTap?, cls?, disabled?}]`. Portrait left, numbers right. |
 | `stat(label, value, kind?)` | chip like `Cha 42`. `kind`: `'charm'`, `'vigor'`, `'wit'` (colours). |
 | `sign(level)` | level 0..3 = `--`, `-`, `+`, `++` (coloured red to green); `null` = grey `?`. Decide your own thresholds. `ZCore.fmt.signs(level)` is the plain text. |
