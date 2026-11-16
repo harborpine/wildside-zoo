@@ -6,6 +6,7 @@ exports.facSetup = () => {
   const S = RT.S, H = RT.H, K = ZGeo.DENSITY || 1, ent = ZE.entrance(S), ex = ZGeo.toScreen(ent.q, ent.r), built = [];
   [['bench', 'savanna', 1], ['icecream', 'arctic', 0], ['gift', 'jungle', 1], ['photo', 'desert', 1], ['fountain', 'mythic', 0]].forEach(w => {
     const t = w[0], hab = H[w[1]], list = [], seen = {}; if (!hab) return;
+    if (S.items.some(i => i.k === 'fac' && i.t === t)) { built.push(t); return; } // the harness page already built it
     ZE.ringCells(S, hab.id).forEach(rc => ZE.DIRS.forEach(d => {
       const q = rc[0] + d[0], r = rc[1] + d[1], k = q + ',' + r; if (seen[k]) return; seen[k] = 1;
       if (!ZE.placeCheck(S, 'fac', t, q, r, 0).ok) return; const p = ZGeo.toScreen(q, r);

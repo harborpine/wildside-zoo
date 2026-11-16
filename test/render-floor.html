@@ -66,11 +66,13 @@ var DM = /[?&]d=(1|2)\b/.exec(location.search); if (DM) window.ZWZ_DENSITY = +DM
     var res = Z.build(S, 'hab', t, best.q, best.r, best.rot); if (!res.ok) { log.push(t + ': ' + res.msg); return null; }
     return S.items[S.items.length - 1];
   }
-  // facilities: a free hex touching the given habitat, preferring the side nearest the entrance
+  // facilities: a free hex one step out from the given habitat, across its walkway ring (nothing may stand against a habitat
+  // since Update 7), preferring the side nearest the entrance
   function placeFac(t, hab, nth) {
     var list = [];
     if (!hab) return null;
-    Z.cells(hab).forEach(function (k) { DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (Z.canPlace(S, 'fac', t, q, rr, 0) && !(Math.abs(ZGeo.toScreen(q, rr).x - ex.x) < 60 * KD && ex.y - ZGeo.toScreen(q, rr).y < 70 * KD) && !list.some(function (o) { return o.q === q && o.r === rr; })) { var p = ZGeo.toScreen(q, rr); list.push({ q: q, r: rr, d: Math.abs(p.x - ex.x) + Math.abs(p.y - ex.y) * 2 }); } }); });
+    var ringOf = Z.ringCells ? Z.ringCells(S, hab.id) : Z.cells(hab);
+    ringOf.forEach(function (k) { DIRS.forEach(function (d) { var q = k[0] + d[0], rr = k[1] + d[1]; if (Z.canPlace(S, 'fac', t, q, rr, 0) && !(Math.abs(ZGeo.toScreen(q, rr).x - ex.x) < 60 * KD && ex.y - ZGeo.toScreen(q, rr).y < 70 * KD) && !list.some(function (o) { return o.q === q && o.r === rr; })) { var p = ZGeo.toScreen(q, rr); list.push({ q: q, r: rr, d: Math.abs(p.x - ex.x) + Math.abs(p.y - ex.y) * 2 }); } }); });
     list.sort(function (a, b) { return a.d - b.d; });
     var pick = list[Math.min(nth || 0, list.length - 1)]; if (!pick) { log.push('no spot for ' + t); return null; }
     var res = Z.build(S, 'fac', t, pick.q, pick.r, 0); if (!res.ok) log.push(t + ': ' + res.msg);
