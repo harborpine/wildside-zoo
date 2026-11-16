@@ -200,8 +200,8 @@
   D.FAST_ROLES = ['explorer', 'leader'];                                      // roles that bring an expedition home a week sooner
   D.SHOW_MEDALS = { gold: 1, silver: 0.85, bronze: 0.7 };                     // share of the gold bar needed for each medal
   D.UPGRADE_MULT = [0, 2, 5, 14, 40];                                         // habitat upgrade cost = build cost x this, by current level
-  D.VISITORS_PER_REP = 800;                                                   // weekly visitors that earn one point of reputation
-  D.REVIEW_REP_DIV = 46;                                                      // review reputation = total x total / this
+  D.VISITORS_PER_REP = 700;                                                   // weekly visitors that earn one point of reputation (was 800; R7 makes up for rarer happenings)
+  D.REVIEW_REP_DIV = 42;                                                      // review reputation = total x total / this (was 46; R7 makes up for rarer event choices)
   D.HOF_SCORE = 34;                                                           // review total that enters the Hall of Fame
   D.CRITICS = [{ key: 'animals', name: 'Animals' }, { key: 'habitat', name: 'Habitat' }, { key: 'fun', name: 'Fun' }, { key: 'learning', name: 'Learning' }];
   D.STAT_SCORE = { charm: 'fun', wit: 'learning', vigor: 'animals' };         // which review score a star animal's best stat lifts
@@ -234,6 +234,23 @@
   D.CRATES_PER_VISIT = 5;
   D.CRATE_RANK_K = 0.12; // crate price = expected animal value x 1.3 + this x the rank money scale x rarity
   D.EXP_TWO = 0.2;      // chance an expedition brings back 2 animals instead of 1
+  // Star-level expeditions: the player picks a star (= rarity) level 1 to 5 for the chosen region. cost = multiplier on the region's
+  // base price (D.BIOMES[b].exp), min = the least such a run ever costs (what the strongest team's finds sell for, so that sending
+  // cheap Savanna runs and selling the finds is never a way to make money), weeks = extra weeks on top of the region's length,
+  // rank = zoo rank that unlocks it, variant = chance each find is a rare variant. Tuned with the bot to keep the old pacing.
+  D.EXP_STAR = [null,
+    { cost: 1,   min: 0,     weeks: 0, rank: 1, variant: 0.03 },
+    { cost: 1.3, min: 0,     weeks: 0, rank: 1, variant: 0.03 },
+    { cost: 1.8, min: 8500,  weeks: 1, rank: 2, variant: 0.035 },
+    { cost: 3,   min: 30000, weeks: 2, rank: 4, variant: 0.04 },
+    { cost: 6,   min: 60000, weeks: 3, rank: 6, variant: 0.045 }
+  ];
+  D.EXP_SECRET_STARS = [4, 5]; // the two secret regions only hold very rare animals: their runs are 4 or 5 stars (4 is the base price and length)
+  // Odds of a find one star below / above the chosen star: base + per x (team strength / region difficulty), kept between min and max.
+  // The rest lands on the chosen star. A stronger team (Scouting) means fewer finds below and more above.
+  // An ordinary early team (x = 0.8): 21% below, 62% on the star, 17% above. A strong team (x = 1.5): 5% below, 67% on, 28% above.
+  D.EXP_ODDS = { down: { base: 0.45, per: -0.3, min: 0.05, max: 0.4 }, up: { base: 0.05, per: 0.15, min: 0.05, max: 0.3 } };
+  D.EXP_FRAGMENT = 0.14; // chance a strong team brings back an old map piece (rank 5 and up)
   D.ARRIVAL_WEEKS = 2;   // an arrival left undecided this long goes to the holding pen (never a habitat)
   D.HOLD_UPKEEP = 1.0;   // extra upkeep in the holding pen, as a share of the animal's normal upkeep (1.0 = the pen costs double)
   D.HOLD_PROFIT_SHARE = 0.9; // safety: the pen's whole cost never takes more than this share of the zoo's weekly profit without it
@@ -265,7 +282,9 @@
     pipe:       { title: 'Burst pipe',         w: 8,  bad: true, who: 'builder' },
     rival:      { title: 'Rival opening',      w: 8,  bad: true }
   };
-  D.HAP_GAP = [10, 14]; // weeks between happenings (about 12 on average)
+  D.HAP_GAP = [40, 56]; // weeks between happenings (about 48 on average: a rare treat, a quarter as often as the old 10 to 14)
+  D.HAP_TREAT = 2;      // a happening is now a rare treat: the reputation, money and research its good news gives is this many times the old amount
+  D.CHOICE_CHANCE = 0.25; // chance that a project's mid-point choice comes up at all (it used to come up every time)
   // Person kinds used by happenings ('keeper' is also a staff role; 'vet' here is a visiting vet, not a staff role).
   D.WHO = ['teacher', 'donor', 'reporter', 'photographer', 'kid', 'professor', 'builder', 'volunteer', 'elder', 'vet', 'keeper'];
   // Habitat footprints on the hex grid, as axial [q, r] offsets from the anchor. They can be rotated in 60 degree steps.
@@ -281,6 +300,27 @@
   };
   D.SHAPE_NAME = { savanna: 'triangle of 3', jungle: 'diamond of 4', desert: 'line of 4', arctic: 'block of 5', mountain: 'big triangle of 6', ocean: 'flower of 7', paleo: 'slab of 7', mythic: 'ring of 6 with an open middle' };
   D.YEARLY = { openday: 6, festival: 18, show: 40 };
+
+  // ---------- Challenge mode: five short levels, separate from the long-term zoos ----------
+  // A level should take about CH_MINUTES real minutes at speed 2, where one game week lasts CH_WEEK_SEC real seconds
+  // (core.js WEEK_MS[2] = 5000), so 10 minutes = 120 game weeks of running time.
+  D.CH_WEEK_SEC = 5; D.CH_MINUTES = 10;
+  // goal.kind: 'visitors' (visitors in one week), 'species' (different species owned now, of goal.biome), 'money' (bank balance),
+  //   'bred' (average stat of the best baby bred in this level; 58 is grade A), 'rank' (zoo star rank).
+  // weeks = time limit. stars = [w3, w2]: reach the goal by week w3 for 3 stars, by w2 for 2, by the limit for 1.
+  // rows = rows of land (the map is 10 wide), money = starting money, start = 'bare' (empty land, 2 zebras in the pen) or
+  //   'starter' (a Savanna habitat and a Snack Stand already built), animals = starting animals instead of the 2 zebras
+  //   [species, sex, stat level], staff = the starting team instead of a keeper and an explorer [role, skill level],
+  //   research = know-how already known, biomes = the only regions allowed, maxHabs = most habitats allowed, no = switched-off actions.
+  D.LEVELS = [
+    { id: 'small',   n: 1, name: 'Pocket Park',  goal: { kind: 'visitors', target: 900 },                 weeks: 120, stars: [60, 76],  rows: 6, money: D.START_MONEY, start: 'bare' },
+    { id: 'savanna', n: 2, name: 'Savanna Only', goal: { kind: 'species', target: 9, biome: 'savanna' }, weeks: 120, stars: [45, 70],  rows: 8, money: D.START_MONEY, start: 'bare', biomes: ['savanna'] },
+    { id: 'broke',   n: 3, name: 'Shoestring',   goal: { kind: 'money', target: 50000 },                  weeks: 120, stars: [62, 85],  rows: 8, money: 1500, start: 'starter', no: ['expedition'] },
+    { id: 'breed',   n: 4, name: 'Family Tree',  goal: { kind: 'bred', target: 58 },                      weeks: 120, stars: [60, 88],  rows: 8, money: 12000, start: 'starter',
+      animals: [['zebra', 'M', 46], ['zebra', 'F', 46], ['warthog', 'M', 46], ['warthog', 'F', 46]], staff: [['keeper', 40], ['guide', 16]], research: ['tech:gen1'] },
+    { id: 'tiny',    n: 5, name: 'Two Pens',     goal: { kind: 'rank', target: 4 },                       weeks: 132, stars: [80, 100], rows: 4, money: D.START_MONEY, start: 'bare', maxHabs: 2 }
+  ];
+  D.GOAL_ICON = { visitors: 'visitors', species: 'm-animals', money: 'coin', bred: 'heart', rank: 'rep', open: 'habitat', variants: 'new' }; // sprite icon for each goal kind
 
   D.SEASONS = [
     { name: 'Spring', mult: 1.0 }, { name: 'Summer', mult: 1.25 }, { name: 'Autumn', mult: 0.95 }, { name: 'Winter', mult: 0.72 }

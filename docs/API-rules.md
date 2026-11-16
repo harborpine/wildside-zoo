@@ -1,9 +1,201 @@
 # Rules API as built (`data.js` -> `ZD`, `engine.js` -> `ZE`)
 
 Written by the Rules teammate. Everything Menus and Moments need is here. In Node the same objects come from
-`require('./data.js')` and `require('./engine.js')`. Checks: `node test/rules-check.js` and `node test/bot.js 0.8`.
+`require('./data.js')` and `require('./engine.js')`. Checks: `node test/rules-check.js`, `node test/bot.js 0.8` and `node test/bot.js challenge all 40`.
 
-## R5. Round 5 changes (read this first; the sections below are updated to match)
+## R7. Update 7 changes (read this first; it overrides anything older below)
+
+Save version stays **3**; every old save loads with no migration needed (nothing new is stored for rings; a normal zoo has no
+`S.ch`; an expedition that was already out keeps its old `budget` and comes home under the old odds).
+Checks: `node test/rules-check.js` (about 2 minutes), `node test/bot.js 0.8`, `node test/bot.js challenge all 40`.
+
+**Things other owners must change because of R7** (details in the sections below):
+
+| Who | What |
+|---|---|
+| Menus | `startExpedition(S, region, team, star)`: the 4th argument is now a **star level**, not a budget. Build the Send out page from `ZE.expStars(S, region, team)`. `ZE.teamPower(S, team)` has no budget argument any more. Lean / Standard / Lavish are gone |
+| Menus, Renderer | Placement: use `ZE.placeCheck` (why not, and which hexes). A facility can no longer stand directly against a habitat; it goes one hex out, across the walkway. `ZE.starterSpots().snack` moved one hex further from the habitat |
+| Renderer | Draw `ZE.ringCells(S)` as walkway and let visitors walk on it |
+| Moments, Menus, anyone with a test that waits for a project choice | Project choices now come up only a quarter of the time. A test or demo that needs one calls `ZE.debug.alwaysChoices(true)` first (and `false` after) |
+| Shell | Challenge plumbing: `ZE.newChallenge`, `ZE.challengeStatus`, the `challenge` report, `ZE.nextGoal` for the chip |
+
+### R7.1 Rare treats: happenings and project choices a quarter as often
+
+- **Happenings:** the gap between two is now 40 to 56 weeks (`D.HAP_GAP`), measured one per 47 weeks (was one per 12). About one in
+  three is still a mild setback. The first one still comes 5 to 7 weeks after the zoo opens. Because they are rare, the good news
+  pays double (`D.HAP_TREAT` = 2: the reputation, money and research figures of school, donor, heat, stray, scholar, coins,
+  feature and escape). Nothing else about happenings changed (same keys, same report, same `resolveHappening`).
+- **Project choices** (`tracks, guide, camp, river, vet, diet, watch, star, boost`): each one now comes up with chance
+  `D.CHOICE_CHANCE` = 0.25 (it used to come up every time). When it does not come up the project simply carries on: no report,
+  no `p.choice`. One exception keeps reviews fair: when an event's `star` choice does not come up, the engine picks the best
+  star animal by itself (the old default), so `review.star` is always filled; you still get the floor `fx` for it.
+- `ZE.debug.alwaysChoices(true|false)`: makes every choice come up (for tests and for building the choice screens). Returns the new setting.
+- To make up for the lost rewards: review reputation is `total x total / 42` (`D.REVIEW_REP_DIV`, was 46) and one reputation
+  point per 700 weekly visitors (`D.VISITORS_PER_REP`, was 800).
+
+### R7.2 The walkway ring
+
+Every habitat has a ring of walkway on **every free owned hex that borders it**. It costs nothing, it is not an item and it is
+not stored: the engine works it out from the layout, so it follows the habitat when it moves and goes when it is sold (hexes
+another habitat still borders stay). Rings of neighbouring habitats may share hexes.
+
+| Call | Meaning |
+|---|---|
+| `ZE.ringCells(S, habId?) -> [[q, r], ...]` | Every ring hex, or only that habitat's. **Renderer: draw these as path; visitors may walk on them** |
+| `ZE.isRing(S, q, r)` | Is that hex a ring hex |
+| `ZE.c(S).ring` | `{ 'q,r': [habitatId, ...] }` (two or more ids = shared). Also `ZE.ringMap(S, items?, ignoreId?)` and `ZE.layout(S, items).ring` for a hypothetical layout |
+| `ZE.ringAt(S, biome, q, r, rot, ignoreId?) -> [[q, r], ...]` | The ring a habitat would have at that spot, for the Edit mode ghost. Pass the item's id as `ignoreId` when moving it |
+| `ZE.placeCheck(S, kind, t, q, r, rot, ignoreId?)` | `{ ok: true }` or `{ ok: false, why, msg, cells: [[q, r], ...] }`. `msg` is a short sentence; `cells` are the hexes in the way (paint them red) |
+| `ZE.canPlace(...)` | Same arguments, just the boolean (`placeCheck(...).ok`) |
+
+`why` values:
+
+| why | Meaning | `cells` |
+|---|---|---|
+| `land` | Part of it is off the owned land | the hexes off the land |
+| `entrance` | It would cover the gate | the gate hex |
+| `taken` | Something is already there | the occupied hexes |
+| `touch` | A habitat would touch another habitat. There is always at least one walkway hex between two habitats | the other habitat's hexes it touches |
+| `crowd` | A habitat would touch a building, so its walkway could not go all the way round | the building hexes it touches |
+| `ring` | A building on a habitat's walkway | the building's own hex |
+
+- `build` and `move` use the same check and return its `msg` when refused. Where an item already stands is always legal
+  (`placeCheck` with its own `ignoreId` at its own spot is `{ ok: true }`).
+- A habitat may sit against the edge of the map or of the owned land (no ring there) and beside the gate hex.
+- **"Next to" now reaches across the walkway.** Two items are next to each other when they touch (only possible in layouts built
+  before R7) or when one is a habitat and the other touches its ring. So a bench one hex out from the habitat still lifts it,
+  facility combos still complete (`picnic`, `trail`, ...), and two habitats that share a walkway count for the pair combos
+  (`icefire`, `landsea`, `highwild`, `station`). Facility to facility is unchanged (they must touch). `ZE.c(S).nb`,
+  `ZE.layout`, `ZE.nearMisses` and every bonus use this one rule; `nearMisses` only lists hexes where the facility may legally go.
+- **Old saves:** nothing is moved or removed. Buildings that stand against a habitat stay and keep working; the ring appears on
+  the bordering hexes that are free. Moving an old item must follow the new rule at its new spot.
+- `ZE.starterSpots()`: the Snack Stand spot is now 3 hexes to the right of the habitat's anchor (was 2), just outside the ring.
+
+### R7.3 Best of its kind, and who lives where
+
+| Call | Meaning |
+|---|---|
+| `ZE.bestOf(S, animal or animalId) -> boolean` | True when the player owns two or more of this species **and sex** and this one is the best (highest average of the three stats, the same measure as `compareOwned().best`; on a tie exactly one is marked, the one owned longest). False for an animal not in `S.animals` |
+| `ZE.habAnimals(S, habId or null) -> [{ id, sp, name, sex, grade, avg, variant, juv, best }]` | The animals living in that habitat (`null` = the holding pen) in display order: species in collection-book order, females first, then best first. `grade` is `ZE.grade` of the average ('D'..'SS'), `best` is `bestOf` |
+| `ZE.arrivalChoices(S, animalId)` | Every entry now also has **`animals`** = `habAnimals` of that place, so the where-list can show who already lives there |
+
+### R7.4 Next goal
+
+`ZE.nextGoal(S) -> { kind, icon, cur, target, ... }`. Never null. `icon` is a sprite icon id (`D.GOAL_ICON[kind]`).
+
+| kind | icon | When | cur / target | Extra |
+|---|---|---|---|---|
+| `open` | `habitat` | No habitat yet | 0 / 1 | |
+| `rank` | `rep` | Normal play | reputation now / reputation for the next star rank | `rank` = the rank it leads to |
+| `species` | `m-animals` | At the top rank | species recorded / 68 | |
+| `variants` | `new` | Collection full | rare variants / 68 | |
+| `money` | `coin` | Everything done | bank / the next power of ten | |
+| (challenge) | see R7.6 | In a challenge | the level goal, same numbers as `challengeStatus` | `weeksLeft`, `challenge: true`, and `rank` or `grade` when the goal has one |
+
+### R7.5 Star-level expeditions (replaces Lean / Standard / Lavish)
+
+The player picks a region and then a **star level** for the run. A star is a rarity level: 1 Common, 2 Uncommon, 3 Rare,
+4 Very rare, 5 Legendary. A higher star costs more, takes longer, and the finds centre on that star.
+
+| Star | Price | Extra weeks | Unlocks at zoo rank | Rare-variant chance |
+|---|---|---|---|---|
+| 1 | region base price | 0 | 1 | 3% |
+| 2 | x1.3 | 0 | 1 | 3% |
+| 3 | x1.8, at least $8,500 | +1 | 2 | 3.5% |
+| 4 | x3, at least $30,000 | +2 | 4 | 4% |
+| 5 | x6, at least $60,000 | +3 | 6 | 4.5% |
+
+(`D.EXP_STAR`. The minimum prices stop cheap Savanna runs being a way to make money by selling the finds. Savanna runs cost
+$3,000 / $3,900 / $8,500 / $30,000 / $60,000.) The two secret regions only have stars **4 and 5** (`D.EXP_SECRET_STARS`);
+there 4 is the base price and length and 5 costs double and takes a week longer.
+
+**Odds** (`D.EXP_ODDS`): with x = team strength divided by the region's difficulty (the `ratio`), the chance of a find one
+star **below** is `0.45 - 0.3x` (kept between 5% and 40%), one star **above** is `0.05 + 0.15x` (5% to 30%), and the rest
+lands on the chosen star. An ordinary early team (x = 0.8): 21% below, 62% on, 17% above. A strong team (x = 1.5): 5% below,
+67% on, 28% above. So Scouting still matters: it moves finds upward. Never more than one star away. A star with nothing below
+it in that region (1 star) or above it (5 stars in a normal region) puts that share on the chosen star.
+
+| Call | Meaning |
+|---|---|
+| `ZE.expStars(S, region, staffIds) -> [{ star, name, unlocked, lock, rank, cost, weeks, odds, ratio }]` | **Everything the Send out page needs**, one entry per star of that region, lowest first. `name` = rarity name. `lock` = `''` or why not: `'Rank 4'`, or `'Not in this challenge.'`. `rank` = zoo rank that unlocks it. `weeks` already includes the team's speed-up. `odds` = `{ rarity: chance }` (2 or 3 entries that add up to 1). `ratio` = team strength against the region (show as signs as before) |
+| `ZE.expStarRange(region) -> [lowest, highest]` | `[1, 5]`, or `[4, 5]` for a secret region |
+| `ZE.expCost(region, star)`, `ZE.expWeeks(S, region, staffIds, star)` | Price and length of one star level (no star = the lowest) |
+| `ZE.expOdds(S, region, power, star) -> { ratio, star, byRarity }` | The same odds from a team strength |
+| `ZE.teamPower(S, staffIds)` | Team strength. **No budget argument any more** |
+| `ZE.startExpedition(S, region, staffIds, star)` | `{ ok, pid }`. No star = the region's lowest. Refused for a star the region does not have, or one above the zoo's rank (`'Needs zoo rank 4.'`) |
+
+- The project carries `star` (no `budget`); `ZE.projectInfo(S, p).star` is the star (or `null` for an expedition sent before R7).
+- The `expedition` report has a new field **`star`** (`null` for an old one). `found[]` is unchanged: still 1 animal 80% of the
+  time and 2 animals 20%, each rolled on the odds above.
+- The `guide` and `camp` choices make the team stronger (better odds upward); `tracks` rolls the first find twice and keeps the rarer.
+
+### R7.6 Challenge mode
+
+Five short levels in `D.LEVELS`, separate from the three long-term zoos. A challenge takes nothing from them and gives
+nothing back (no legacy bonus in, no score, year-end, yearly events or legacy out).
+
+`D.LEVELS[i] = { id, n, name, goal: { kind, target, biome? }, weeks, stars: [w3, w2], rows, money, start, animals?, staff?,
+research?, biomes?, maxHabs?, no? }`. `weeks` is the time limit. Reach the goal by week `w3` for 3 stars, by `w2` for 2, by
+the limit for 1. The map is the usual 10 columns wide and `rows` rows deep (`S.rows`); it never grows.
+One game week is `D.CH_WEEK_SEC` = 5 real seconds at speed 2, so 120 weeks = 10 minutes of running time (level 5 has 132 weeks, 11 minutes).
+
+| n | id | name | Goal | Limit | 3 stars by | 2 stars by | Map rows | Start | Rules |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | `small` | Pocket Park | 900 visitors in one week (`visitors`) | 120 | week 60 | week 76 | 6 | $26,500, bare land | |
+| 2 | `savanna` | Savanna Only | own 9 different Savanna species at once (`species`) | 120 | 45 | 70 | 8 | $26,500, bare land | only Savanna: habitats, research, expeditions, trader |
+| 3 | `broke` | Shoestring | $50,000 in the bank (`money`) | 120 | 62 | 85 | 8 | $1,500, starter zoo built | no expeditions |
+| 4 | `breed` | Family Tree | breed a grade A baby, average 58 or more (`bred`) | 120 | 60 | 88 | 8 | $12,000, starter zoo, 2 zebras and 2 warthogs of about 46, a skilled keeper, Genetics I known | |
+| 5 | `tiny` | Two Pens | star rank 4 (`rank`) | 132 | 80 | 100 | 4 | $26,500, bare land | at most 2 habitats |
+
+| Call | Meaning |
+|---|---|
+| `ZE.newChallenge(levelId or n, opts?) -> S` | A fresh state for that level (`null` for an unknown level). `opts.zooName` optional; the name defaults to the level's name. `S.ch = { id, n, done, failed, stars, endWeek, best }` |
+| `ZE.level(S)` | The `D.LEVELS` entry of the running challenge, or `null` in a normal zoo |
+| `ZE.challengeStatus(S)` | `null` in a normal zoo, else `{ id, level, name, kind, icon, cur, target, week, weeks, weeksLeft, stars3, stars2, starsNow, stars, done, failed }` (see below) |
+| `ZE.allowed(S, what, id?) -> { ok: true } or { ok: false, msg }` | May the player do this here. Always `{ ok: true }` in a normal zoo. Use it to hide or grey out; the actions check it themselves and return the same `msg` |
+| `ZE.nextGoal(S)` | In a challenge: `{ kind, icon, cur, target, weeksLeft, challenge: true }` with the same numbers as the status |
+
+**`challengeStatus` fields.** `level` = the level number, `id` = its id. `kind`, `icon`, `cur`, `target` = the goal as the chip
+shows it. `week` = weeks played (frozen at the end), `weeks` = the limit, `weeksLeft`. `stars3`, `stars2` = the two star
+weeks. `starsNow` = the stars the player would get by reaching the goal this coming week (3, 2 or 1 while running; the earned
+stars once done). `stars` = `null` while running, then the earned stars (0 = failed). `done`, `failed`.
+Per goal kind: `visitors` cur = last week's visitors; `species` cur = different species of `biome` in `S.animals` now (waiting
+arrivals do not count), plus `biome`; `money` cur = the bank; `bred` cur = the average of the best baby bred in this level
+(it still counts after it is sold), plus `grade` = the target as a grade letter (`'A'`); `rank` cur = reputation and
+target = the reputation that rank needs, plus `rankNow` and `rank` (the rank numbers).
+
+**`allowed(S, what, id)`**
+
+| what | id | Refused when |
+|---|---|---|
+| `'land'`, `'yearly'` | | always in a challenge (the map never grows; no Open Day, Festival or Winter Show) |
+| `'hab'` | biome | the level's `biomes` does not list it, or the level's `maxHabs` habitats are already built (`msg` `'Only 2 habitats here.'`) |
+| `'biome'` | biome | the level's `biomes` does not list it (hide that region's habitats, research and expeditions) |
+| `'expedition'` | region (optional) | the level's `no` lists `'expedition'`, or the region is not in `biomes` |
+| `'research'` | research id | it is a `region:` the level does not allow (`researchList` shows it with `lock: 'Not in this challenge.'`) |
+| `'breed'`, `'event'`, `'crate'`, `'buy'`, `'hire'`, `'campaign'` | | the level's `no` lists it (none of the first five levels does; the actions are wired for later levels) |
+
+Also in a challenge: `ZE.nextLand(S)` is `null`; `ZE.expStars` shows every star locked with the reason when expeditions are off;
+the trader, crates and strays only ever bring animals of regions the level has open.
+
+**How a level ends.** The goal is judged once a week at the end of `tick` (never inside an action). When it is reached, or the
+time limit passes, the engine pushes exactly ONE report and the level stands still: `tick` does nothing afterwards.
+
+| type | Fields |
+|---|---|
+| `challenge` | `level` (level id), `n` (level number), `stars` (3, 2, 1, or 0 = out of time), `week` |
+
+**What never happens in a challenge:** `yearlyplan`, `yearly`, `show`, `showresult`, `yearend`, `final` reports; `S.history`
+stays empty; `S.finished` stays false. Happenings, callers, VIP visits, rank-ups and everything else work as normal.
+`serialize` / `deserialize` round-trip a challenge exactly, mid-way and after its end.
+
+### R7.7 New data (all in `data.js`)
+
+`D.HAP_GAP` [40, 56], `D.HAP_TREAT` 2, `D.CHOICE_CHANCE` 0.25, `D.VISITORS_PER_REP` 700, `D.REVIEW_REP_DIV` 42, `D.EXP_STAR`,
+`D.EXP_SECRET_STARS`, `D.EXP_ODDS`, `D.EXP_FRAGMENT` 0.14 (map-piece chance, was 10% to 18% by budget), `D.CH_WEEK_SEC`,
+`D.CH_MINUTES`, `D.LEVELS`, `D.GOAL_ICON` (`visitors, species, money, bred, rank, open, variants` -> icon id).
+
+## R5. Round 5 changes (older; R7 above wins where they differ)
 
 Save version stays **3**. Old saves load: `deserialize` fills every new field with a default.
 
@@ -113,7 +305,7 @@ rank, `D.CRATE_VISIT` by rank band 1-2, 3-4, 5-6, 7-8, 9-10, rarities 1..5). The
 
 ### R5.6 Happenings (#5)
 
-- Less often: about **one every 12 weeks** (the gap is 10 to 14 weeks), measured with the bot. Quiet start unchanged
+- (R7: now about one every 47 weeks, gap 40 to 56; see R7.1.) Round 5 made it about **one every 12 weeks** (the gap was 10 to 14 weeks), measured with the bot. Quiet start unchanged
   (first one 5 to 7 weeks after opening).
 - About **one in three is a mild setback**. Three new setbacks (all `bad: true`):
 
@@ -188,11 +380,11 @@ rank, `D.CRATE_VISIT` by rank band 1-2, 3-4, 5-6, 7-8, 9-10, rarities 1..5). The
 - `ZE.habName(S, item) -> 'Savanna 2'` (for a facility it returns the facility name).
 - `ZE.cells(item) -> [[q, r], ...]`, `ZE.cellsOf(kind, t, q, r, rot)`, `ZE.rot(q, r, n)`, `ZE.DIRS` (6 neighbour steps),
   `ZE.occupancy(S, ignoreId?) -> {'q,r': itemId}`, `ZE.kindOf(item) -> 'hab:savanna' | 'fac:snack'`.
-- `ZE.canPlace(S, kind, t, q, r, rot, ignoreId?) -> boolean` (on owned land, free, not the entrance). Pass the item's
-  own id as `ignoreId` when moving it.
+- `ZE.canPlace(S, kind, t, q, r, rot, ignoreId?) -> boolean` (on owned land, free, not the entrance, and the walkway-ring
+  rules of R7.2; `ZE.placeCheck` gives the reason). Pass the item's own id as `ignoreId` when moving it.
 - `ZE.layout(S, items?) -> {nb, active, byId, occ}`: pure preview of a real or hypothetical item list. `active` is
   `[{id: comboId, anchor: itemId, members: [itemId, ...]}]`; outline `anchor` plus `members` for each. `nb[itemId]` is the
-  list of touching items. To preview a placement, copy `S.items`, add or move the ghost, call `layout`, and compare the
+  list of items next to it (touching, or across a habitat's walkway ring: R7.2). The result also has `ring`. To preview a placement, copy `S.items`, add or move the ghost, call `layout`, and compare the
   combo ids with `ZE.c(S).active`.
 - `ZE.nearMisses(S) -> [{combo, fac, anchor, cells: [[q, r], ...]}]`: known combos one facility short and the free hexes
   where it would complete them.
@@ -295,10 +487,11 @@ prefer the fields. Themes are not tied to any stat (their fit is per biome, `ZD.
 | `ZE.showMedals(S)` | `{gold, silver, bronze}` scores needed at this year's show, or `null` when no show is open |
 | `ZE.showScore(S, a)`, `ZE.showMedal(S, a)` | An animal's show score; the medal it would win (`'gold'|'silver'|'bronze'|null`) |
 | `ZE.expFast(S, staffIds)` | Weeks saved by the team's roles (1 with an Explorer or Expedition Leader, else 0). `ZD.FAST_ROLES` |
-| `ZE.expWeeks(S, region, staffIds)` | How long that expedition would take |
-| `ZE.expCost(region, budget)` | Price; budget 0 lean, 1 standard, 2 lavish |
-| `ZE.teamPower(S, staffIds, budget)` | Team strength |
-| `ZE.expOdds(S, region, power)` | `{ratio, byRarity: {1: p, 2: p, ...}}`. `ratio` = strength against the region (show as signs: under 0.6 `--`, under 0.9 `-`, under 1.2 `+`, else `++`) |
+| `ZE.expStars(S, region, staffIds)` | Everything the Send out page needs, per star level (R7.5) |
+| `ZE.expWeeks(S, region, staffIds, star)` | How long that expedition would take |
+| `ZE.expCost(region, star)` | Price of that star level (R7.5; the budget is gone) |
+| `ZE.teamPower(S, staffIds)` | Team strength |
+| `ZE.expOdds(S, region, power, star)` | `{ratio, star, byRarity: {rarity: p}}` (R7.5). `ratio` = strength against the region (show as signs: under 0.6 `--`, under 0.9 `-`, under 1.2 `+`, else `++`) |
 | `ZE.maxExp(S)` | Expeditions allowed at once (1, or 2 with Second Convoy) |
 | `ZE.breedCheck(S, aId, bId)` | `''` if the pair can breed now, else the reason |
 | `ZE.readyPairs(S, habId)` | `[[aId, bId], ...]` pairs that can start now |
@@ -382,7 +575,7 @@ All take `S` first (call them through `ZCore.act`). Each lists what it adds to `
 **Projects**
 | Action | Arguments | Returns on success |
 |---|---|---|
-| `startExpedition` | `region, [staffIds 1..3], budget 0..2` | `{pid}` |
+| `startExpedition` | `region, [staffIds 1..3], star 1..5` (R7.5) | `{pid}` |
 | `startBreeding` | `animalIdA, animalIdB, leadStaffId` | `{pid}` |
 | `startEvent` | `habId, themeId, leadStaffId` | `{pid}` |
 | `cancelProject` | `pid` | `{refund}` (half the cost of an expedition, else 0) |
@@ -392,7 +585,7 @@ All take `S` first (call them through `ZCore.act`). Each lists what it adds to `
 ## 5. Projects and mid-point choices
 
 `S.projects` entries: `{id, type:'expedition'|'breed'|'event', start, end, staff:[ids], hab?, choice, ...}`.
-`hab` is set for breeding and events. Extra fields: expedition `region, budget, power, cost`; breed `a, b` (animal ids);
+`hab` is set for breeding and events. Extra fields: expedition `region, star, power, cost` (R7.5); breed `a, b` (animal ids);
 event `theme, pts, star, boost, repeat`. `end` can move by a week when a choice says so.
 
 A waiting choice is `project.choice`:
@@ -403,7 +596,7 @@ A waiting choice is `project.choice`:
 
 `who` is the lead's role id (a person sprite kind), `whoId` their staff id. `cost` is money, `costRp` research points,
 `odds` the chance of success 0..1 (show it), `note` a few words on what it does. `def` is the option used if the player
-never answers. The engine raises `{type:'choice', pid}` and an fx `{type:'choice'}` when it appears. Answer with
+never answers. **R7: each choice only comes up a quarter of the time (R7.1).** The engine raises `{type:'choice', pid}` and an fx `{type:'choice'}` when it appears. Answer with
 `resolveChoice(S, pid, i)`; an option the player cannot afford is refused (`ok:false`) and the choice stays.
 Nothing waits for an answer: the default is applied at the project's next choice point or when it finishes. When you show
 a `choice` report, check `ZE.project(S, pid)` still exists and still has `.choice`.
@@ -424,12 +617,13 @@ a `choice` report, check `ZE.project(S, pid)` still exists and still has `.choic
 
 | type | Fields |
 |---|---|
+| `challenge` | `level, n, stars (0 = out of time), week`: a challenge level ended (R7.6) |
 | `rankup` | `rank, name, unlocks:[short lines]` |
 | `combo` | `id` (see `ZD.COMBOS`), `anchor` (item id), `members` (item ids) |
 | `caller` | `kind: 'trader'|'director'|'headhunter'`. Then read `S.offers` (and `ZE.crateInfo(S)`) or `S.headhunt`. Dismissing needs no engine call |
 | `choice` | `pid` (section 5) |
 | `happening` | `key, title, text, bad:boolean, who?, hab?, animal?, newAnimal?, options?` (section 7) |
-| `expedition` | `region, found:[{id, sp, sex, rarity, isNew, variant, charm, vigor, wit, hab:null, pending:true, price}], rp, fragment, notes:[...], ups:[names who levelled up], staff:[ids]`. `found` has 1 entry (80%) or 2 (20%), see R5.9. **Reveal order:** for each entry of `found` in order: rarity (and `isNew`), then species and variant, then the three stats, then Sell (`price`) / Keep and where (R5.2); `hab` is always `null` now. Then `rp` (research from field notes) and, if `fragment > 0`, "map piece `fragment` of 4" |
+| `expedition` | `region, star` (R7.5), `found:[{id, sp, sex, rarity, isNew, variant, charm, vigor, wit, hab:null, pending:true, price}], rp, fragment, notes:[...], ups:[names who levelled up], staff:[ids]`. `found` has 1 entry (80%) or 2 (20%), see R5.9. **Reveal order:** for each entry of `found` in order: rarity (and `isNew`), then species and variant, then the three stats, then Sell (`price`) / Keep and where (R5.2); `hab` is always `null` now. Then `rp` (research from field notes) and, if `fragment > 0`, "map piece `fragment` of 4" |
 | `secret` | `region: 'paleo'|'mythic'` (a secret region opened; comes right after the expedition report for paleo) |
 | `birth` | `fail:boolean, a, b` (parent ids), `lead` (staff id), `sp, chance` (success chance that applied), `kids:[...]`, and when it worked `twins, firstBred`. Each kid: `{id, sp, sex, name, hab, rolls:[{stat, parents, value, delta, lucky}], variantChance, variant}`. **Reveal order:** for each kid: the three `rolls` in order (charm, vigor, wit): show `parents` (the parents' average), count to `value`, flag `lucky` (a lucky jump of 6 to 10); then the variant roll: show `variantChance`, then `variant`. Each kid also has `hab: null, pending: true, suggest` (the parents' habitat) and `price`: after the reveal, run Sell / Keep / where for it (R5.2) |
 | `review` | `hab, biome, theme, aff 0..3, fitWord, firstTime` (first time this theme met this biome), `sc:{animals, habitat, fun, learning}`, `critics:[{key, name, score}]`, `total, hof, repeat, fired, star, boost, money, rep, rp, lead`. **Reveal order:** the four `critics` in array order, one at a time, each out of 10; then `total` out of 40; then the Hall of Fame moment if `hof` (34 or more); then rewards `money, rep, rp`. `star` is `null` or `{animal, stat, score, gain}` (that animal may have been sold since: guard the lookup); `boost` is `null` or `{good, score, amt, big}` |
@@ -445,7 +639,7 @@ a `choice` report, check `ZE.project(S, pid)` still exists and still has `.choic
 
 ## 7. Happenings
 
-About one every 10 to 14 weeks (12 on average, `D.HAP_GAP`), never in the same week as a yearly event, about 1 in 3 a mild setback.
+About one every 40 to 56 weeks (`D.HAP_GAP`, R7.1; it was 10 to 14), never in the same week as a yearly event, about 1 in 3 a mild setback.
 The report and `S.happening` hold the same data:
 
 ```
@@ -523,7 +717,7 @@ and an explorer are on the team, and money is `ZD.START_MONEY` = $26,500 (+$6,00
 old $20,000 (`ZD.START_MONEY_CLASSIC`) plus the price of the old free starter, a Savanna habitat ($5,000) and a Snack Stand
 ($1,500), listed in `ZD.START_KIT`. Building the first Savanna habitat no longer moves the zebras in: `build` returns
 `movable` (their two ids) and the interface offers `moveIn`. Both starter items fit on the starting land from week 0; `ZE.starterSpots() -> {hab:{q,r}, snack:{q,r}}`
-gives the classic positions (rotation 0) if you want to suggest a spot.
+gives the classic positions (rotation 0) if you want to suggest a spot (R7: the Snack Stand spot is one hex further out, just outside the walkway ring).
 
 `opts.starter === true` gives the **classic start** instead: the Savanna habitat and Snack Stand already built at
 `starterSpots()`, zebras housed, $20,000, a trader in town. Tests and the bot use it when they need a known layout.
