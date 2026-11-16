@@ -249,7 +249,8 @@ html.sa #app { position: relative; top: auto; bottom: auto; left: auto; right: a
 #goal .low { color: #ff8d80; }
 #goal .gsep { width: 3px; height: 14px; background: #6b5238; margin: 0 2px; }
 #goal .stars .star { width: 11px; height: 11px; }
-body.screens-open #goal, body.title-on #goal, body.placing #goal { display: none; }
+body.screens-open #goal, body.title-on #goal, body.placing #goal, body.editing #goal { display: none; }
+body.editing #news { visibility: hidden; pointer-events: none; }
 
 /* ---------- update 7: panels run to the bottom of the screen; the Back button sits just above the home-indicator inset ---------- */
 .layer:not(.modal) { padding-bottom: 0; }

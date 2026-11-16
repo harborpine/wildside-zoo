@@ -65,6 +65,11 @@ Where this section disagrees with older text further down, this section wins.
 * Test shortcut: `index.html?challenge=<levelId>` resumes that level's saved run, else starts it fresh. `ZT.startChallenge`, `ZT.resumeChallenge`, `ZT.challengeStars`,
   `ZT.challengeSaved`, `ZT.inChallenge`, `ZT.leaveChallenge`, `ZT.clearChallenge`.
 
+### Edit mode counts like placement (wave 2)
+* `ZRender.editing()` (read defensively; may be absent) is treated exactly like `ZRender.placing()`: `ZCore.running()` is false (clock paused), a floor tap and
+  `ZCore.openMenu()` do nothing, and `body` carries class `editing` while it is on (kept in step by the 50 ms loop, like `placing`). `#goal` and `#news` hide under `body.editing`.
+* `ZCore.saveLegacy()` returns `false` and writes nothing while a challenge is in play. The shell itself has no 20-year or legacy logic beyond storing that record.
+
 ## Start-up order
 
 `index.html` loads `data, engine, geo, sprites, render, core, menus, moments` (the optional ones with `onerror` so the page still loads without them).

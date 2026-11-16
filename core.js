@@ -18,7 +18,7 @@
   let chId = null, chOver = false, goalKey = null, goalErr = false;   // challenge level being played (null in a normal zoo); its result has arrived
   let busy = null;                          // the report currently on screen (or null)
   let busySince = 0, emptyStackSince = 0, token = 0;
-  let lastPl = false, newsKey = null, newsTimer = 0, skipReports = false, dirtySave = false, saveTimer = 0, saveFailedToast = false;
+  let lastPl = false, lastEd = false, newsKey = null, newsTimer = 0, skipReports = false, dirtySave = false, saveTimer = 0, saveFailedToast = false;
   let legacy = { runs: 0, best: 0, aff: {}, combos: {}, hall: [], carry: null };
   const errors = [];
   const handlers = {};
@@ -30,6 +30,7 @@
   const hasR = () => !!(window.ZRender && typeof window.ZRender.init === 'function');
   const R = () => (hasR() ? window.ZRender : null);
   const placing = () => { const r = R(); try { return !!(r && r.placing && r.placing()); } catch (e) { return false; } };
+  const editing = () => { const r = R(); try { return !!(r && typeof r.editing === 'function' && r.editing()); } catch (e) { return false; } };   // Edit mode on the map: treated like placement everywhere
   function recordError(e, where) { const m = (where ? where + ': ' : '') + (e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : String(e)); errors.push(m); if (errors.length > 50) errors.shift(); try { console.warn('[wildside]', m); } catch (x) { /* none */ } }
   window.addEventListener('error', ev => { errors.push('window: ' + (ev.message || '') + ' @' + (ev.filename || '').split('/').pop() + ':' + ev.lineno); });
   window.addEventListener('unhandledrejection', ev => { errors.push('promise: ' + (ev.reason && (ev.reason.stack || ev.reason.message) || ev.reason)); });
@@ -174,7 +175,7 @@
   const ui = { chipRow, statChip, astat, skillChip, grade, sym, cost, el, btn, grid, list, stat, img, icon, sign, stars, flames, bar, section, note, tabs, reveal, choices, toast, confirm };
 
   // ------------------------------------------------------------------ screen stack
-  function isRunning() { return !!S && !stack.length && !busy && !placing() && !(LANDSCAPE && LANDSCAPE.matches); }
+  function isRunning() { return !!S && !stack.length && !busy && !placing() && !editing() && !(LANDSCAPE && LANDSCAPE.matches); }
   function syncRunning() { const r = isRunning(); if (r !== lastRunning) { lastRunning = r; const rr = R(); if (rr && rr.setRunning) { try { rr.setRunning(r); } catch (e) { recordError(e, 'setRunning'); } } } if (!r && !stack.length && !busy) { /* placement */ } }
 
   function renderEntry(en) {
@@ -467,7 +468,8 @@
   }
   function leaveChallenge() { if (!inChallenge()) return false; toTitle(); return true; }   // saves the run (so it can be resumed) and shows the title
   function clearChallenge() { try { localStorage.removeItem(CH_KEY); } catch (e) { /* ignore */ } if (inChallenge()) { dirtySave = false; toTitle(true); } return true; }   // give up: forget the run in progress (best stars stay)
-  function saveLegacy() { try { localStorage.setItem(LEGACY_KEY, JSON.stringify(legacy)); return true; } catch (e) { return false; } }
+  function saveLegacy() { if (chId != null || (S && S.ch)) return false;   // a challenge gives nothing to the long-term zoos
+    try { localStorage.setItem(LEGACY_KEY, JSON.stringify(legacy)); return true; } catch (e) { return false; } }
   function loadLegacy() { try { const raw = localStorage.getItem(LEGACY_KEY); if (raw) legacy = Object.assign(legacy, JSON.parse(raw)); } catch (e) { /* ignore */ } }
 
   // ------------------------------------------------------------------ new game, strip, ticks
@@ -551,11 +553,12 @@
     if (run) { acc += dt; const ms = WEEK_MS[speed]; if (acc >= ms) { acc = acc > ms * 2 ? 0 : acc - ms; doTick(); } }
     if (run !== lastRunning) syncRunning();
     const pl = placing(); if (pl !== lastPl) { lastPl = pl; document.body.classList.toggle('placing', pl); }
+    const ed = editing(); if (ed !== lastEd) { lastEd = ed; document.body.classList.toggle('editing', ed); }
   }
 
   // ------------------------------------------------------------------ boot and hooks
   function openMenu() {
-    if (!S || stack.length || busy || placing()) return;
+    if (!S || stack.length || busy || placing() || editing()) return;
     if (window.ZMenus && typeof ZMenus.open === 'function') { try { ZMenus.open(); } catch (e) { recordError(e, 'ZMenus.open'); } return; }
     push({ id: 'menu', title: 'Menu', backLabel: 'Play', render(body, api) {
       body.appendChild(note('The real menu goes here.'));
@@ -567,7 +570,7 @@
       ]));
     } });
   }
-  function onFloorTap(info) { if (stack.length || busy || placing()) return; log('tap', info && info.item ? { item: info.item.id != null ? info.item.id : undefined } : undefined); openMenu(); }
+  function onFloorTap(info) { if (stack.length || busy || placing() || editing()) return; log('tap', info && info.item ? { item: info.item.id != null ? info.item.id : undefined } : undefined); openMenu(); }
 
   function build() {
     $strip = $('strip'); $date = $('s-date'); $stars = $('s-stars'); $money = $('s-money'); $vis = $('s-vis'); $goal = $('goal'); $floor = $('floor'); $news = $('news'); $screens = $('screens'); $toasts = $('toasts'); $stage = $('stage');
