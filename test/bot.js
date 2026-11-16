@@ -45,7 +45,7 @@ function run(skill, verbose, opts) {
   // which star level to send: the highest unlocked one that is cheap next to the bank and can still bring a new species; else 2 stars; else the lowest
   function pickStar(region, team) {
     const list = Z.expStars(S, region, team).filter(x => x.unlocked && S.money > x.cost * 1.3); if (!list.length) return null;
-    const fresh = x => D.SPECIES_LIST.some(s => s.biome === region && s.rarity === x.star && !S.book[s.id]);
+    const fresh = x => D.SPECIES_LIST.some(s => s.biome === region && (s.rarity === x.star || s.rarity === x.star + 1) && !S.book[s.id]); // a run can also find one star above
     const cheap = list.filter(x => x.cost <= S.money * (+process.env.BOT_STARSHARE || 0.6) || x === list[0]);
     const want = cheap.filter(fresh).pop() || cheap.pop();
     return want.star;

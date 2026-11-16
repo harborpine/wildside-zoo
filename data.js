@@ -240,16 +240,17 @@
   // rank = zoo rank that unlocks it, variant = chance each find is a rare variant. Tuned with the bot to keep the old pacing.
   D.EXP_STAR = [null,
     { cost: 1,   min: 0,     weeks: 0, rank: 1, variant: 0.03 },
-    { cost: 1.3, min: 0,     weeks: 0, rank: 1, variant: 0.03 },
-    { cost: 1.8, min: 8500,  weeks: 1, rank: 2, variant: 0.035 },
-    { cost: 3,   min: 30000, weeks: 2, rank: 4, variant: 0.04 },
-    { cost: 6,   min: 60000, weeks: 3, rank: 6, variant: 0.045 }
+    { cost: 1.1, min: 0,     weeks: 0, rank: 1, variant: 0.03 },
+    { cost: 1.3, min: 9500,  weeks: 1, rank: 2, variant: 0.035 },
+    { cost: 1.6, min: 33500, weeks: 1, rank: 3, variant: 0.04 },
+    { cost: 2,   min: 60000, weeks: 2, rank: 4, variant: 0.045 }
   ];
   D.EXP_SECRET_STARS = [4, 5]; // the two secret regions only hold very rare animals: their runs are 4 or 5 stars (4 is the base price and length)
   // Odds of a find one star below / above the chosen star: base + per x (team strength / region difficulty), kept between min and max.
   // The rest lands on the chosen star. A stronger team (Scouting) means fewer finds below and more above.
-  // An ordinary early team (x = 0.8): 21% below, 62% on the star, 17% above. A strong team (x = 1.5): 5% below, 67% on, 28% above.
-  D.EXP_ODDS = { down: { base: 0.45, per: -0.3, min: 0.05, max: 0.4 }, up: { base: 0.05, per: 0.15, min: 0.05, max: 0.3 } };
+  // An ordinary early team (x = 0.8): 21% below, 53% on the star, 26% above. A strong team (x = 1.5): 5% below, 55% on, 40% above.
+  // (The chance above is what brings the lucky rare find a cheap run used to bring: a 2 star run is about as good as the old Standard run.)
+  D.EXP_ODDS = { down: { base: 0.45, per: -0.3, min: 0.05, max: 0.3 }, up: { base: 0.1, per: 0.2, min: 0.1, max: 0.4 } };
   D.EXP_FRAGMENT = 0.14; // chance a strong team brings back an old map piece (rank 5 and up)
   D.ARRIVAL_WEEKS = 2;   // an arrival left undecided this long goes to the holding pen (never a habitat)
   D.HOLD_UPKEEP = 1.0;   // extra upkeep in the holding pen, as a share of the animal's normal upkeep (1.0 = the pen costs double)
@@ -313,17 +314,19 @@
   //   [species, sex, stat level], staff = the starting team instead of a keeper and an explorer [role, skill level],
   //   research = know-how already known, biomes = the only regions allowed, maxHabs = most habitats allowed, no = switched-off actions.
   D.LEVELS = [
-    { id: 'small',   n: 1, name: 'Pocket Park',  goal: { kind: 'visitors', target: 900 },                 weeks: 120, stars: [60, 76],  rows: 6, money: D.START_MONEY, start: 'bare' },
-    { id: 'savanna', n: 2, name: 'Savanna Only', goal: { kind: 'species', target: 9, biome: 'savanna' }, weeks: 120, stars: [45, 70],  rows: 8, money: D.START_MONEY, start: 'bare', biomes: ['savanna'] },
-    { id: 'broke',   n: 3, name: 'Shoestring',   goal: { kind: 'money', target: 50000 },                  weeks: 120, stars: [62, 85],  rows: 8, money: 1500, start: 'starter', no: ['expedition'] },
+    { id: 'small',   n: 1, name: 'Pocket Park',  goal: { kind: 'visitors', target: 1000 },                weeks: 120, stars: [58, 70],  rows: 6, money: D.START_MONEY, start: 'bare' },
+    { id: 'savanna', n: 2, name: 'Savanna Only', goal: { kind: 'species', target: 9, biome: 'savanna' }, weeks: 120, stars: [36, 64],  rows: 8, money: D.START_MONEY, start: 'bare', biomes: ['savanna'] },
+    { id: 'broke',   n: 3, name: 'Shoestring',   goal: { kind: 'money', target: 50000 },                  weeks: 120, stars: [62, 74],  rows: 8, money: 1500, start: 'starter', no: ['expedition'] },
     { id: 'breed',   n: 4, name: 'Family Tree',  goal: { kind: 'bred', target: 58 },                      weeks: 120, stars: [60, 88],  rows: 8, money: 12000, start: 'starter',
       animals: [['zebra', 'M', 46], ['zebra', 'F', 46], ['warthog', 'M', 46], ['warthog', 'F', 46]], staff: [['keeper', 40], ['guide', 16]], research: ['tech:gen1'] },
-    { id: 'tiny',    n: 5, name: 'Two Pens',     goal: { kind: 'rank', target: 4 },                       weeks: 132, stars: [80, 100], rows: 4, money: D.START_MONEY, start: 'bare', maxHabs: 2 }
+    { id: 'tiny',    n: 5, name: 'Two Pens',     goal: { kind: 'rank', target: 4 },                       weeks: 120, stars: [68, 86], rows: 4, money: D.START_MONEY, start: 'bare', maxHabs: 2 }
   ];
   D.GOAL_ICON = { visitors: 'visitors', species: 'm-animals', money: 'coin', bred: 'heart', rank: 'rep', open: 'habitat', variants: 'new' }; // sprite icon for each goal kind
 
   D.SEASONS = [
-    { name: 'Spring', mult: 1.0 }, { name: 'Summer', mult: 1.25 }, { name: 'Autumn', mult: 0.95 }, { name: 'Winter', mult: 0.72 }
+    // R7 follow-up: every season 7% busier than before (was 1.0, 1.25, 0.95, 0.72). This pays back what the rarer mid-project
+    // choices used to earn, so the long game keeps its old pace (measured with the bot).
+    { name: 'Spring', mult: 1.07 }, { name: 'Summer', mult: 1.34 }, { name: 'Autumn', mult: 1.02 }, { name: 'Winter', mult: 0.77 }
   ];
 
   // t = the year a strong player is expected to overtake this rival

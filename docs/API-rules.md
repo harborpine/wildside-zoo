@@ -30,8 +30,10 @@ Checks: `node test/rules-check.js` (about 2 minutes), `node test/bot.js 0.8`, `n
   no `p.choice`. One exception keeps reviews fair: when an event's `star` choice does not come up, the engine picks the best
   star animal by itself (the old default), so `review.star` is always filled; you still get the floor `fx` for it.
 - `ZE.debug.alwaysChoices(true|false)`: makes every choice come up (for tests and for building the choice screens). Returns the new setting.
-- To make up for the lost rewards: review reputation is `total x total / 42` (`D.REVIEW_REP_DIV`, was 46) and one reputation
-  point per 700 weekly visitors (`D.VISITORS_PER_REP`, was 800).
+- To make up for the lost rewards: review reputation is `total x total / 42` (`D.REVIEW_REP_DIV`, was 46), one reputation
+  point per 700 weekly visitors (`D.VISITORS_PER_REP`, was 800), and every season is 7% busier (`D.SEASONS` multipliers
+  1.07 / 1.34 / 1.02 / 0.77, were 1.0 / 1.25 / 0.95 / 0.72). With these the 20-year game keeps its old pace (bot, 120 runs each
+  way: rank and species within 5% at years 1, 2, 3, 5, 10 and 15; year-end bank within about 15%).
 
 ### R7.2 The walkway ring
 
@@ -100,29 +102,30 @@ The player picks a region and then a **star level** for the run. A star is a rar
 | Star | Price | Extra weeks | Unlocks at zoo rank | Rare-variant chance |
 |---|---|---|---|---|
 | 1 | region base price | 0 | 1 | 3% |
-| 2 | x1.3 | 0 | 1 | 3% |
-| 3 | x1.8, at least $8,500 | +1 | 2 | 3.5% |
-| 4 | x3, at least $30,000 | +2 | 4 | 4% |
-| 5 | x6, at least $60,000 | +3 | 6 | 4.5% |
+| 2 | x1.1 | 0 | 1 | 3% |
+| 3 | x1.3, at least $9,500 | +1 | 2 | 3.5% |
+| 4 | x1.6, at least $33,500 | +1 | 3 | 4% |
+| 5 | x2, at least $60,000 | +2 | 4 | 4.5% |
 
 (`D.EXP_STAR`. The minimum prices stop cheap Savanna runs being a way to make money by selling the finds. Savanna runs cost
-$3,000 / $3,900 / $8,500 / $30,000 / $60,000.) The two secret regions only have stars **4 and 5** (`D.EXP_SECRET_STARS`);
-there 4 is the base price and length and 5 costs double and takes a week longer.
+$3,000 / $3,300 / $9,500 / $33,500 / $60,000; a Rainforest run $10,000 / $11,000 / $13,000 / $33,500 / $60,000; a Polar run
+$70,000 / $77,000 / $91,000 / $112,000 / $140,000.) The two secret regions only have stars **4 and 5** (`D.EXP_SECRET_STARS`);
+there 4 is the base price and length and 5 costs a quarter more and takes a week longer.
 
 **Odds** (`D.EXP_ODDS`): with x = team strength divided by the region's difficulty (the `ratio`), the chance of a find one
-star **below** is `0.45 - 0.3x` (kept between 5% and 40%), one star **above** is `0.05 + 0.15x` (5% to 30%), and the rest
-lands on the chosen star. An ordinary early team (x = 0.8): 21% below, 62% on, 17% above. A strong team (x = 1.5): 5% below,
-67% on, 28% above. So Scouting still matters: it moves finds upward. Never more than one star away. A star with nothing below
+star **below** is `0.45 - 0.3x` (kept between 5% and 30%), one star **above** is `0.1 + 0.2x` (10% to 40%), and the rest
+lands on the chosen star (always at least half). An ordinary early team (x = 0.8): 21% below, 53% on, 26% above. A strong
+team (x = 1.5): 5% below, 55% on, 40% above. So Scouting still matters: it moves finds upward. Never more than one star away. A star with nothing below
 it in that region (1 star) or above it (5 stars in a normal region) puts that share on the chosen star.
 
 | Call | Meaning |
 |---|---|
-| `ZE.expStars(S, region, staffIds) -> [{ star, name, unlocked, lock, rank, cost, weeks, odds, ratio }]` | **Everything the Send out page needs**, one entry per star of that region, lowest first. `name` = rarity name. `lock` = `''` or why not: `'Rank 4'`, or `'Not in this challenge.'`. `rank` = zoo rank that unlocks it. `weeks` already includes the team's speed-up. `odds` = `{ rarity: chance }` (2 or 3 entries that add up to 1). `ratio` = team strength against the region (show as signs as before) |
+| `ZE.expStars(S, region, staffIds) -> [{ star, name, unlocked, lock, rank, cost, weeks, odds, ratio }]` | **Everything the Send out page needs**, one entry per star of that region, lowest first. `name` = rarity name. `lock` = `''` or why not: `'Rank 3'`, or `'Not in this challenge.'`. `rank` = zoo rank that unlocks it. `weeks` already includes the team's speed-up. `odds` = `{ rarity: chance }` (2 or 3 entries that add up to 1). `ratio` = team strength against the region (show as signs as before) |
 | `ZE.expStarRange(region) -> [lowest, highest]` | `[1, 5]`, or `[4, 5]` for a secret region |
 | `ZE.expCost(region, star)`, `ZE.expWeeks(S, region, staffIds, star)` | Price and length of one star level (no star = the lowest) |
 | `ZE.expOdds(S, region, power, star) -> { ratio, star, byRarity }` | The same odds from a team strength |
 | `ZE.teamPower(S, staffIds)` | Team strength. **No budget argument any more** |
-| `ZE.startExpedition(S, region, staffIds, star)` | `{ ok, pid }`. No star = the region's lowest. Refused for a star the region does not have, or one above the zoo's rank (`'Needs zoo rank 4.'`) |
+| `ZE.startExpedition(S, region, staffIds, star)` | `{ ok, pid }`. No star = the region's lowest. Refused for a star the region does not have, or one above the zoo's rank (`'Needs zoo rank 3.'`) |
 
 - The project carries `star` (no `budget`); `ZE.projectInfo(S, p).star` is the star (or `null` for an expedition sent before R7).
 - The `expedition` report has a new field **`star`** (`null` for an old one). `found[]` is unchanged: still 1 animal 80% of the
@@ -137,15 +140,15 @@ nothing back (no legacy bonus in, no score, year-end, yearly events or legacy ou
 `D.LEVELS[i] = { id, n, name, goal: { kind, target, biome? }, weeks, stars: [w3, w2], rows, money, start, animals?, staff?,
 research?, biomes?, maxHabs?, no? }`. `weeks` is the time limit. Reach the goal by week `w3` for 3 stars, by `w2` for 2, by
 the limit for 1. The map is the usual 10 columns wide and `rows` rows deep (`S.rows`); it never grows.
-One game week is `D.CH_WEEK_SEC` = 5 real seconds at speed 2, so 120 weeks = 10 minutes of running time (level 5 has 132 weeks, 11 minutes).
+One game week is `D.CH_WEEK_SEC` = 5 real seconds at speed 2, so 120 weeks = 10 minutes of running time.
 
 | n | id | name | Goal | Limit | 3 stars by | 2 stars by | Map rows | Start | Rules |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | `small` | Pocket Park | 900 visitors in one week (`visitors`) | 120 | week 60 | week 76 | 6 | $26,500, bare land | |
-| 2 | `savanna` | Savanna Only | own 9 different Savanna species at once (`species`) | 120 | 45 | 70 | 8 | $26,500, bare land | only Savanna: habitats, research, expeditions, trader |
-| 3 | `broke` | Shoestring | $50,000 in the bank (`money`) | 120 | 62 | 85 | 8 | $1,500, starter zoo built | no expeditions |
+| 1 | `small` | Pocket Park | 1,000 visitors in one week (`visitors`) | 120 | week 58 | week 70 | 6 | $26,500, bare land | |
+| 2 | `savanna` | Savanna Only | own 9 different Savanna species at once (`species`) | 120 | 36 | 64 | 8 | $26,500, bare land | only Savanna: habitats, research, expeditions, trader |
+| 3 | `broke` | Shoestring | $50,000 in the bank (`money`) | 120 | 62 | 74 | 8 | $1,500, starter zoo built | no expeditions |
 | 4 | `breed` | Family Tree | breed a grade A baby, average 58 or more (`bred`) | 120 | 60 | 88 | 8 | $12,000, starter zoo, 2 zebras and 2 warthogs of about 46, a skilled keeper, Genetics I known | |
-| 5 | `tiny` | Two Pens | star rank 4 (`rank`) | 132 | 80 | 100 | 4 | $26,500, bare land | at most 2 habitats |
+| 5 | `tiny` | Two Pens | star rank 4 (`rank`) | 120 | 68 | 86 | 4 | $26,500, bare land | at most 2 habitats |
 
 | Call | Meaning |
 |---|---|
@@ -191,7 +194,7 @@ stays empty; `S.finished` stays false. Happenings, callers, VIP visits, rank-ups
 
 ### R7.7 New data (all in `data.js`)
 
-`D.HAP_GAP` [40, 56], `D.HAP_TREAT` 2, `D.CHOICE_CHANCE` 0.25, `D.VISITORS_PER_REP` 700, `D.REVIEW_REP_DIV` 42, `D.EXP_STAR`,
+`D.HAP_GAP` [40, 56], `D.HAP_TREAT` 2, `D.CHOICE_CHANCE` 0.25, `D.VISITORS_PER_REP` 700, `D.REVIEW_REP_DIV` 42, `D.SEASONS` (7% busier), `D.EXP_STAR`,
 `D.EXP_SECRET_STARS`, `D.EXP_ODDS`, `D.EXP_FRAGMENT` 0.14 (map-piece chance, was 10% to 18% by budget), `D.CH_WEEK_SEC`,
 `D.CH_MINUTES`, `D.LEVELS`, `D.GOAL_ICON` (`visitors, species, money, bred, rank, open, variants` -> icon id).
 
