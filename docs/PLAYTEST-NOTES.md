@@ -34,3 +34,13 @@ Harrison is sending notes while he tests (from 2026-11-15). Save each one here i
 - Note 6: ONE Edit mode replaces the Build menu and the Move screen: Build opens the map in Edit mode; a sideways-scrolling strip along the bottom lists what you can add, grouped; tap anything on the map to move or sell it.
 - He asked the Lead for suggestions of additions, removals or changes for this update.
 - Symbols (note 11): flat 2D style APPROVED 2026-11-15 ("b and the other stuff looks great"); Hosting = idea B, the purple smiling speech bubble. Samples in `docs/art-review/symbols-v2/`.
+
+## Play-test notes, round 2 (2026-11-16, played on build e344ee7, i.e. before Update 7). Saved, NOT started.
+
+| # | His note | Status |
+|---|---|---|
+| 14 | Advertisements: one fixed length, priced per week. Every advert lasts 12 weeks and costs an amount per week, so the Projects screen no longer has to explain how long each one runs (fewer words). | saved |
+| 15 | Expeditions: default to Lean. (He played the old build. In Update 7 the 1 to 5 stars replaced Lean / Standard / Lavish, and the Send out page opens on the last star used, or the highest star costing at most half the bank. Lead's reading, to confirm with him: open on the cheapest star, 1 star.) | saved |
+| 16 | No lock symbol for things he can't afford. Not enough money is different from locked: a lock must only mean "not unlocked yet". | saved |
+| 17 | The main game feels too easy. He likes the difficulty in Game Dev Story, which makes playing well feel rewarding; Wildside Zoo needs some of that. (Our own balance only; nothing copied.) | saved |
+| 18 | Animal trader: fewer animals, less often. A visit every 3 months, bringing 2 animals plus 3 random rolls. (Exact meaning of "3 random rolls" to confirm with him when updates start.) | saved |
