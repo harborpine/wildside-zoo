@@ -592,7 +592,7 @@
       if (S.offers) rollOffers(S, 'trader');
     }
     if (L.staff) S.staff = L.staff.map(p => makeStaff(S, p[0], p[1]));            // the level's own team: [role, skill level]
-    (L.research || []).forEach(id => { S.research[id] = true; });                    // know-how the level starts with
+    (L.research || []).forEach(id => { S.research[id] = true; if (id.indexOf('region:') === 0) S.regions[id.slice(7)] = true; }); // know-how the level starts with (a known region is open)
     S.rep = 0; S.rp = 5; S.news = []; S.elog = []; S.reports = []; S.yr = newYearStats();
     news(S, L.name + ': challenge ' + L.n + '.', '');
     ev(S, 'start', { challenge: L.id });
@@ -633,10 +633,17 @@
       if (S.projects.some(p => p.hab === id)) return fail('A project is running here.');
       moved = Z.inHab(S, id); moved.forEach(a => { a.hab = null; });
     }
-    const refund = Math.round((it.k === 'hab' ? D.BIOMES[it.t].hab : D.FAC[it.t].cost) * 0.5);
+    const refund = Z.removeRefund(S, it.id);
     S.money += refund; S.items = S.items.filter(i => i.id !== id);
     // its animals wait in the holding pen (the player moves them)
     ev(S, 'remove', { k: it.k, t: it.t, refund: refund }); Z.refresh(S); return { ok: true, refund: refund };
+  };
+  // What selling gives back: removeRefund(S, itemId) for a placed item, or removeRefund(S, 'hab'|'fac', biome|facilityId).
+  // Half the list build price (D.REFUND_SHARE), whatever was paid. 0 for anything unknown.
+  Z.removeRefund = function (S, kind, t) {
+    if (typeof kind === 'number') { const it = Z.item(S, kind); if (!it) return 0; kind = it.k; t = it.t; }
+    const base = kind === 'hab' ? D.BIOMES[t] && D.BIOMES[t].hab : kind === 'fac' ? D.FAC[t] && D.FAC[t].cost : 0;
+    return base ? Math.round(base * D.REFUND_SHARE) : 0;
   };
   Z.upgrade = function (S, id) {
     const h = Z.item(S, id); if (!h || h.k !== 'hab') return fail('Pick a habitat.');

@@ -774,7 +774,7 @@ check('challenge: five levels as data; each can be started and is a separate sma
     const mins = L.weeks * D.CH_WEEK_SEC / 60; ok(mins >= 8 && mins <= 12, L.id + ' time limit is about 10 minutes at speed 2 (' + mins + ')');
     const S = Z.newChallenge(L.id); ok(S && S.ch && S.ch.id === L.id && S.ch.n === L.n && S.v === Z.SAVE_VERSION); eq(Z.newChallenge(L.n).ch.id, L.id, 'by number');
     eq([S.money, S.rows, S.week, S.ng, S.rep], [L.money, L.rows, 0, 0, 0]); eq(Z.level(S), L); eq(S.reports, []);
-    eq(S.items.length, L.start === 'starter' ? 2 : 0); if (L.animals) { eq(S.animals.map(a => [a.sp, a.sex]), L.animals.map(a => [a[0], a[1]])); ok(S.animals.every(a => a.hab === S.items[0].id)); eq(Object.keys(S.book).sort(), [...new Set(L.animals.map(a => a[0]))].sort()); } else eq(S.animals.length, 2);
+    eq(S.items.length, L.start === 'starter' ? 2 : 0); if (L.animals) { eq(S.animals.map(a => [a.sp, a.sex]), L.animals.map(a => [a[0], a[1]])); ok(S.animals.every(a => a.hab === (L.start === 'starter' ? S.items[0].id : null)), L.id + ': the starting animals live in its starter habitat, or wait in the pen on bare land'); ok(S.animals.length <= Z.holdCap(S), 'they fit the pen'); eq(Object.keys(S.book).sort(), [...new Set(L.animals.map(a => a[0]))].sort()); } else eq(S.animals.length, 2);
     if (L.staff) eq(S.staff.map(s => s.role), L.staff.map(s => s[0])); (L.research || []).forEach(id => ok(S.research[id]));
     S.items.forEach(it => Z.cells(it).forEach(c => ok(Z.inLand(S, c[0], c[1]), 'starting items on the level\'s land')));
     const at = Z.starterSpots(); if (L.start !== 'starter') { ok(Z.canPlace(S, 'hab', 'savanna', at.hab.q, at.hab.r, 0) && Z.canPlace(S, 'fac', 'snack', at.snack.q, at.snack.r, 0), L.id + ': room for the starter on its map'); ok(S.money >= D.BIOMES.savanna.hab + D.FAC.snack.cost); }
@@ -848,7 +848,7 @@ check('challenge: restrictions refuse what they should, the lookup agrees, and a
 
 check('challenge: serialize and deserialize round-trip a level mid-way and after its end; a normal save has no challenge in it', () => {
   D.LEVELS.forEach(L => {
-    const tick = Z.tick, saved = []; Z.tick = function (S) { tick(S); if (S.ch && !S.ch.done && S.week % 25 === 0) saved.push(Z.serialize(S)); };
+    const tick = Z.tick, saved = []; Z.tick = function (S) { tick(S); if (S.ch && !S.ch.done && S.week % 3 === 0) saved.push(Z.serialize(S)); }; // every 3 weeks: a skilled player can end level 4 by week 7
     let end; try { end = bot(0.8, false, { level: L.id }).S; } finally { Z.tick = tick; }
     ok(saved.length >= 1, L.id + ' saved mid-way');
     saved.forEach(str => { const S = Z.deserialize(str); ok(S && S.ch && S.ch.id === L.id, 'loaded'); eq(Z.serialize(S), str, L.id + ' round trip is exact'); eq(Z.challengeStatus(S), Z.challengeStatus(JSON.parse(str).ch ? Z.deserialize(str) : null)); eq(Z.level(S), L);
@@ -858,14 +858,30 @@ check('challenge: serialize and deserialize round-trip a level mid-way and after
   const N = Z.deserialize(Z.serialize(NG())); eq(N.ch, undefined); eq(Z.challengeStatus(N), null); ok(Z.nextLand(N));
 });
 
-check('bot: every challenge level can be played to its end; a sensible player usually wins, an idle one runs out of time (5 x 8 + 5 runs)', () => {
+// R7 tester round: the judge for "1 star is reachable" is now a careful first-timer (bot profile 'first'), not the sensible bot.
+// The old line "the sensible bot's median finish is week 30 or later" is replaced on purpose: a skilled breeder can win level 4
+// on the first baby. In its place, stricter tests of the new aim: the first-timer wins often, 3 stars are reachable, idling never wins.
+check('bot: every challenge level can be played to its end; a careful first-timer usually gets 1 star, a skilled player can get 3, an idle zoo never wins (5 x (40 + 20) + 5 x 3 runs)', () => {
   const out = [];
   D.LEVELS.forEach(L => {
-    const r = bot.challenge(L.id, 8, 0.8); ok(r.won >= 0.6, L.id + ': the sensible bot finished only ' + Math.round(100 * r.won) + '%'); ok(r.median >= 30, L.id + ': too quick (median week ' + r.median + ')');
-    const idle = bot(0, false, { level: L.id }); eq([idle.stars, idle.week], [0, L.weeks], L.id + ': doing nothing must not win');
-    out.push(L.n + ': ' + Math.round(100 * r.won) + '% won, median week ' + r.median + ', stars ' + r.stars.slice(1).join('/'));
+    const f = bot.challenge(L.id, 40, bot.FIRST_SKILL, true); // true rate about 75 to 100% per level; 55% leaves room for chance in 40 runs
+    ok(f.won >= 0.55, L.id + ': the first-timer got a star in only ' + Math.round(100 * f.won) + '% of 40 runs');
+    ok(f.stars[3] < 40, L.id + ': the first-timer got 3 stars every time');
+    const g = bot.challenge(L.id, 20, 1); ok(g.won >= 0.9, L.id + ': the sensible bot finished only ' + Math.round(100 * g.won) + '%'); ok(g.stars[3] >= 1, L.id + ': 3 stars were never reached by the sensible bot in 20 runs');
+    for (let i = 0; i < 3; i++) { const idle = bot(0, false, { level: L.id }); eq([idle.stars, idle.week], [0, L.weeks], L.id + ': doing nothing must not win'); }
+    out.push(L.n + ': first-timer ' + Math.round(100 * f.won) + '% (stars ' + f.stars.slice(1).join('/') + '), skilled 3 stars ' + g.stars[3] + '/20');
   });
   return out.join(' | ');
+});
+
+check('removeRefund: half the list price for a placed item or a kind, 0 for nothing; remove pays exactly that', () => {
+  const S = NG(); S.money = 1e6; eq(D.REFUND_SHARE, 0.5);
+  S.items.forEach(it => eq(Z.removeRefund(S, it.id), Math.round((it.k === 'hab' ? D.BIOMES[it.t].hab : D.FAC[it.t].cost) * 0.5)));
+  D.BIOME_ORDER.forEach(b => eq(Z.removeRefund(S, 'hab', b), Math.round(D.BIOMES[b].hab / 2))); D.FAC_ORDER.forEach(t => eq(Z.removeRefund(S, 'fac', t), Math.round(D.FAC[t].cost / 2)));
+  eq([Z.removeRefund(S, 99999), Z.removeRefund(S, 'fac', 'nope'), Z.removeRefund(S, 'hab', 'nope'), Z.removeRefund(S, 'x', 'savanna')], [0, 0, 0, 0]);
+  S.research['fac:gift'] = true; const sp = firstSpot(S, 'fac', 'gift'), id = Z.build(S, 'fac', 'gift', sp[0], sp[1], 0).id; Z.debug.happening(S, 'sale'); // a Builder's deal is on: the refund is still from the list price
+  const want = Z.removeRefund(S, id), m = S.money, r = Z.remove(S, id); ok(r.ok); eq([r.refund, S.money - m], [want, want], 'remove pays what removeRefund said (the list price, not a sale price)');
+  const h = S.items.find(i => i.k === 'hab'), w2 = Z.removeRefund(S, h.id), m2 = S.money, r2 = Z.remove(S, h.id); eq([r2.refund, S.money - m2], [w2, w2]);
 });
 
 console.log(failed ? '\nRULES CHECK: ' + failed + ' FAILED' : '\nRULES CHECK: ALL PASSED');

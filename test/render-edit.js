@@ -292,8 +292,13 @@ async function runChallenge(name) {
         await page.evaluate(() => ZRender.reset()); await sleep(900); await page.screenshot({ path: path.join(shots, 'render-r7-challenge-' + lv + '-built' + sfx + '.png') });
       }
       // speed 2 through the real Shell
-      { await page.evaluate(() => ZT.setSpeed(2)); await sleep(500); const a = await page.evaluate(() => ({ r: ZT.running(), d: ZRender.debug() })); await sleep(1500); const b = await page.evaluate(() => ZRender.debug());
-        if (a.r) ok(b.speed === 2 && Math.abs((b.worldTime - a.d.worldTime) / (b.clock - a.d.clock) - 2) < 0.05, lv + ': at the Shell\'s speed 2 the floor should run at twice the pace: speed ' + b.speed + ', ratio ' + ((b.worldTime - a.d.worldTime) / (b.clock - a.d.clock)).toFixed(2)); else notes.push(lv + ': NOT TESTED: Shell speed 2 (the game was not running: a screen was open)');
+      { await page.evaluate(() => ZT.setSpeed(2)); let a, b, endRun = false;
+        for (let tries = 0; tries < 4; tries++) { // a pop-up may pause the game part way through the window; measure again over a window that ran throughout (the ratio itself is judged just as strictly)
+          await sleep(500); a = await page.evaluate(() => ({ r: ZT.running(), d: ZRender.debug() })); await sleep(1500); b = await page.evaluate(() => ZRender.debug()); endRun = await page.evaluate(() => ZT.running());
+          if (!a.r || endRun) break; await page.evaluate(() => { ZT.skipReports = true; ZT.popAll(); }); }
+        await page.evaluate(() => { ZT.skipReports = false; });
+        if (a.r && !endRun) notes.push(lv + ': NOT TESTED: Shell speed 2 (a pop-up paused the game in every measuring window)');
+        else if (a.r) ok(b.speed === 2 && Math.abs((b.worldTime - a.d.worldTime) / (b.clock - a.d.clock) - 2) < 0.05, lv + ': at the Shell\'s speed 2 the floor should run at twice the pace: speed ' + b.speed + ', ratio ' + ((b.worldTime - a.d.worldTime) / (b.clock - a.d.clock)).toFixed(2)); else notes.push(lv + ': NOT TESTED: Shell speed 2 (the game was not running: a screen was open)');
         await page.evaluate(() => ZT.setSpeed(1)); }
       notes.push(lv + ' (' + info.rows + ' rows): floor ' + v0.w + 'x' + Math.round(v0.h) + ', gate at ' + v0.gate + ', land spans y ' + v0.top + '..' + v0.bottom + (fitsDeep ? ' (whole depth in view, no up/down scroll)' : ' (scrolls up and down)') + ', owned ' + v0.share + '% of the view; side limits: land edge ' + L.left + ' px in from the left, ' + Math.round(Rt.w - Rt.right) + ' px in from the right; ' + reach.n + ' owned hexes all reachable');
       const se = await page.evaluate(() => ZT.errors.map(String));

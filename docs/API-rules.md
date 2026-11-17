@@ -7,7 +7,8 @@ Written by the Rules teammate. Everything Menus and Moments need is here. In Nod
 
 Save version stays **3**; every old save loads with no migration needed (nothing new is stored for rings; a normal zoo has no
 `S.ch`; an expedition that was already out keeps its old `budget` and comes home under the old odds).
-Checks: `node test/rules-check.js` (about 2 minutes), `node test/bot.js 0.8`, `node test/bot.js challenge all 40`.
+Checks: `node test/rules-check.js` (about 1.5 minutes), `node test/bot.js 0.8`, `node test/bot.js challenge all 40` (first the careful
+first-timer profile, then the sensible bot at skills 0.5, 0.8 and 1; `node test/bot.js challenge 3 100 first` for one profile).
 
 **Things other owners must change because of R7** (details in the sections below):
 
@@ -138,20 +139,26 @@ Five short levels in `D.LEVELS`, separate from the three long-term zoos. A chall
 nothing back (no legacy bonus in, no score, year-end, yearly events or legacy out).
 
 `D.LEVELS[i] = { id, n, name, goal: { kind, target, biome? }, weeks, stars: [w3, w2], rows, money, start, animals?, staff?,
-research?, biomes?, maxHabs?, no? }`. `weeks` is the time limit. Reach the goal by week `w3` for 3 stars, by `w2` for 2, by
+research?, biomes?, maxHabs?, no? }`. `research` lists know-how the level starts with; a `region:` id there also opens
+that region. `weeks` is the time limit. Reach the goal by week `w3` for 3 stars, by `w2` for 2, by
 the limit for 1. The map is the usual 10 columns wide and `rows` rows deep (`S.rows`); it never grows.
 One game week is `D.CH_WEEK_SEC` = 5 real seconds at speed 2, so 120 weeks = 10 minutes of running time.
 
 | n | id | name | Goal | Limit | 3 stars by | 2 stars by | Map rows | Start | Rules |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | `small` | Pocket Park | 1,000 visitors in one week (`visitors`) | 120 | week 58 | week 70 | 6 | $26,500, bare land | |
-| 2 | `savanna` | Savanna Only | own 9 different Savanna species at once (`species`) | 120 | 36 | 64 | 8 | $26,500, bare land | only Savanna: habitats, research, expeditions, trader |
-| 3 | `broke` | Shoestring | $50,000 in the bank (`money`) | 120 | 62 | 74 | 8 | $1,500, starter zoo built | no expeditions |
-| 4 | `breed` | Family Tree | breed a grade A baby, average 58 or more (`bred`) | 120 | 60 | 88 | 8 | $12,000, starter zoo, 2 zebras and 2 warthogs of about 46, a skilled keeper, Genetics I known | |
-| 5 | `tiny` | Two Pens | star rank 4 (`rank`) | 120 | 68 | 86 | 4 | $26,500, bare land | at most 2 habitats |
+| 1 | `small` | Pocket Park | 1,000 visitors in one week (`visitors`) | 120 | week 62 | week 72 | 6 | $26,500, bare land | |
+| 2 | `savanna` | Savanna Only | own 8 different Savanna species at once (`species`): the eight of 1 to 3 stars | 120 | 26 | 40 | 8 | $26,500, bare land; a zebra pair, a warthog and an ostrich wait in the pen (3 kinds owned) | only Savanna: habitats, research, expeditions, trader |
+| 3 | `broke` | Shoestring | $60,000 in the bank (`money`) | 120 | 65 | 80 | 8 | $1,500, starter zoo built, Marketing I known | no expeditions |
+| 4 | `breed` | Family Tree | breed a grade A baby, average 58 or more (`bred`) | 120 | 8 | 24 | 8 | $12,000, starter zoo, 2 zebras and 2 warthogs of about 54, a skilled keeper, Genetics I and II and Nursery known | |
+| 5 | `tiny` | Two Pens | star rank 3 (`rank`) | 120 | 32 | 50 | 4 | $26,500, bare land | at most 2 habitats |
+
+Tuned so a careful first-timer (the bot's `first` profile) gets at least 1 star in about 80 to 100 runs of 100 on every level, and 3 stars
+need skill (or, in levels 2 and 4, luck: the last Savanna kind and a strong first baby are partly chance). On a level with animals
+and bare land (level 2) the starting animals wait in the holding pen until the first habitat is built; on a starter level they live in it.
 
 | Call | Meaning |
 |---|---|
+| `ZE.removeRefund(S, itemId)` or `ZE.removeRefund(S, 'hab'|'fac', biome or facilityId)` | What selling gives back: half the list build price (`D.REFUND_SHARE` 0.5), whatever was paid or any discount on now; 0 for anything unknown. `remove` pays exactly this, so Menus can show it before asking |
 | `ZE.newChallenge(levelId or n, opts?) -> S` | A fresh state for that level (`null` for an unknown level). `opts.zooName` optional; the name defaults to the level's name. `S.ch = { id, n, done, failed, stars, endWeek, best }` |
 | `ZE.level(S)` | The `D.LEVELS` entry of the running challenge, or `null` in a normal zoo |
 | `ZE.challengeStatus(S)` | `null` in a normal zoo, else `{ id, level, name, kind, icon, cur, target, week, weeks, weeksLeft, stars3, stars2, starsNow, stars, done, failed }` (see below) |
@@ -194,7 +201,7 @@ stays empty; `S.finished` stays false. Happenings, callers, VIP visits, rank-ups
 
 ### R7.7 New data (all in `data.js`)
 
-`D.HAP_GAP` [40, 56], `D.HAP_TREAT` 2, `D.CHOICE_CHANCE` 0.25, `D.VISITORS_PER_REP` 700, `D.REVIEW_REP_DIV` 42, `D.SEASONS` (7% busier), `D.EXP_STAR`,
+`D.REFUND_SHARE` 0.5, `D.HAP_GAP` [40, 56], `D.HAP_TREAT` 2, `D.CHOICE_CHANCE` 0.25, `D.VISITORS_PER_REP` 700, `D.REVIEW_REP_DIV` 42, `D.SEASONS` (7% busier), `D.EXP_STAR`,
 `D.EXP_SECRET_STARS`, `D.EXP_ODDS`, `D.EXP_FRAGMENT` 0.14 (map-piece chance, was 10% to 18% by budget), `D.CH_WEEK_SEC`,
 `D.CH_MINUTES`, `D.LEVELS`, `D.GOAL_ICON` (`visitors, species, money, bred, rank, open, variants` -> icon id).
 
@@ -538,7 +545,7 @@ All take `S` first (call them through `ZCore.act`). Each lists what it adds to `
 |---|---|---|
 | `build` | `kind ('hab'|'fac'), t, q, r, rot` | `{id, housed: 0, movable}`; nothing moves in by itself; `movable` = `ZE.movableTo` the new habitat, for a "move them in?" prompt (`moveIn`) |
 | `move` | `itemId, q, r, rot?` | free; nothing extra |
-| `remove` | `itemId` | `{refund}` (half the build price). Its animals go to the holding pen. Refused while a project runs there |
+| `remove` | `itemId` | `{refund}` (half the build price, `ZE.removeRefund`). Its animals go to the holding pen. Refused while a project runs there |
 | `upgrade` | `habId` | `{lvl, housed: 0, movable}` |
 | `moveIn` | `habId, ids?` | `{moved, left}` (R5.2) |
 | `buyLand` | none | `{rows}` |

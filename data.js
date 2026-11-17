@@ -185,6 +185,7 @@
   D.START_KIT = [['hab', 'savanna'], ['fac', 'snack']];
   D.START_MONEY_CLASSIC = 20000;
   D.START_MONEY = D.START_MONEY_CLASSIC + D.BIOMES.savanna.hab + D.FAC.snack.cost; // 26,500
+  D.REFUND_SHARE = 0.5; // selling a building gives back this share of its build price
   D.QUIET_WEEKS = 2; // no callers or happenings until this long after the first habitat is built
   D.LAND = [ // total rows owned after each purchase
     { rows: 10, cost: 8000,    rank: 2 },
@@ -314,12 +315,15 @@
   //   [species, sex, stat level], staff = the starting team instead of a keeper and an explorer [role, skill level],
   //   research = know-how already known, biomes = the only regions allowed, maxHabs = most habitats allowed, no = switched-off actions.
   D.LEVELS = [
-    { id: 'small',   n: 1, name: 'Pocket Park',  goal: { kind: 'visitors', target: 1000 },                weeks: 120, stars: [58, 70],  rows: 6, money: D.START_MONEY, start: 'bare' },
-    { id: 'savanna', n: 2, name: 'Savanna Only', goal: { kind: 'species', target: 9, biome: 'savanna' }, weeks: 120, stars: [36, 64],  rows: 8, money: D.START_MONEY, start: 'bare', biomes: ['savanna'] },
-    { id: 'broke',   n: 3, name: 'Shoestring',   goal: { kind: 'money', target: 50000 },                  weeks: 120, stars: [62, 74],  rows: 8, money: 1500, start: 'starter', no: ['expedition'] },
-    { id: 'breed',   n: 4, name: 'Family Tree',  goal: { kind: 'bred', target: 58 },                      weeks: 120, stars: [60, 88],  rows: 8, money: 12000, start: 'starter',
-      animals: [['zebra', 'M', 46], ['zebra', 'F', 46], ['warthog', 'M', 46], ['warthog', 'F', 46]], staff: [['keeper', 40], ['guide', 16]], research: ['tech:gen1'] },
-    { id: 'tiny',    n: 5, name: 'Two Pens',     goal: { kind: 'rank', target: 4 },                       weeks: 120, stars: [68, 86], rows: 4, money: D.START_MONEY, start: 'bare', maxHabs: 2 }
+    { id: 'small',   n: 1, name: 'Pocket Park',  goal: { kind: 'visitors', target: 1000 },                weeks: 120, stars: [62, 72],  rows: 6, money: D.START_MONEY, start: 'bare' },
+    // Savanna Only: the eight Savanna kinds of 1 to 3 stars; the player starts with three of the commons, so a 1 to 3 star run finds the rest
+    { id: 'savanna', n: 2, name: 'Savanna Only', goal: { kind: 'species', target: 8, biome: 'savanna' }, weeks: 120, stars: [26, 40],  rows: 8, money: D.START_MONEY, start: 'bare', biomes: ['savanna'],
+      animals: [['zebra', 'M', 15], ['zebra', 'F', 15], ['warthog', 'F', 15], ['ostrich', 'M', 15]] },
+    // Shoestring: Marketing I known, so building up pays back inside the level. An untouched zoo ends near $49,400 (at most $53,700 in 200 runs)
+    { id: 'broke',   n: 3, name: 'Shoestring',   goal: { kind: 'money', target: 60000 },                  weeks: 120, stars: [65, 80],  rows: 8, money: 1500, start: 'starter', no: ['expedition'], research: ['tech:mkt1'] },
+    { id: 'breed',   n: 4, name: 'Family Tree',  goal: { kind: 'bred', target: 58 },                      weeks: 120, stars: [8, 24],  rows: 8, money: 12000, start: 'starter',
+      animals: [['zebra', 'M', 54], ['zebra', 'F', 54], ['warthog', 'M', 54], ['warthog', 'F', 54]], staff: [['keeper', 40], ['guide', 16]], research: ['tech:gen1', 'tech:gen2', 'tech:incub'] },
+    { id: 'tiny',    n: 5, name: 'Two Pens',     goal: { kind: 'rank', target: 3 },                       weeks: 120, stars: [32, 50], rows: 4, money: D.START_MONEY, start: 'bare', maxHabs: 2 }
   ];
   D.GOAL_ICON = { visitors: 'visitors', species: 'm-animals', money: 'coin', bred: 'heart', rank: 'rep', open: 'habitat', variants: 'new' }; // sprite icon for each goal kind
 
