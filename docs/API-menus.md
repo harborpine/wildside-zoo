@@ -47,6 +47,16 @@ Built from `ZE.expStars(S, region, team)`: a header (region picture and name, te
 rank medal and the rank number; a tap says why), cost and weeks of the chosen star (`.mn-xinfo .xc / .xw`), its odds rows (`.mn-xodds`), Send. The star opens on the one used
 last in that region, else the highest unlocked one costing at most half the bank. `startExpedition(region, team, star)`. Fits at 393x852 (insets 62 / 34) and 375x667.
 
+### Round 7 tester follow-ups
+- **`ZMenus.openLevels()`**: opens the challenge level list (`challenges`) on top of the title, from anywhere. Inside a challenge it first calls
+  `ZCore.leaveChallenge()` (the run is kept); from a zoo it saves and goes to the title; called twice it does not stack a second list. Returns true when
+  the list is showing. Moments' "Levels" button on the challenge result card calls it (after its own `done()`).
+- A greyed Projects box (Expedition, Breeding, Event, Advertise) and a greyed hiring tier now say why in the usual short note when tapped
+  (the challenge's `ZE.allowed(...).msg`, or the plain reason). `fitGrid` items may carry `why`.
+- Event set-up: theme boxes are a fixed 52 px tall (44 px on screens under 720 px high) instead of stretching to fill the panel.
+- While the Edit strip shows, Menus lifts the Shell's `#toasts` to 8 px above the strip (inline `bottom`, removed again when the strip hides), so notes
+  never sit on the tabs. Nothing needed from the Shell.
+
 ### Info trimmed
 Rumors: one row per secret place (padlock or tick, name or `?`, tick boxes / map-piece pips; a tap toasts the next hint) and a 4x2 grid of special visitors (tick or `?`;
 a tap toasts who or when). Log: Menus' own short screen `log` (`ZMenus.screens.log`): Copy (`ZCore.copyLog`, size shown) and Save as file; the note box is gone.
@@ -58,7 +68,7 @@ A staff level is the number in a small gold box (`.mn-lv`); the skill key line a
 - Title: a fourth entry under the slots (`.mn-slot.mn-chal`, symbol `level`, total stars `n/15`, a Continue tag on tall screens when a run is saved).
 - `challenges` screen (`ZMenus.screens.challenges`): the five `D.LEVELS` in one line (`.mn-lvc[data-level]`): number, goal symbol (`D.GOAL_ICON`) and number, limits as
   symbol lines (clock weeks, coin start money, map rows, padlock + habitat picture = only that biome, fence + number = habitats at most, cross + explorer = no expeditions,
-  paw + number = animals to start with), three `star-on` / `star-off` from `ZCore.challengeStars()`; locked (grey, padlock) until the level before has 1 star.
+  paw + number = animals to start with), three `star-on` / `star-off` from `ZCore.challengeStars()`; locked (grey, padlock) unless it is level 1, already has stars of its own, or the level before has at least 1 star (one rule, `levelOpen`).
   Continue (`ZCore.resumeChallenge()`) when `ZCore.challengeSaved()`; Start (`ZCore.startChallenge(id)`; asks once if it would replace a run in progress).
 - Inside a challenge (`ZCore.inChallenge()`): Info hides Rumors, Ranks, Years, Awards; System's Title screen calls `ZCore.leaveChallenge()`, Replay tutorial is replaced by
   Restart level (asks once); Projects greys Expedition / Breeding / Event / Advertise with a padlock when `ZE.allowed` says no; hiring tiers grey for `'hire'`;

@@ -724,7 +724,7 @@
 
   // ---------------------------------------------------------------- Edit mode (the map stays as it is; taps pick things; see docs/API-renderer.md)
   function leaveEdit(tell) { const e = E; E = null; sel = null; barAt = -1; if (e && tell && e.cbs.onExit) { try { e.cbs.onExit(); } catch (err) { /* the caller's business */ } } }
-  R.startEdit = function (cbs) { const S = st(); if (!S) return false; if (P) R.stopPlacement(); if (!M && vw) rebuild(S); E = { cbs: cbs || {} }; sel = null; barAt = -1; return true; };
+  R.startEdit = function (cbs) { const S = st(); if (!S) return false; if (P) R.stopPlacement(); if (!M && vw) rebuild(S); floaters = []; E = { cbs: cbs || {} }; sel = null; barAt = -1; return true; };
   R.stopEdit = function () { if (P) R.stopPlacement(); leaveEdit(false); };
   R.editing = () => !!E;
   // select(itemId) puts the blinking outline round that item (habitat or facility) and glides it into clear view; select(null) clears it

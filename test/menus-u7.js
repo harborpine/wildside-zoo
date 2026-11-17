@@ -72,7 +72,9 @@ async function run(name) {
     // too dear: greyed, a tap explains and starts nothing
     await ev(() => { ZT.S.money = 100; }); await sleep(500); b = await bar();
     check(b.cards.includes('fac:bench!'), 'with too little money the thing is greyed'); await tapSel('#edit-bar .mn-ec[data-key="fac:bench"]', 0, 400);
-    check(!(await ev(() => ZRender.placing())), 'a greyed thing does not start placement'); await ev(() => { ZT.S.money = 60000; }); await sleep(500);
+    check(!(await ev(() => ZRender.placing())), 'a greyed thing does not start placement');
+    { const tp = await ev(() => { const t = document.querySelector('#toasts .toast'), b = document.getElementById('edit-bar').getBoundingClientRect(), r = t && t.getBoundingClientRect(); return t ? { text: t.textContent, bottom: Math.round(r.bottom), top: Math.round(r.top), barTop: Math.round(b.top) } : null; }); await shot('edit-toast');
+      check(!!tp && /Need/.test(tp.text) && tp.bottom <= tp.barTop && tp.top > 0, 'the note saying why sits above the whole strip, not on its tabs (' + JSON.stringify(tp) + ')'); } await ev(() => { ZT.S.money = 60000; }); await sleep(500);
     // pick the bench on the map (or, before the renderer lands, from the Placed tab), then Move
     const benchId = await ev(() => ZT.S.items.filter(i => i.t === 'bench').pop().id);
     async function pick(id) {
@@ -106,6 +108,8 @@ async function run(name) {
     await tapSel('#edit-bar .mn-et.done', 0, 600); b = await bar();
     check(!b.shown && !(await ev(() => ZMenus.editing())) && (!hasEdit || !(await ev(() => ZRender.editing()))) && await ev(() => ZT.running()), 'Done leaves Edit mode and time runs again');
     await page.touchscreen.tap(196, 300); await sleep(500); check((await stack()) === 'menu', 'after Done a tap on the zoo opens the menu again');
+    await ev(() => ZT.popAll()); await sleep(2600); await ev(() => ZCore.ui.toast('Test note')); await sleep(250);
+    check(await ev(() => { const ts = document.getElementById('toasts'), r = ts.querySelector('.toast').getBoundingClientRect(); return !ts.style.bottom && r.bottom > innerHeight - 200; }), 'outside Edit mode pop-up notes are back in their usual place');
     check(await ev(() => !ZMenus.screens.habitats && !ZMenus.screens.facilities && !ZMenus.screens.move && !ZMenus.screens.remove), 'the old Build lists and the Move screen are gone');
     await T.ctx.close();
   }
@@ -159,6 +163,15 @@ async function run(name) {
     // two habitats: the habitat list comes first, then the same one screen
     await ev(() => { const S = ZT.S; let q; for (let rr = 19; rr >= 0 && !q; rr--) for (let c = 0; c < ZD.GRID_W && !q; c++) { const p = ZE.fromOffset(c, rr); if (ZE.canPlace(S, 'hab', 'jungle', p[0], p[1], 0)) q = p; } ZCore.act('build', 'hab', 'jungle', q[0], q[1], 0); ZT.popAll(); ZMenus.screens.event(); }); await sleep(500);
     check((await stack()) === 'event-habs', lab + ': with two habitats the habitat list comes first');
+    await T.ctx.close();
+  }
+
+  // with only the starting themes the boxes keep a sensible height (they used to stretch to fill the screen)
+  for (const size of [PHONE, SMALL]) {
+    const T = await mk(size, '?play=1'), { ev, shot, stack, fit } = T, lab = size[0] + 'x' + size[1];
+    await ev(() => { ZCore.onReport('*', (r, d) => d()); ZT.S.items.forEach(i => { if (i.k === 'hab') i.eventAt = -99; }); ZMenus.screens.event(); }); await sleep(500);
+    const th = await ev(() => [...document.querySelectorAll('.layer:not([hidden]) .mn-pk.theme')].map(x => Math.round(x.getBoundingClientRect().height))), f = await fit(); await shot('event-few-' + lab);
+    check((await stack()) === 'event-setup' && th.length >= 2 && th.length <= 4 && th.every(h => h >= 44 && h <= 60) && f.over <= 0 && f.out.length === 0 && await ev(() => document.querySelectorAll('.layer:not([hidden]) .mn-pk.host').length >= 1 && !!document.querySelector('.layer:not([hidden]) .mn-send')), lab + ': with ' + th.length + ' themes each theme box is ' + th.join('/') + ' px tall (44 to 60), host, theme and Start on one screen, no scrolling');
     await T.ctx.close();
   }
 
@@ -236,6 +249,11 @@ async function run(name) {
     await ev(() => { localStorage.setItem('wildside-zoo-v3-challenge-stars', JSON.stringify({ small: 2, savanna: 0 })); ZCore.toTitle(); }); await sleep(600);
     await tapSel('.mn-chal'); r = await read(); await shot('levels-stars');
     check(r.cards[0].on3 === 2 && r.cards[0].off3 === 1 && !r.cards[1].off && r.cards[2].off, 'two stars on level 1 show as two lit stars and unlock level 2 only');
+    // stars on a later level keep it open even when the level before has none (stars stored out of order); the level after it opens too
+    await ev(() => { localStorage.setItem('wildside-zoo-v3-challenge-stars', JSON.stringify({ small: 1, broke: 3 })); ZCore.toTitle(); }); await sleep(600); await tapSel('.mn-chal');
+    { const r2 = await read(); await shot('levels-gap'); const st2 = r2.cards.map(c => c.n + (c.off ? 'L' : 'O')).join(' ');
+      check(st2 === '1O 2O 3O 4O 5L' && r2.cards[2].on3 === 3 && r2.cards[1].off3 === 3, 'unlock rule: 1 open; 2 open (1 has stars); 3 open (its own 3 stars, though 2 has none); 4 open (3 has stars); 5 locked (' + st2 + ')'); }
+    await ev(() => { localStorage.setItem('wildside-zoo-v3-challenge-stars', JSON.stringify({ small: 2, savanna: 0 })); ZCore.toTitle(); }); await sleep(600); await tapSel('.mn-chal');
     await tapSel('.mn-lvc[data-level="savanna"]'); await tap('Start', 500); if ((await stack()).endsWith('confirm')) { check(true, 'starting another level while one is in progress asks first'); await tap('Start', 900); }
     check(await ev(() => ZCore.inChallenge() && ZCore.challengeId === 'savanna'), 'level 2 starts');
     await ev(() => { const S = ZT.S; ZD.BIOME_ORDER.forEach(b => { S.regions[b] = true; }); S.money = 500000; ZMenus.edit(); }); await sleep(600);
@@ -246,6 +264,13 @@ async function run(name) {
     check((await stack()) === 'research' || reg.length <= 1, 'Savanna Only: Research hides the regions the level forbids (' + (await stack()) + ': ' + reg.join(', ') + ')');
     await ev(() => { ZT.popAll(); ZT.startChallenge('broke'); }); await sleep(600); await ev(() => ZMenus.screens.projects()); await sleep(400);
     check(await ev(() => { const g = [...document.querySelectorAll('.layer:not([hidden]) .gbox')].find(x => x.textContent.trim().startsWith('Expedition')); return g.classList.contains('disabled') && !!g.querySelector('.sub img[alt="Locked"]'); }), 'Shoestring: Expedition is greyed with a padlock'); await shot('ch-projects');
+    await sleep(2600); await tap('Expedition', 300); const why = await ev(() => (document.querySelector('#toasts .toast') || { textContent: '' }).textContent); await shot('ch-projects-why');
+    check(/Not in this challenge/.test(why) && (await stack()) === 'projects' && await ev(() => !ZT.S.projects.length), 'tapping the padlocked Expedition box says why ("' + why + '") and starts nothing');
+    // the hook Moments uses for its Levels button: leaves the run (kept) and opens the level list on the title
+    const okL = await ev(() => ZMenus.openLevels()); await sleep(700);
+    check(okL === true && (await stack()) === 'title>challenges' && !(await ev(() => ZCore.inChallenge())) && await ev(() => { const c = ZCore.challengeSaved(); return !!c && c.levelId === 'broke'; }), 'ZMenus.openLevels() from inside a challenge: the run is kept and the level list opens on the title (' + await stack() + ')');
+    await ev(() => ZMenus.openLevels()); await sleep(400); check((await stack()) === 'title>challenges', 'calling it again does not stack a second list');
+    await ev(() => { ZCore.pop(); }); await sleep(300); await ev(() => ZMenus.openLevels()); await sleep(500); check((await stack()) === 'title>challenges', 'from the bare title it opens the level list (' + await stack() + ')');
     await ev(() => { ZT.popAll(); ZT.startChallenge('tiny'); }); await sleep(600);
     await ev(() => { const S = ZT.S; S.money = 500000; for (let n = 0; n < 2; n++) { let q; for (let rr = ZD.GRID_H - 1; rr >= 0 && !q; rr--) for (let c = 0; c < ZD.GRID_W && !q; c++) { const p = ZE.fromOffset(c, rr); if (ZE.canPlace(S, 'hab', 'savanna', p[0], p[1], 0)) q = p; } if (q) ZCore.act('build', 'hab', 'savanna', q[0], q[1], 0); } ZT.popAll(); ZMenus.edit(); }); await sleep(900);
     const tiny = await ev(() => ({ habs: ZT.S.items.filter(i => i.k === 'hab').length, card: (document.querySelector('#edit-bar .mn-ec[data-key="hab:savanna"]') || { className: 'missing' }).className }));

@@ -79,6 +79,7 @@
     const g = ui.grid(items, { cols, cls: 'mn-fitgrid' + (fixed ? ' mn-fixedgrid' : '') }), rowsN = Math.ceil(items.length / cols);
     g.style.gridTemplateRows = fixed ? 'repeat(' + rowsN + ', ' + rowMin + 'px)' : 'repeat(' + rowsN + ', minmax(' + (rowMin || 0) + 'px, 1fr))';
     if (fixed) g.style.flex = 'none';
+    items.forEach((it, i) => { if (it && it.disabled && it.why && g.children[i]) g.children[i].addEventListener('click', guard(() => ui.toast(it.why, 'bad'))); });   // a greyed box still says why
     return g;
   }
   function guard(fn) { let last = 0; return function (ev) { const t = performance.now(); if (t - last < 300) return; last = t; return fn(ev); }; }
@@ -239,7 +240,7 @@ button.mn-slot.empty{width:100%;gap:12px;padding:6px 10px;background:var(--cream
 .mn-xinfo{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mn-xinfo .c{display:flex;align-items:center;justify-content:center;gap:4px;min-height:44px;background:var(--paper);box-shadow:0 0 0 2px var(--line);font-size:20px;font-weight:700}.mn-xinfo .c img{height:24px;width:auto}
 .mn-xodds{display:flex;flex-direction:column;gap:2px;padding:4px 8px;background:var(--paper);box-shadow:0 0 0 2px var(--line)}.mn-xodds .mn-odd{min-height:28px}.mn-xodds .mn-odd.me .p{font-size:17px}
 .btn.mn-send{flex:none}
-.mn-pick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.mn-pick.themes{grid-template-columns:repeat(2,minmax(0,1fr));flex:1 1 auto;min-height:0;grid-auto-rows:minmax(44px,1fr)}.mn-pick.themes.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mn-pick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.mn-pick.themes{grid-template-columns:repeat(2,minmax(0,1fr));flex:none;grid-auto-rows:52px}@media (max-height:720px){.mn-pick.themes{grid-auto-rows:44px}}.mn-pick.themes.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .mn-pk{min-width:44px;min-height:44px;margin:0;padding:2px 3px;border:0;display:flex;align-items:center;justify-content:center;gap:3px;background:var(--paper);box-shadow:0 0 0 2px var(--line);font:inherit;font-weight:700;color:var(--ink);cursor:pointer}
 .mn-pk.host{flex-direction:column;min-height:58px}.mn-pk.host img{height:30px;width:auto;image-rendering:pixelated}.mn-pk.host .chip{margin:0;font-size:12px}.mn-pk.host .chip img.sym{height:14px;width:auto}.mn-pk.host .chip .v{padding:1px 3px;font-size:12px;min-width:14px}
 .mn-pk.theme{justify-content:space-between;text-align:left;padding:2px 6px}.mn-pk.theme .tn{font-size:13px;line-height:1.1;min-width:0}.mn-pk.theme .fs{flex:none;display:flex;align-items:center;gap:2px}.mn-pk.theme .fs img{height:14px;width:auto}.mn-pk.theme .sg{min-width:22px;padding:2px 3px;font-size:12px}.mn-pick.c3 .mn-pk.theme{padding:2px 4px;gap:2px}.mn-pick.c3 .mn-pk.theme .tn{font-size:12px}
@@ -346,10 +347,10 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
       const evWhy = evs.length ? (!free ? 'No one' : s.money < cost ? needMoney(cost) : '') : (habs().length ? 'None' : 'No habitat');
       const camps = E.campaigns(s), runningC = camps.filter(c => c.weeksLeft > 0).length;
       const g = fitGrid([
-        { icon: pUrl('explorer', 4), label: 'Expedition', sub: ex.ok ? '' : typeof ex.why === 'string' ? ex.why.replace('Convoy is out', 'Out').replace('No one free', 'No one') : ex.why, disabled: !ex.ok, onTap: expStart },
-        { icon: iUrl('ready-breed', 4), label: 'Breeding', sub: !allow('breed') ? lockSub() : pairs.length ? pairs.length + ' ready' : 'None', disabled: !pairs.length || !free || !allow('breed'), onTap: breedPairs },
-        { icon: iUrl('ready-event', 4), label: 'Event', sub: !allow('event') ? lockSub() : evWhy || evs.length + ' ready', disabled: !!evWhy || !allow('event'), onTap: eventHabsScreen },
-        { icon: iUrl('rep', 4), label: 'Advertise', sub: !allow('campaign') ? lockSub() : !open ? 'No habitat' : runningC ? runningC + ' on' : '', disabled: !open || !allow('campaign'), onTap: campaignScreen }
+        { icon: pUrl('explorer', 4), label: 'Expedition', sub: ex.ok ? '' : typeof ex.why === 'string' ? ex.why.replace('Convoy is out', 'Out').replace('No one free', 'No one') : ex.why, disabled: !ex.ok, why: allowMsg('expedition') || (typeof ex.why === 'string' ? ex.why : 'Locked'), onTap: expStart },
+        { icon: iUrl('ready-breed', 4), label: 'Breeding', sub: !allow('breed') ? lockSub() : pairs.length ? pairs.length + ' ready' : 'None', disabled: !pairs.length || !free || !allow('breed'), why: allowMsg('breed') || (!pairs.length ? 'No pair is ready.' : 'No one is free.'), onTap: breedPairs },
+        { icon: iUrl('ready-event', 4), label: 'Event', sub: !allow('event') ? lockSub() : evWhy || evs.length + ' ready', disabled: !!evWhy || !allow('event'), why: allowMsg('event') || (evWhy === 'No one' ? 'No one is free.' : evWhy === 'None' ? 'No habitat is ready.' : evWhy === 'No habitat' ? 'Build a habitat first.' : evWhy), onTap: eventHabsScreen },
+        { icon: iUrl('rep', 4), label: 'Advertise', sub: !allow('campaign') ? lockSub() : !open ? 'No habitat' : runningC ? runningC + ' on' : '', disabled: !open || !allow('campaign'), why: allowMsg('campaign') || 'Build a habitat first.', onTap: campaignScreen }
       ], 2, 84, true);
       body.appendChild(g);
       const hot = [];
@@ -603,7 +604,7 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
       const glow = want && want[0] === edit.grp ? strip.querySelector('[data-key="' + want[1] + '"]') : null;
       if (glow) { glow.classList.add('mn-glow'); strip.scrollLeft = Math.max(0, glow.offsetLeft - 60); } else strip.scrollLeft = keep;
     }
-    edit.sig = editSig();
+    edit.sig = editSig(); if (!bar.hidden) editToasts(bar);
   }
   const editSig = () => { const s = S(); return s ? [Math.floor(s.money), s.items.length, s.items.reduce((n, i) => n + (i.lvl || 0), 0), edit.sel, edit.grp, E.rank(s), s.rows, edit.wantKey, edit.wantDone, Object.keys(s.research).length, s.projects.length].join('|') : ''; };
   function editSel(id) { const r = R(); try { if (r && r.select) r.select(id == null ? null : id); } catch (e) { /* ignore */ } }
@@ -628,6 +629,13 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
     const show = edit.on && !st.length && !placingNow();
     if (show) { const r = R(); if (hasEdit() && r.editing && !r.editing()) { editArm(); if (edit.sel != null) editSel(edit.sel); } if (edit.sig !== editSig() || !bar.firstChild) editRender(); }
     if (bar.hidden === show) { bar.hidden = !show; document.body.classList.toggle('mn-editing', show); }
+    editToasts(show ? bar : null);
+  }
+  function editToasts(bar) {
+    const ts = document.getElementById('toasts'); if (!ts) return;
+    if (!bar) { if (ts.dataset.mnLift) { ts.style.bottom = ''; delete ts.dataset.mnLift; } return; }
+    const host = ts.offsetParent || document.body, px = Math.round(host.getBoundingClientRect().bottom - bar.getBoundingClientRect().top + 8) + 'px';
+    if (ts.style.bottom !== px) { ts.style.bottom = px; ts.dataset.mnLift = '1'; }
   }
   function editPlace(spec, onPlace) {
     const r = R(); if (!r || !r.startPlacement) { ui.toast('Placing needs the floor.', 'bad'); return false; }
@@ -973,10 +981,12 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
   function hireOptions(api) {
     const s = S(), full = s.staff.length >= E.staffCap(s) || !allow('hire'), out = s.hiring ? (E.hiringInfo ? E.hiringInfo(s) : null) : null;
     if (s.hiring) return row({ img: pUrl('headhunter', 3), title: out ? out.detail : 'Advert', sub: out ? wkc(out.weeksLeft) : 'Out', extra: ui.bar(out ? out.progress : 0), tap: () => ui.toast('Applicants arrive soon.') });
-    return ui.choices(E.hireTiers(s).map(t => ({ label: t.name, note: full ? 'Staff room full' : t.lock ? 'Needs ' + t.lock : [t.note, t.weeks ? ' · ' : '', t.weeks ? ui.sym('time', { scale: 2, label: 'Weeks', text: 'wk' }) : null, t.weeks ? ' ' + t.weeks : ''], cost: t.cost, disabled: full || !!t.lock })), i => {
+    const tiers = E.hireTiers(s), ch = ui.choices(tiers.map(t => ({ label: t.name, note: full ? 'Staff room full' : t.lock ? 'Needs ' + t.lock : [t.note, t.weeks ? ' · ' : '', t.weeks ? ui.sym('time', { scale: 2, label: 'Weeks', text: 'wk' }) : null, t.weeks ? ' ' + t.weeks : ''], cost: t.cost, disabled: full || !!t.lock })), i => {
       const r = Core.act('advertise', i); if (!r.ok) return;
       ui.toast('Advert out', 'good'); try { api.rerender(); } catch (e) { /* ignore */ }
     });
+    tiers.forEach((tr, i) => { if ((full || tr.lock) && ch.children[i]) ch.children[i].addEventListener('click', guard(() => ui.toast(allowMsg('hire') || (full ? 'Staff room full' : 'Needs ' + tr.lock), 'bad'))); });
+    return ch;
   }
   function hireScreen() {
     push({ id: 'staff-hire', title: 'Advertise', render(body, api) {
@@ -1282,11 +1292,13 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
     return el('button', { type: 'button', cls: 'mn-lvc' + (on ? ' on' : '') + (open ? '' : ' off'), 'data-level': lv.id, 'aria-label': 'Level ' + lv.n + (open ? '' : ' locked'), tap: guard(tap) },
       span('num', String(lv.n)), el('span', { cls: 'goal' }, symS((D.GOAL_ICON && D.GOAL_ICON[g.kind]) || 'goal', 'Goal', 3), span('gv', gv)), el('span', { cls: 'rs' }, lines), open ? star3(stars) : el('span', { cls: 'mn-s3 lk' }, symS('lock', 'Locked')));
   }
+  // One rule for every level: level 1 is always open; any other level is open when it has stars of its own or the level before it has stars.
+  const levelOpen = (L, st, i) => i === 0 || (st[L[i].id] || 0) >= 1 || (st[L[i - 1].id] || 0) >= 1;
   function challengesScreen() {
     let pick = null;
     push({ id: 'challenges', title: 'Challenges', render(body, api) {
       body.classList.add('mn-tight');
-      const L = levels(), st = chStars(), sv = chSaved(), open = i => i === 0 || (st[L[i - 1].id] || 0) >= 1;
+      const L = levels(), st = chStars(), sv = chSaved(), open = i => levelOpen(L, st, i);
       if (pick == null || !open(L.findIndex(x => x.id === pick))) { const idx = L.map((x, i) => i).filter(open), fresh = idx.find(i => !(st[L[i].id] > 0)); pick = sv && L.some(x => x.id === sv.levelId) ? sv.levelId : L[fresh != null ? fresh : idx[idx.length - 1]].id; }
       const cur = L.find(x => x.id === pick);
       body.appendChild(el('div', { cls: 'mn-lvline' }, L.map((lv, i) => levelCard(lv, open(i), Math.min(3, st[lv.id] || 0), lv.id === pick, () => { if (!open(i)) { ui.toast('Finish level ' + i + ' first', 'bad'); return; } pick = lv.id; api.rerender(); }))));
@@ -1295,6 +1307,15 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
       const go = () => { Core.startChallenge(cur.id); };
       body.appendChild(ui.btn('Start', () => { if (svL && !sv.over) ui.confirm('Start level ' + cur.n + ' from the beginning? The level in progress is lost.', go, { yes: 'Start' }); else go(); }, { cls: 'primary big mn-chstart', icon: iUrl('level', 3), sub: String(cur.n) }));
     } });
+  }
+  // From anywhere: the level list on top of the title (leaves a running challenge first, keeping the run). Moments' "Levels" button calls it.
+  function openLevels() {
+    editStop();
+    if (inCh()) { if (Core.leaveChallenge) Core.leaveChallenge(); else Core.toTitle(); } else if (Core.stack().indexOf('title') < 0) { if (S()) toTitle(); else if (Core.showTitle) Core.showTitle(); }
+    const st = Core.stack(); if (st[st.length - 1] === 'challenges') return true;
+    if (st.indexOf('title') < 0 || !levels().length) return false;
+    while (Core.stack().length > 1) Core.pop();
+    challengesScreen(); return true;
   }
   const nz = { slot: 1, name: 'Wildside Zoo', tut: true, staff: null, animal: null };
   function newZooName(slot) {
@@ -1403,7 +1424,7 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
   // ------------------------------------------------------------------ public
   window.ZMenus = {
     open, title, startTutorial, init() { /* nothing to register */ }, recordLegacy,
-    edit: editMode, stopEdit: editStop, editing: () => edit.on,
+    edit: editMode, stopEdit: editStop, editing: () => edit.on, openLevels,
     screens: { main: open, projects: projectsScreen, animals: () => animalsScreen('zoo'), staff: staffScreen, research: researchScreen, info: infoScreen, system: systemScreen,
       book: bookScreen, combos: comboScreen, fits: fitScreen, rumors: rumorScreen, ranks: rankScreen, years: yearsScreen, awards: awardsScreen, how: howScreen, log: logScreen, challenges: challengesScreen, newZoo: () => newZooName(1),
       candidates: candidatesScreen, whoTurnedUp: candidatesScreen, expedition: expStart, breeding: breedPairs, event: eventHabsScreen, campaigns: campaignScreen, hire: hireScreen, market: () => animalsScreen('market'), pen: () => animalsScreen('pen'), crate: crateScreen,
