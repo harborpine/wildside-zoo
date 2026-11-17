@@ -1,6 +1,7 @@
 /* Renderer checks for Update 7. Headless only.   node test/render-edit.js [chromium|webkit|both]
-   Phone size 393x852 at 3x. Covers: the walkway ring (drawn as path, walked by visitors, no decorations on it, shown with the
-   placement ghost, refusals explained and the hexes in the way marked), speed 2 (the board moves twice as fast, smoothly, nobody
+   Phone size 393x852 at 3x. Covers: the Update 8 border walkways (a strip inside each habitat drawn as path, walked by people,
+   nobody inside a fence, habitats may touch, a building closed in by habitats still reached, the strip shown with the placement
+   ghost, refusals explained and the hexes in the way marked), speed 2 (the board moves twice as fast, smoothly, nobody
    off the walkable hexes), Edit mode (pick, select, move, add, the #edit-bar allowance, leaving), and small challenge maps.
    Screenshots: test/shots/render-r7-*.png (WebKit copies end in -webkit.png). Exit code 1 if any check fails. */
 const path = require('path'), fs = require('fs'), urlm = require('url');
@@ -20,7 +21,7 @@ async function open(name, url, readyFn) {
   return { browser, page, errors };
 }
 
-// ------------------------------------------------------------------ the floor harness: ring, speed, Edit mode
+// ------------------------------------------------------------------ the floor harness: walkways, speed, Edit mode
 async function runFloor(name) {
   const fails = [], notes = [], sfx = name === 'chromium' ? '' : '-' + name, ok = (c, m) => { if (!c) fails.push(m); return c; };
   const { browser, page, errors } = await open(name, urlm.pathToFileURL(path.join(__dirname, 'render-floor.html')).href, 'window.RT && RT.ready');
@@ -31,10 +32,10 @@ async function runFloor(name) {
   const note = () => page.evaluate(() => document.getElementById('placement-note').textContent);
   const btn = cls => page.locator('#placement-bar button.' + cls);
   try {
-    // the demo facilities, one hex out across the walkway; then start the floor again with a speed the test controls and a
+    // the demo facilities, right against their habitats; then start the floor again with a speed the test controls and a
     // state it can swap (ZRender.init is safe to call again)
     const built = await page.evaluate(setup.facSetup); await page.evaluate(setup.pixelTools);
-    ok(built.length === 5, 'the five demo facilities should all find a legal spot one hex out from a habitat, built: ' + JSON.stringify(built));
+    ok(built.length === 5, 'the five demo facilities should all find a legal spot against a habitat, built: ' + JSON.stringify(built));
     await page.evaluate(() => {
       window.SPD = 1; RT.cur = RT.S; RT.picks = []; RT.exits = 0; RT.moves = [];
       ZRender.init(document.getElementById('floor'), { getState: () => RT.cur, getSpeed: () => window.SPD, onTap: t => RT.taps.push({ q: t.q, r: t.r, item: t.item ? t.item.id : null }) });
@@ -42,77 +43,83 @@ async function runFloor(name) {
     });
     await sleep(3000);
     const K = await page.evaluate(() => ZGeo.DENSITY || 1), d0 = await dbg();
-    notes.push('floor: buffer ' + d0.buffer.w + 'x' + d0.buffer.h + ' at ' + d0.buffer.scale + ' CSS px per buffer pixel (dpr ' + d0.buffer.dpr + '); visitors ' + d0.visitors + ', animals ' + d0.animals + ', path hexes ' + d0.paths + ', ring hexes ' + d0.ring);
+    notes.push('floor: buffer ' + d0.buffer.w + 'x' + d0.buffer.h + ' at ' + d0.buffer.scale + ' CSS px per buffer pixel (dpr ' + d0.buffer.dpr + '); visitors ' + d0.visitors + ', animals ' + d0.animals + ', path hexes ' + d0.paths + ', border strip edges ' + d0.strips);
 
-    // ---------- 1. the walkway ring
-    const ringInfo = await page.evaluate(() => {
-      const S = RT.S, occ = ZE.occupancy(S), cells = ZE.ringCells(S), habs = S.items.filter(i => i.k === 'hab'), e = ZE.entrance(S);
-      let touching = 0; habs.forEach(a => habs.forEach(b => { if (a.id < b.id && ZE.cells(a).some(c => ZE.cells(b).some(o => ZE.DIRS.some(d => c[0] + d[0] === o[0] && c[1] + d[1] === o[1])))) touching++; }));
-      return { cells: cells.map(c => ({ q: c[0], r: c[1] })).filter(c => !(c.q === e.q && c.r === e.r)), free: cells.every(c => !occ[c[0] + ',' + c[1]] && ZE.inLand(S, c[0], c[1])), habs: habs.length, touching: touching };
-    });
-    ok(ringInfo.habs >= 5 && ringInfo.cells.length >= 30 && ringInfo.free && ringInfo.touching === 0, 'the demo zoo should have five habitats, each with a ring, none touching: ' + JSON.stringify({ habs: ringInfo.habs, ring: ringInfo.cells.length, touching: ringInfo.touching }));
-    ok(d0.ring >= ringInfo.cells.length && d0.ringPath === d0.ring, 'every ring hex must be laid as walkway: engine ring ' + ringInfo.cells.length + ', renderer ring ' + d0.ring + ', of which path ' + d0.ringPath);
-    ok(d0.ringDeco === 0, d0.ringDeco + ' decorations stand on ring hexes');
-    { // what is actually on screen at each ring hex: walkway-coloured ground
-      await page.evaluate(() => ZRender.setRunning(false)); let bad = [], seen = 0;
-      for (const c of ringInfo.cells) { await page.evaluate(([q, r]) => ZRender.centerOn(q, r, true), [c.q, c.r]); await sleep(45); const k = await page.evaluate(([q, r]) => TT.kind(q, r), [c.q, c.r]); seen++; if (k !== 'path') bad.push(c.q + ',' + c.r + '=' + k); }
-      // a ring hex under a standing visitor can read as 'other'; grass never may, and at most a few may be hidden
-      ok(!bad.some(b => /grass/.test(b)) && bad.length <= Math.ceil(seen * 0.12), 'ring hexes not drawn as walkway: ' + bad.join(' ')); notes.push('ring: ' + seen + ' ring hexes looked at on screen, ' + (seen - bad.length) + ' read as walkway' + (bad.length ? ' (hidden by a person or sprite: ' + bad.join(' ') + ')' : '') + '; decorations on ring hexes: ' + d0.ringDeco);
+    // ---------- 1. the border walkways (Update 8): a narrow strip inside every habitat's own hexes, the fence inward of it
+    const kindAt = (x, y) => page.evaluate(([x, y]) => { // what the ground looks like at one buffer point: majority of 5 pixels round it
+      const cv = document.getElementById('floor'), im = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height), b = cv.getBoundingClientRect(), sx = cv.width / b.width, n = { path: 0, grass: 0, hab: 0 };
+      [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]].forEach(o => { const c = ZRender.bufToClient(x + o[0], y + o[1]), X = Math.round((c.x - b.left) * sx), Y = Math.round((c.y - b.top) * sx); if (X < 0 || Y < 0 || X >= cv.width || Y >= cv.height) return; const i = (Y * cv.width + X) * 4, R = im.data[i], G = im.data[i + 1], B = im.data[i + 2]; if (R > 150 && R > G + 8 && G > B) n.path++; else if (G > R + 15 && G > B) n.grass++; else n.hab++; });
+      return n.path >= 3 ? 'path' : n.grass >= 3 ? 'grass' : 'other'; }, [x, y]);
+    const walkInfo = await page.evaluate(() => { const S = RT.S, habs = S.items.filter(i => i.k === 'hab'), occ = ZE.occupancy(S), cells = habs.reduce((n, h) => n + ZE.cells(h).length, 0);
+      return { habs: habs.length, ring: ZE.ringCells(S).length, footprint: Object.keys(occ).filter(k => habs.some(h => h.id === occ[k])).length, cells: cells }; });
+    ok(walkInfo.habs >= 5 && walkInfo.ring === 0 && walkInfo.footprint === walkInfo.cells, 'five habitats, no ring hexes, each habitat only on its own hexes: ' + JSON.stringify(walkInfo));
+    ok(d0.strips >= walkInfo.habs * 6 && d0.stripNodes > d0.strips, 'every habitat should have its border strip in the walk graph: ' + JSON.stringify({ strips: d0.strips, nodes: d0.stripNodes }));
+    ok(d0.unreached.length === 0, 'every habitat and building should be reachable on foot: unreached ' + JSON.stringify(d0.unreached));
+    { // on screen: the middle of each front-facing strip is walkway-coloured ground
+      await page.evaluate(() => ZRender.setRunning(false)); const spots = (await page.evaluate(() => ZRender.stripSpots())).filter(s => s.front); let bad = [], seen = 0;
+      for (const s of spots) { await page.evaluate(([q, r]) => ZRender.centerOn(q, r, true), [s.q, s.r]); await sleep(40); const k = await kindAt(s.x, s.y); seen++; if (k !== 'path') bad.push(s.q + ',' + s.r + '/' + s.ei + '=' + k); }
+      // a strip under a standing visitor or an animal's head can read as 'other'; grass never may, and only a few may be hidden
+      ok(seen >= 15 && !bad.some(b => /grass/.test(b)) && bad.length <= Math.ceil(seen * 0.15), 'border strips not drawn as walkway: ' + bad.join(' ')); notes.push('walkway: ' + seen + ' front strip middles looked at on screen, ' + (seen - bad.length) + ' read as walkway' + (bad.length ? ' (covered: ' + bad.join(' ') + ')' : ''));
       await page.evaluate(() => ZRender.setRunning(true));
     }
-    { // visitors use the ring like any path, and nobody is ever on a hex that is not walkable
-      let mx = 0, off = 0; for (let i = 0; i < 25; i++) { const d = await dbg(); mx = Math.max(mx, d.onRing); off = Math.max(off, d.offPath); await sleep(120); }
-      ok(mx >= 3, 'visitors should be walking on ring hexes, most seen at once: ' + mx); ok(off === 0, off + ' people were standing on a built hex (inside a fence or a building)'); notes.push('ring: up to ' + mx + ' people on ring hexes at once; people on built hexes: ' + off);
+    { // people walk the strips; nobody is ever inside a fence or on a building; animals stay inside their fence
+      let mx = 0, off = 0, inF = 0, aOut = 0; for (let i = 0; i < 30; i++) { const d = await dbg(); mx = Math.max(mx, d.onStrip); off = Math.max(off, d.offPath); inF = Math.max(inF, d.inFence); aOut = Math.max(aOut, d.animalsOut); await sleep(120); }
+      ok(mx >= 3, 'people should be walking on the border strips, most seen at once: ' + mx); ok(off === 0 && inF === 0, off + ' people off the walkable ground, ' + inF + ' inside a fence'); ok(aOut === 0, aOut + ' animals heading outside their fence');
+      notes.push('walkway: up to ' + mx + ' people on border strips at once; inside a fence: ' + inF + '; off the walkable ground: ' + off + '; animals outside their fence: ' + aOut);
     }
-    { const H = await page.evaluate(() => ({ a: RT.H.savanna, b: RT.H.jungle })); await page.evaluate(([a, b]) => { ZRender.setZoom(0); ZRender.centerOn(Math.round((a.q + b.q) / 2), Math.round((a.r + b.r) / 2), true); }, [H.a, H.b]); await sleep(500); await shot('rings'); await page.evaluate(() => ZRender.setZoom(1)); await sleep(200); }
+    { const H = await page.evaluate(() => ({ a: RT.H.savanna, b: RT.H.jungle })); await page.evaluate(([a, b]) => { ZRender.setZoom(0); ZRender.centerOn(Math.round((a.q + b.q) / 2), Math.round((a.r + b.r) / 2), true); }, [H.a, H.b]); await sleep(500); await shot('walkways'); await page.evaluate(() => ZRender.setZoom(1)); await sleep(200); }
 
-    // ---------- 2. placement: the ghost's ring, and refusals explained (ZE.placeCheck)
+    // ---------- 2. placement: habitats may touch; the ghost shows its strip; refusals explained (ZE.placeCheck)
     const sp = await page.evaluate(() => {
-      const S = RT.S, out = { touch: null, crowd: null, ringFac: null, okHab: null, taken: null, land: null }, cells = [];
+      const S = RT.S, out = { beside: null, okHab: null, taken: null, land: null, facBeside: null }, cells = [], occ = ZE.occupancy(S);
       for (let r = 0; r < ZD.GRID_H; r++) for (let c = 0; c < ZD.GRID_W; c++) { const a = ZE.fromOffset(c, r); cells.push([a[0], r]); }
+      const touchesHab = cs => cs.some(c => ZE.DIRS.some(d => { const o = occ[(c[0] + d[0]) + ',' + (c[1] + d[1])]; return o && ZE.item(S, o).k === 'hab'; }));
       cells.forEach(c => { for (let rot = 0; rot < 6; rot++) { const k = ZE.placeCheck(S, 'hab', 'savanna', c[0], c[1], rot); const o = { q: c[0], r: c[1], rot: rot, msg: k.msg, cells: k.cells };
-        if (k.ok) { const ring = ZE.ringAt(S, 'savanna', c[0], c[1], rot), now = ZE.c(S).ring, fresh = ring.filter(x => !now[x[0] + ',' + x[1]]); if (fresh.length >= 4 && (!out.okHab || fresh.length > out.okHab.fresh.length)) out.okHab = Object.assign(o, { ring: ring, fresh: fresh }); }
-        else if (k.why === 'touch' && !out.touch) out.touch = o; else if (k.why === 'crowd' && !out.crowd) out.crowd = o; else if (k.why === 'land' && !out.land && ZE.inLand(S, c[0], c[1])) out.land = o; } });
-      cells.forEach(c => { const k = ZE.placeCheck(S, 'fac', 'bench', c[0], c[1], 0); if (!k.ok && k.why === 'ring' && !out.ringFac) out.ringFac = { q: c[0], r: c[1], msg: k.msg }; if (!k.ok && k.why === 'taken' && !out.taken) out.taken = { q: c[0], r: c[1], msg: k.msg }; });
+        if (k.ok) { const cs = ZE.cellsOf('hab', 'savanna', c[0], c[1], rot); if (!out.beside && touchesHab(cs)) out.beside = o; if (!out.okHab && !cs.some(x => ZE.DIRS.some(d => occ[(x[0] + d[0]) + ',' + (x[1] + d[1])]))) out.okHab = o; }
+        else if (k.why === 'land' && !out.land && ZE.inLand(S, c[0], c[1])) out.land = o; } });
+      cells.forEach(c => { const k = ZE.placeCheck(S, 'fac', 'bench', c[0], c[1], 0); if (!k.ok && k.why === 'taken' && !out.taken) out.taken = { q: c[0], r: c[1], msg: k.msg }; if (k.ok && !out.facBeside && touchesHab([c])) out.facBeside = { q: c[0], r: c[1] }; });
+      out.why = {}; cells.forEach(c => { for (let rot = 0; rot < 6; rot++) { const k = ZE.placeCheck(S, 'hab', 'savanna', c[0], c[1], rot); if (!k.ok) out.why[k.why] = 1; } });
       return out;
     });
-    ok(sp.touch && sp.crowd && sp.ringFac && sp.okHab && sp.taken && sp.land, 'could not find every kind of spot in the demo zoo: ' + JSON.stringify(Object.keys(sp).filter(k => !sp[k])));
+    ok(sp.beside && sp.okHab && sp.taken && sp.land && sp.facBeside, 'could not find every kind of spot in the demo zoo: ' + JSON.stringify(Object.keys(sp).filter(k => !sp[k])));
+    ok(Object.keys(sp.why).every(k => ['land', 'entrance', 'taken'].indexOf(k) >= 0), 'only land, entrance and taken may refuse a habitat now: ' + JSON.stringify(sp.why));
     const sameCells = (a, b) => a.map(c => c[0] + ',' + c[1]).sort().join(';') === b.map(c => c[0] + ',' + c[1]).sort().join(';');
     const RED = [255, 74, 58];
     await page.evaluate(() => RT.place({ kind: 'hab', t: 'savanna', label: 'Savanna' })); await sleep(200);
     ok((await btn('zr-rotate').count()) === 1, 'a savanna habitat should get a Rotate button');
     const turnTo = async rot => { for (let i = 0; i < 6 && (await dbg()).placement.rot !== rot; i++) await btn('zr-rotate').click(); };
-    for (const k of ['touch', 'crowd', 'land']) {
-      const s = sp[k]; if (!s) continue; await tapHex(s); await turnTo(s.rot); await sleep(120); const p = (await dbg()).placement, t = await note();
-      ok(!p.ok && p.state === 'bad' && p.why === k, 'habitat at a "' + k + '" spot should be refused for that reason: ' + JSON.stringify({ ok: p.ok, why: p.why }));
+    { const s = sp.land; await tapHex(s); await turnTo(s.rot); await sleep(120); const p = (await dbg()).placement, t = await note();
+      ok(!p.ok && p.state === 'bad' && p.why === 'land', 'habitat off the land should be refused for that reason: ' + JSON.stringify({ ok: p.ok, why: p.why }));
       ok(t.indexOf(s.msg) >= 0 && s.msg.length > 8, 'the note should give the engine\'s reason "' + s.msg + '", it says "' + t + '"');
-      ok(sameCells(p.bad, s.cells), 'the marked hexes should be the ones the engine names (' + k + '): ' + JSON.stringify(p.bad) + ' vs ' + JSON.stringify(s.cells));
+      ok(sameCells(p.bad, s.cells), 'the marked hexes should be the ones the engine names: ' + JSON.stringify(p.bad) + ' vs ' + JSON.stringify(s.cells));
       await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 2, true), [s.q, s.r]); await sleep(120);
       let red = 0; for (let i = 0; i < 6; i++) { red = Math.max(red, (await page.evaluate(c => TT.count(c[0], c[1], c[2]).all, RED))); await sleep(110); }
-      ok(red > 150, 'no solid red marking on screen for a refused spot (' + k + '): ' + red + ' red pixels'); notes.push('refused habitat (' + k + '): note "' + t + '", ' + p.bad.length + ' hexes marked, ' + red + ' red pixels');
-      if (k === 'touch') await shot('place-touch');
-      await page.locator('#placement-bar button.zr-place').click({ force: true }); ok((await page.evaluate(() => RT.placed.length)) === 0, 'Place on a refused spot (' + k + ') must not call onPlace');
+      ok(red > 150, 'no solid red marking on screen for a refused spot: ' + red + ' red pixels'); notes.push('refused habitat (land): note "' + t + '", ' + p.bad.length + ' hexes marked, ' + red + ' red pixels');
+      await page.locator('#placement-bar button.zr-place').click({ force: true }); ok((await page.evaluate(() => RT.placed.length)) === 0, 'Place on a refused spot must not call onPlace');
     }
-    // a legal spot: the ghost shows the ring the habitat would get, as walkway, and the decorations there step aside
-    { const s = sp.okHab; await btn('zr-cancel').click(); const f = s.fresh[0];
-      await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 1, true), [s.q, s.r]); await sleep(150); await page.evaluate(() => ZRender.setRunning(false)); await sleep(80);
-      const before = []; for (const c of s.fresh) before.push(await page.evaluate(([q, r]) => TT.kind(q, r), c));
-      await page.evaluate(() => RT.place({ kind: 'hab', t: 'savanna', label: 'Savanna', real: true })); await tapHex(s, false); await turnTo(s.rot); await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 1, true), [s.q, s.r]); await sleep(200);
-      const p = (await dbg()).placement, after = []; for (const c of s.fresh) after.push(await page.evaluate(([q, r]) => TT.kind(q, r), c));
-      ok(p.ok && /fits here|completes|breaks/i.test(p.msg), 'the legal habitat spot should fit: ' + JSON.stringify(p));
-      ok(sameCells(p.ring, s.ring), 'the ghost ring should be ZE.ringAt: ' + JSON.stringify(p.ring) + ' vs ' + JSON.stringify(s.ring));
-      const wasGrass = before.filter(k => k === 'grass').length, nowPath = after.filter(k => k === 'path').length;
-      ok(wasGrass >= 3 && nowPath >= after.length - 1 && !after.includes('grass'), 'the ring-to-be should show as walkway with the ghost (before: ' + before.join(',') + '; with the ghost: ' + after.join(',') + ')');
-      notes.push('ghost ring: ' + p.ring.length + ' hexes, ' + s.fresh.length + ' of them new; on screen before ' + before.join(',') + ' -> with the ghost ' + after.join(','));
-      await shot('place-ring');
-      const ring0 = (await dbg()).ring; await btn('zr-place').click(); await sleep(500); const d1 = await dbg();
-      ok(!(await page.evaluate(() => ZRender.placing())) && d1.ring > ring0 && d1.ringPath === d1.ring && d1.ringDeco === 0, 'after building, the new habitat\'s ring should be walkway with no decorations: ' + JSON.stringify({ ring0, ring: d1.ring, path: d1.ringPath, deco: d1.ringDeco }));
-      const built2 = []; for (const c of s.fresh) built2.push(await page.evaluate(([q, r]) => TT.kind(q, r), c)); ok(!built2.includes('grass'), 'the built ring is not drawn as walkway: ' + built2.join(','));
+    // a habitat right against another one fits; the ghost shows its own border strip; once built the two strips meet
+    { const s = sp.beside; await tapHex(s); await turnTo(s.rot); await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 1, true), [s.q, s.r]); await sleep(200);
+      const p = (await dbg()).placement; ok(p.ok && /fits here|completes|breaks/i.test(p.msg) && p.ring.length === 0, 'a habitat touching another should fit, with no ring: ' + JSON.stringify(p));
+      await shot('place-touch'); await btn('zr-cancel').click(); }
+    { const s = sp.okHab;
+      await page.evaluate(() => RT.place({ kind: 'hab', t: 'savanna', label: 'Savanna', real: true })); await tapHex(s, false); await turnTo(s.rot); await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 1, true), [s.q, s.r]); await page.evaluate(() => ZRender.setRunning(false)); await sleep(250);
+      const p = (await dbg()).placement; ok(p.ok, 'the lone habitat spot should fit: ' + JSON.stringify(p));
+      // the ghost's front strip middles, worked out here from the hex geometry: walkway-coloured
+      const gs = await page.evaluate(([q, r, rot]) => { const T = 0.27 / 2, cs = ZE.cellsOf('hab', 'savanna', q, r, rot), set = {}, out = []; cs.forEach(c => { set[c[0] + ',' + c[1]] = 1; });
+        cs.forEach(c => { const p = ZGeo.toScreen(c[0], c[1]); ZGeo.EDGES.forEach((e, ei) => { if (set[(c[0] + e[0][0]) + ',' + (c[1] + e[0][1])] || ZGeo.edgeMidY(ei) <= 0) return; const A = ZGeo.CORNERS[e[1]], B = ZGeo.CORNERS[e[2]]; out.push([p.x + (A[0] + B[0]) / 2 * (1 - T), p.y + (A[1] + B[1]) / 2 * (1 - T)]); }); }); return out; }, [s.q, s.r, s.rot]);
+      const gk = []; for (const g of gs) gk.push(await kindAt(g[0], g[1]));
+      ok(gk.filter(k => k === 'path').length >= gs.length - 1, 'the ghost should show its border strip as walkway: ' + gk.join(','));
+      notes.push('ghost: ' + gs.length + ' front strip middles -> ' + gk.join(','));
+      await shot('place-strip');
+      const st0 = (await dbg()).strips; await btn('zr-place').click(); await sleep(500); const d1 = await dbg();
+      ok(!(await page.evaluate(() => ZRender.placing())) && d1.strips > st0, 'after building, the new habitat should have its border strip: ' + JSON.stringify({ before: st0, after: d1.strips }));
+      const bk = []; for (const g of gs) bk.push(await kindAt(g[0], g[1])); ok(bk.filter(k => k === 'path').length >= gs.length - 1, 'the built habitat\'s strip is not drawn as walkway: ' + bk.join(','));
       await page.evaluate(() => { ZRender.setRunning(true); RT.placed.length = 0; });
     }
-    // a facility on a walkway, and on a taken hex
+    // a bench right against a habitat fits now; a taken hex is refused
     await page.evaluate(() => RT.place({ kind: 'fac', t: 'bench', label: 'Garden Bench' }));
-    for (const k of ['ringFac', 'taken']) { const s = sp[k]; await tapHex(s); const p = (await dbg()).placement, t = await note(); ok(!p.ok && p.why === (k === 'ringFac' ? 'ring' : 'taken') && t.indexOf(s.msg) >= 0, 'a bench at a "' + k + '" spot: ' + JSON.stringify({ ok: p.ok, why: p.why, note: t })); ok(p.bad.length >= 1, 'no hexes marked for ' + k); notes.push('refused bench (' + k + '): note "' + t + '"'); if (k === 'ringFac') { await page.evaluate(([q, r]) => ZRender.centerOn(q, r - 2, true), [s.q, s.r]); await sleep(150); await shot('place-on-ring'); } }
+    { const s = sp.facBeside; await tapHex(s); const p = (await dbg()).placement; ok(p.ok, 'a bench right against a habitat should fit: ' + JSON.stringify({ ok: p.ok, why: p.why, msg: p.msg })); }
+    { const s = sp.taken; await tapHex(s); const p = (await dbg()).placement, t = await note(); ok(!p.ok && p.why === 'taken' && t.indexOf(s.msg) >= 0, 'a bench on a taken hex: ' + JSON.stringify({ ok: p.ok, why: p.why, note: t })); ok(p.bad.length >= 1, 'no hexes marked for taken'); notes.push('refused bench (taken): note "' + t + '"'); }
     await btn('zr-cancel').click();
 
     // ---------- 3. speed 2: the board moves twice as fast (animals, people, pop-ups), the clock of the screen itself does not
@@ -223,6 +230,29 @@ async function runFloor(name) {
     await page.evaluate(() => { ZRender.startEdit({ onPick: () => {}, onExit: () => { RT.exits++; } }); RT.cur = ZE.newGame(null, { starter: true }); }); await sleep(500);
     ok(!(await page.evaluate(() => ZRender.editing())) && (await page.evaluate(() => RT.exits)) === 1, 'a new game while editing should end Edit mode and call onExit once'); await page.evaluate(() => { RT.cur = RT.S; clearInterval(RT.barTimer); document.getElementById('edit-bar').remove(); }); await sleep(500);
 
+    // ---------- a building closed in by habitats on every side is still reached, along the habitats' border strips
+    { const cl = await page.evaluate(() => {
+        const S = ZE.newGame(); S.money = 1e9; ZD.BIOME_ORDER.forEach(b => { S.regions[b] = true; }); ZD.FAC_ORDER.forEach(f => { S.research['fac:' + f] = true; }); S.rows = ZD.GRID_H;
+        const e = ZE.entrance(S), mid = ZE.fromOffset(Math.floor(ZD.GRID_W / 2) - 2, ZD.GRID_H - 6); const b = ZE.build(S, 'fac', 'gift', mid[0], mid[1], 0); if (!b.ok) return { err: 'gift: ' + b.msg };
+        for (const d of ZE.DIRS) { const q = mid[0] + d[0], r = mid[1] + d[1]; if (ZE.occupancy(S)[q + ',' + r]) continue; let done = false;
+          for (const t of ['savanna', 'jungle', 'desert']) { for (let rot = 0; rot < 6 && !done; rot++) for (const o of ZD.SHAPES[t]) { const p = ZE.rot(o[0], o[1], rot), aq = q - p[0], ar = r - p[1]; if (ZE.canPlace(S, 'hab', t, aq, ar, rot)) { done = ZE.build(S, 'hab', t, aq, ar, rot).ok; break; } } if (done) break; } }
+        const closed = ZE.DIRS.every(d => ZE.occupancy(S)[(mid[0] + d[0]) + ',' + (mid[1] + d[1])]);
+        S.visitorsLast = 1400; S.reports = []; S.fx = []; RT.cur = S; ZRender.reset(); ZRender.mapChanged(); ZRender.centerOn(mid[0], mid[1], true);
+        return { closed: closed, gift: b.id, habs: S.items.filter(i => i.k === 'hab').length, q: mid[0], r: mid[1] };
+      });
+      ok(cl.closed, 'could not close a building in with habitats: ' + JSON.stringify(cl));
+      await sleep(2500); let unr = null, mx = 0, inF = 0, off = 0, atGift = 0;
+      for (let i = 0; i < 40; i++) { const d = await dbg(); unr = d.unreached; mx = Math.max(mx, d.onStrip); inF = Math.max(inF, d.inFence); off = Math.max(off, d.offPath);
+        const ppl = await page.evaluate(([q, r]) => { const c = ZGeo.toScreen(q, r); return ZRender.stripPeople().filter(p => p.on === 'strip' && Math.hypot(p.x - c.x, p.y - c.y) < ZGeo.W * 0.75).length; }, [cl.q, cl.r]); atGift = Math.max(atGift, ppl); await sleep(150); }
+      ok(unr && unr.length === 0, 'everything should be reachable, unreached: ' + JSON.stringify(unr));
+      const rc = await page.evaluate(id => ZRender.reach(id), cl.gift);
+      ok(rc && rc.ok && rc.strip && rc.viaStrip >= 2, 'the closed-in Gift Shop should be reached from the gate along the border strips: ' + JSON.stringify(rc));
+      ok(mx >= 1, 'people should be on the border strips in the closed-in layout: ' + mx);
+      ok(inF === 0 && off === 0, inF + ' people inside a fence, ' + off + ' off the walkable ground (closed-in layout)');
+      notes.push('closed-in Gift Shop with ' + cl.habs + ' habitats round it: walk from the gate ' + JSON.stringify(rc) + '; up to ' + atGift + ' people on the strips beside it (visitors pick at random, not required), ' + mx + ' on strips in all; inside a fence ' + inF);
+      await page.evaluate(() => ZRender.setRunning(false)); await sleep(100); await shot('closed-in'); await page.evaluate(() => { ZRender.setRunning(true); RT.cur = RT.S; ZRender.reset(); ZRender.mapChanged(); }); await sleep(800);
+    }
+
     // ---------- nothing see-through through all of the above
     { const ar = await page.evaluate(() => ZRender.alphaReport()); notes.push('solid-pixels check: ' + JSON.stringify(ar)); ok(ar.draws > 5000 && ar.minAlpha === 1 && ar.blendOps === 0 && ar.ownPartialPixels === 0, 'something on the floor was drawn see-through: ' + JSON.stringify(ar)); }
     { await page.evaluate(() => { ZRender.startEdit({}); ZRender.select(RT.H.savanna.id); RT.place({ kind: 'hab', t: 'savanna' }); }); await sleep(300); const ar = await page.evaluate(() => ZRender.alphaReport()); ok(ar.ownPartialPixels === 0 && ar.ownPictures >= 4, 'the selection, ghost or refusal outlines contain half-clear pixels: ' + JSON.stringify(ar)); await page.evaluate(() => { ZRender.stopEdit(); }); ok(!(await page.evaluate(() => ZRender.placing())), 'stopEdit should also leave a placement that is open'); }
@@ -231,7 +261,7 @@ async function runFloor(name) {
     ok(errors.length === 0 && pe.length === 0 && Object.keys(dEnd.spriteErrors).length === 0, 'errors: ' + JSON.stringify(errors.concat(pe).concat(Object.values(dEnd.spriteErrors))));
   } catch (e) { fails.push('crashed: ' + (e && e.stack || e)); }
   await browser.close();
-  return { name: name + ' / floor harness (ring, speed, Edit mode)', fails, notes };
+  return { name: name + ' / floor harness (walkways, speed, Edit mode)', fails, notes };
 }
 
 // ------------------------------------------------------------------ small challenge maps in the real page, as the installed app on a phone
@@ -282,13 +312,13 @@ async function runChallenge(name) {
         await page.evaluate(() => { ZRender.reset(); }); await sleep(600);
         await page.evaluate(() => { ZRender.startPlacement({ kind: 'hab', t: 'savanna', label: 'Savanna' }, { onPlace: (q, r, rot) => ZT.act('build', 'hab', 'savanna', q, r, rot), onCancel: () => {} }); }); await sleep(900);
         const g = await page.evaluate(() => { const p = ZRender.debug().placement, fl = document.getElementById('floor').getBoundingClientRect(), bar = document.getElementById('placement-bar').getBoundingClientRect(), nt = document.getElementById('placement-note').getBoundingClientRect(); const pts = ZE.cellsOf('hab', 'savanna', p.q, p.r, p.rot).concat(p.ring).map(c => { const k = ZRender.hexToClient(c[0], c[1]); return [Math.round(k.x), Math.round(k.y)]; }); return { p: p, pts: pts, left: fl.left, right: fl.right, barTop: bar.top, noteBottom: nt.bottom }; });
-        ok(g.p.ok && g.p.ring.length >= 6, lv + ': the first habitat ghost should start legal with its ring: ' + JSON.stringify({ ok: g.p.ok, msg: g.p.msg, ring: g.p.ring.length }));
-        ok(g.pts.every(p => p[0] > g.left + 10 && p[0] < g.right - 10 && p[1] > g.noteBottom + 10 && p[1] < g.barTop - 20), lv + ': the ghost and its ring should be in clear view between the note and the buttons: ' + JSON.stringify(g.pts) + ' note ' + Math.round(g.noteBottom) + ' bar ' + Math.round(g.barTop));
+        ok(g.p.ok && g.p.ring.length === 0, lv + ': the first habitat ghost should start legal (no ring any more): ' + JSON.stringify({ ok: g.p.ok, msg: g.p.msg, ring: g.p.ring.length }));
+        ok(g.pts.every(p => p[0] > g.left + 10 && p[0] < g.right - 10 && p[1] > g.noteBottom + 10 && p[1] < g.barTop - 20), lv + ': the ghost should be in clear view between the note and the buttons: ' + JSON.stringify(g.pts) + ' note ' + Math.round(g.noteBottom) + ' bar ' + Math.round(g.barTop));
         await page.screenshot({ path: path.join(shots, 'render-r7-challenge-' + lv + '-place' + sfx + '.png') });
         await page.locator('#placement-bar button.zr-place').click(); await sleep(500);
         for (let i = 0; i < 8 && (await page.evaluate(() => ZT.stack().length)) > 0; i++) { await page.evaluate(() => ZT.popAll()); await sleep(150); }
         await sleep(600); const d1 = await page.evaluate(() => ZRender.debug());
-        ok((await page.evaluate(() => ZT.S.items.length)) === 1 && d1.ring >= 6 && d1.ringPath === d1.ring && d1.ringDeco === 0, lv + ': the built habitat should have its walkway ring: ' + JSON.stringify({ ring: d1.ring, path: d1.ringPath, deco: d1.ringDeco }));
+        ok((await page.evaluate(() => ZT.S.items.length)) === 1 && d1.strips >= 6 && d1.unreached.length === 0, lv + ': the built habitat should have its border walkway: ' + JSON.stringify({ strips: d1.strips, unreached: d1.unreached }));
         await page.evaluate(() => ZRender.reset()); await sleep(900); await page.screenshot({ path: path.join(shots, 'render-r7-challenge-' + lv + '-built' + sfx + '.png') });
       }
       // speed 2 through the real Shell

@@ -270,7 +270,7 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
       body.appendChild(fitGrid([
         { icon: iUrl('m-projects', 6), label: 'Projects', alert: waiting > 0, onTap: projectsScreen },
         { icon: iUrl('edit', 6), label: 'Edit', onTap: () => editMode() },
-        { icon: iUrl('m-animals', 6), label: 'Animals', alert: pen > 0, onTap: () => animalsScreen(!habs().length && pen ? 'pen' : 'zoo') },
+        { icon: iUrl('m-animals', 6), label: 'Animals', alert: pen > 0 && habs().length > 0, onTap: () => animalsScreen(!habs().length && pen ? 'pen' : 'zoo') },
         { icon: iUrl('m-staff', 6), label: 'Staff', sub: s.staff.length + '/' + E.staffCap(s), alert: !!((s.candidates && s.candidates.length) || s.headhunt), onTap: staffScreen },
         { icon: iUrl('m-research', 6), label: 'Research', alert: researchReady() > 0, onTap: researchScreen },
         { icon: iUrl('m-info', 6), label: 'Info', onTap: infoScreen },

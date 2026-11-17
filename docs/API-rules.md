@@ -16,7 +16,7 @@ first-timer profile, then the sensible bot at skills 0.5, 0.8 and 1; `node test/
 |---|---|
 | Menus | `startExpedition(S, region, team, star)`: the 4th argument is now a **star level**, not a budget. Build the Send out page from `ZE.expStars(S, region, team)`. `ZE.teamPower(S, team)` has no budget argument any more. Lean / Standard / Lavish are gone |
 | Menus, Renderer | Placement: use `ZE.placeCheck` (why not, and which hexes). A facility can no longer stand directly against a habitat; it goes one hex out, across the walkway. `ZE.starterSpots().snack` moved one hex further from the habitat |
-| Renderer | Draw `ZE.ringCells(S)` as walkway and let visitors walk on it |
+| Renderer | (Update 8) Draw a border walkway strip inside each habitat and let people walk on it; `ZE.ringCells` is now an empty stub |
 | Moments, Menus, anyone with a test that waits for a project choice | Project choices now come up only a quarter of the time. A test or demo that needs one calls `ZE.debug.alwaysChoices(true)` first (and `false` after) |
 | Shell | Challenge plumbing: `ZE.newChallenge`, `ZE.challengeStatus`, the `challenge` report, `ZE.nextGoal` for the chip |
 
@@ -36,43 +36,37 @@ first-timer profile, then the sensible bot at skills 0.5, 0.8 and 1; `node test/
   1.07 / 1.34 / 1.02 / 0.77, were 1.0 / 1.25 / 0.95 / 0.72). With these the 20-year game keeps its old pace (bot, 120 runs each
   way: rank and species within 5% at years 1, 2, 3, 5, 10 and 15; year-end bank within about 15%).
 
-### R7.2 The walkway ring
+### R7.2 Walkways (changed in Update 8)
 
-Every habitat has a ring of walkway on **every free owned hex that borders it**. It costs nothing, it is not an item and it is
-not stored: the engine works it out from the layout, so it follows the habitat when it moves and goes when it is sold (hexes
-another habitat still borders stay). Rings of neighbouring habitats may share hexes.
+The Update 7 walkway ring is gone. The owner wanted habitats to keep their own footprint and simply have a narrow path along
+their border, so people can walk everywhere. Now:
+
+- A habitat takes **exactly its own hexes**. There are no ring hexes. Habitats may touch other habitats and buildings again, as
+  before Update 7, and a building may be closed in by habitats on every side.
+- The walkway is drawn by the renderer as a narrow strip **inside** each habitat's outer edge (the fence stands inward of it).
+  Visitors and staff walk along those strips, so a habitat never seals anything off. The engine has no "can visitors reach it"
+  rule and needs none.
+- **"Next to" is plain touching** again: a bench against a habitat lifts it, facility combos and habitat pairs (`icefire`,
+  `landsea`, `highwild`, `station`) need the items to touch. `ZE.c(S).nb`, `ZE.layout`, `ZE.nearMisses` all use this.
+- `ZE.starterSpots()`: the Snack Stand is back 2 hexes to the right of the habitat's anchor, touching it.
+- Old saves: nothing moves. A Snack Stand an Update 7 game left one hex out still works but no longer counts as next to the habitat
+  until it is moved against it.
 
 | Call | Meaning |
 |---|---|
-| `ZE.ringCells(S, habId?) -> [[q, r], ...]` | Every ring hex, or only that habitat's. **Renderer: draw these as path; visitors may walk on them** |
-| `ZE.isRing(S, q, r)` | Is that hex a ring hex |
-| `ZE.c(S).ring` | `{ 'q,r': [habitatId, ...] }` (two or more ids = shared). Also `ZE.ringMap(S, items?, ignoreId?)` and `ZE.layout(S, items).ring` for a hypothetical layout |
-| `ZE.ringAt(S, biome, q, r, rot, ignoreId?) -> [[q, r], ...]` | The ring a habitat would have at that spot, for the Edit mode ghost. Pass the item's id as `ignoreId` when moving it |
 | `ZE.placeCheck(S, kind, t, q, r, rot, ignoreId?)` | `{ ok: true }` or `{ ok: false, why, msg, cells: [[q, r], ...] }`. `msg` is a short sentence; `cells` are the hexes in the way (paint them red) |
 | `ZE.canPlace(...)` | Same arguments, just the boolean (`placeCheck(...).ok`) |
+| `ZE.ringCells`, `ZE.isRing`, `ZE.ringAt`, `ZE.ringMap` | Harmless stubs kept so nothing crashes: `[]`, `false`, `[]`, `{}`. `ZE.c(S).ring` and `ZE.layout(...).ring` are `{}` |
 
-`why` values:
+`why` values (the `touch`, `crowd` and `ring` refusals of Update 7 are gone):
 
 | why | Meaning | `cells` |
 |---|---|---|
 | `land` | Part of it is off the owned land | the hexes off the land |
 | `entrance` | It would cover the gate | the gate hex |
 | `taken` | Something is already there | the occupied hexes |
-| `touch` | A habitat would touch another habitat. There is always at least one walkway hex between two habitats | the other habitat's hexes it touches |
-| `crowd` | A habitat would touch a building, so its walkway could not go all the way round | the building hexes it touches |
-| `ring` | A building on a habitat's walkway | the building's own hex |
 
-- `build` and `move` use the same check and return its `msg` when refused. Where an item already stands is always legal
-  (`placeCheck` with its own `ignoreId` at its own spot is `{ ok: true }`).
-- A habitat may sit against the edge of the map or of the owned land (no ring there) and beside the gate hex.
-- **"Next to" now reaches across the walkway.** Two items are next to each other when they touch (only possible in layouts built
-  before R7) or when one is a habitat and the other touches its ring. So a bench one hex out from the habitat still lifts it,
-  facility combos still complete (`picnic`, `trail`, ...), and two habitats that share a walkway count for the pair combos
-  (`icefire`, `landsea`, `highwild`, `station`). Facility to facility is unchanged (they must touch). `ZE.c(S).nb`,
-  `ZE.layout`, `ZE.nearMisses` and every bonus use this one rule; `nearMisses` only lists hexes where the facility may legally go.
-- **Old saves:** nothing is moved or removed. Buildings that stand against a habitat stay and keep working; the ring appears on
-  the bordering hexes that are free. Moving an old item must follow the new rule at its new spot.
-- `ZE.starterSpots()`: the Snack Stand spot is now 3 hexes to the right of the habitat's anchor (was 2), just outside the ring.
+- `build` and `move` use the same check and return its `msg` when refused. Where an item already stands is always legal.
 
 ### R7.3 Best of its kind, and who lives where
 
@@ -394,7 +388,7 @@ rank, `D.CRATE_VISIT` by rank band 1-2, 3-4, 5-6, 7-8, 9-10, rarities 1..5). The
   rules of R7.2; `ZE.placeCheck` gives the reason). Pass the item's own id as `ignoreId` when moving it.
 - `ZE.layout(S, items?) -> {nb, active, byId, occ}`: pure preview of a real or hypothetical item list. `active` is
   `[{id: comboId, anchor: itemId, members: [itemId, ...]}]`; outline `anchor` plus `members` for each. `nb[itemId]` is the
-  list of items next to it (touching, or across a habitat's walkway ring: R7.2). The result also has `ring`. To preview a placement, copy `S.items`, add or move the ghost, call `layout`, and compare the
+  list of items touching it (R7.2). The result also has `ring` (always `{}` since Update 8). To preview a placement, copy `S.items`, add or move the ghost, call `layout`, and compare the
   combo ids with `ZE.c(S).active`.
 - `ZE.nearMisses(S) -> [{combo, fac, anchor, cells: [[q, r], ...]}]`: known combos one facility short and the free hexes
   where it would complete them.
@@ -727,7 +721,7 @@ and an explorer are on the team, and money is `ZD.START_MONEY` = $26,500 (+$6,00
 old $20,000 (`ZD.START_MONEY_CLASSIC`) plus the price of the old free starter, a Savanna habitat ($5,000) and a Snack Stand
 ($1,500), listed in `ZD.START_KIT`. Building the first Savanna habitat no longer moves the zebras in: `build` returns
 `movable` (their two ids) and the interface offers `moveIn`. Both starter items fit on the starting land from week 0; `ZE.starterSpots() -> {hab:{q,r}, snack:{q,r}}`
-gives the classic positions (rotation 0) if you want to suggest a spot (R7: the Snack Stand spot is one hex further out, just outside the walkway ring).
+gives the classic positions (rotation 0) if you want to suggest a spot (Update 8: the Snack Stand spot touches the habitat again).
 
 `opts.starter === true` gives the **classic start** instead: the Savanna habitat and Snack Stand already built at
 `starterSpots()`, zebras housed, $20,000, a trader in town. Tests and the bot use it when they need a known layout.

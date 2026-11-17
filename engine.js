@@ -329,8 +329,8 @@
     return S;
   };
   // Where the classic starter sits (the bot and tests rebuild it there): {hab:{q,r}, snack:{q,r}}, rotation 0.
-  // The Snack Stand stands just outside the habitat's walkway ring (R7), still "next to" it for combos.
-  Z.starterSpots = function () { const at = Z.fromOffset(3, D.GRID_H - 4); return { hab: { q: at[0], r: at[1] }, snack: { q: at[0] + 3, r: at[1] } }; };
+  // The Snack Stand touches the habitat (Update 8: the walkway is a border strip inside each habitat, so they may touch again).
+  Z.starterSpots = function () { const at = Z.fromOffset(3, D.GRID_H - 4); return { hab: { q: at[0], r: at[1] }, snack: { q: at[0] + 2, r: at[1] } }; };
   // The zoo is open once it has a habitat. Until then nobody visits, nothing costs anything and nothing random happens.
   Z.isOpen = S => S.items.some(i => i.k === 'hab');
   const lively = S => Z.isOpen(S) && S.openedAt != null && S.week >= S.openedAt + D.QUIET_WEEKS; // callers and happenings may come
@@ -351,67 +351,40 @@
   Z.entrance = S => ({ q: ENTRANCE.q, r: ENTRANCE.r });
   Z.isEntrance = (q, r) => q === ENTRANCE.q && r === ENTRANCE.r;
   Z.occupancy = function (S, ignoreId, items) { const g = {}; (items || S.items).forEach(it => { if (it.id === ignoreId) return; Z.cells(it).forEach(c => { g[c[0] + ',' + c[1]] = it.id; }); }); return g; };
-  // ----- the walkway ring (R7): every habitat has a ring of walkway on the free owned hexes that border it -----
-  // The ring is worked out from the layout, never stored: it follows the habitat when it moves and goes when it is sold.
-  // Rings of neighbouring habitats may share hexes. { 'q,r': [habitatId, ...] }
-  Z.ringMap = function (S, items, ignoreId) {
-    items = items || S.items; const g = Z.occupancy(S, ignoreId, items), ring = {};
-    items.forEach(it => {
-      if (it.k !== 'hab' || it.id === ignoreId) return;
-      Z.cells(it).forEach(c => DIRS.forEach(d => { const q = c[0] + d[0], r = c[1] + d[1], k = q + ',' + r; if (g[k] || !Z.inLand(S, q, r)) return; const l = ring[k] || (ring[k] = []); if (l.indexOf(it.id) < 0) l.push(it.id); }));
-    });
-    return ring;
-  };
-  const unkey = k => k.split(',').map(Number);
-  Z.ringCells = function (S, habId) { const m = Z.c(S).ring, out = []; Object.keys(m).forEach(k => { if (habId == null || m[k].indexOf(habId) >= 0) out.push(unkey(k)); }); return out; };
-  Z.isRing = (S, q, r) => !!Z.c(S).ring[q + ',' + r];
-  // The ring a habitat would have at this spot (for the Edit mode ghost). Pass the item's own id as ignoreId when moving it.
-  Z.ringAt = function (S, t, q, r, rot, ignoreId) {
-    const g = Z.occupancy(S, ignoreId), own = {}, seen = {}, out = [], cells = Z.cellsOf('hab', t, q, r, rot); cells.forEach(c => { own[c[0] + ',' + c[1]] = 1; });
-    cells.forEach(c => DIRS.forEach(d => { const a = c[0] + d[0], b = c[1] + d[1], k = a + ',' + b; if (own[k] || seen[k] || g[k] || !Z.inLand(S, a, b)) return; seen[k] = 1; out.push([a, b]); }));
-    return out;
-  };
+  // ----- walkways (Update 8): each habitat has a narrow walkway strip just inside its own hexes (drawn by the renderer) -----
+  // Habitats take exactly their own hexes and may touch each other and buildings; visitors walk along the border strips, so a
+  // habitat never seals anything off. The R7 ring calls stay as harmless stubs: there are no ring hexes any more.
+  Z.ringMap = () => ({});
+  Z.ringCells = () => [];
+  Z.isRing = () => false;
+  Z.ringAt = () => [];
   // May this go here, and if not why. { ok: true } or { ok: false, why, msg, cells: [[q, r], ...] } (cells = the hexes in the way).
-  // why: 'land' (off your land), 'entrance', 'taken', 'touch' (a habitat would touch another habitat: there must be a walkway between),
-  // 'crowd' (a habitat would touch a building, so its walkway could not go all the way round), 'ring' (a building on a habitat's walkway).
+  // why: 'land' (off your land), 'entrance', 'taken'.
   Z.placeCheck = function (S, kind, t, q, r, rot, ignoreId) {
-    const g = Z.occupancy(S, ignoreId), cells = Z.cellsOf(kind, t, q, r, rot), own = {}, me = ignoreId != null ? Z.item(S, ignoreId) : null;
+    const g = Z.occupancy(S, ignoreId), cells = Z.cellsOf(kind, t, q, r, rot), me = ignoreId != null ? Z.item(S, ignoreId) : null;
     const no = (why, msg, bad) => ({ ok: false, why: why, msg: msg, cells: bad });
     if (me && me.q === q && me.r === r && (me.rot || 0) === (rot || 0)) return { ok: true }; // where it already stands is always fine
     let bad = cells.filter(c => !Z.inLand(S, c[0], c[1])); if (bad.length) return no('land', 'That is off your land.', bad);
     bad = cells.filter(c => Z.isEntrance(c[0], c[1])); if (bad.length) return no('entrance', 'Keep the entrance clear.', bad);
     bad = cells.filter(c => g[c[0] + ',' + c[1]]); if (bad.length) return no('taken', 'That spot is taken.', bad);
-    cells.forEach(c => { own[c[0] + ',' + c[1]] = 1; });
-    const habs = [], facs = [], seen = {};
-    cells.forEach(c => DIRS.forEach(d => { const a = c[0] + d[0], b = c[1] + d[1], k = a + ',' + b, o = g[k]; if (!o || own[k] || seen[k]) return; seen[k] = 1; (Z.item(S, o).k === 'hab' ? habs : facs).push([a, b]); }));
-    if (kind === 'hab') {
-      if (habs.length) return no('touch', 'Leave a walkway between habitats.', habs);
-      if (facs.length) return no('crowd', 'Leave room for its walkway.', facs);
-    } else if (habs.length) return no('ring', 'Keep the walkway clear.', cells);
     return { ok: true };
   };
   Z.canPlace = (S, kind, t, q, r, rot, ignoreId) => Z.placeCheck(S, kind, t, q, r, rot, ignoreId).ok;
   const kindOf = it => it.k + ':' + it.t;
   Z.kindOf = kindOf;
-  // Who is next to whom, and which combos are complete. Pure, so the interface can preview a placement.
-  // "Next to" (R7): two items touch, or one of them is a habitat and the other touches its walkway ring
-  // (so a bench across the walkway counts, and two habitats that share a walkway count).
+  // Who touches whom, and which combos are complete. Pure, so the interface can preview a placement.
+  // "Next to" is plain touching again (Update 8).
   Z.layout = function (S, items) {
     items = items || S.items; const g = Z.occupancy(S, null, items), byId = {}; items.forEach(i => { byId[i.id] = i; });
-    const nb = {}, sets = {}, ring = Z.ringMap(S, items);
-    items.forEach(it => {
-      const set = sets[it.id] = {}, add = (q, r) => { const o = g[q + ',' + r]; if (o && o !== it.id) set[o] = 1; };
-      Z.cells(it).forEach(c => DIRS.forEach(d => { const q = c[0] + d[0], r = c[1] + d[1]; add(q, r); if (it.k === 'hab' && ring[q + ',' + r]) DIRS.forEach(e => add(q + e[0], r + e[1])); }));
-    });
-    items.forEach(it => Object.keys(sets[it.id]).forEach(o => { sets[o][it.id] = 1; })); // being next to something works both ways
-    items.forEach(it => { nb[it.id] = Object.keys(sets[it.id]).map(k => byId[k]); });
+    const nb = {};
+    items.forEach(it => { const set = {}; Z.cells(it).forEach(c => DIRS.forEach(d => { const o = g[(c[0] + d[0]) + ',' + (c[1] + d[1])]; if (o && o !== it.id) set[o] = 1; })); nb[it.id] = Object.keys(set).map(k => byId[k]); });
     const active = [];
     D.COMBOS.forEach(c => items.forEach(it => {
       if (kindOf(it) !== c.anchor) return; const members = [];
       const ok = c.needs.every(need => { const m = nb[it.id].find(o => kindOf(o) === need && members.indexOf(o.id) < 0); if (m) members.push(m.id); return !!m; });
       if (ok) active.push({ id: c.id, anchor: it.id, members: members });
     }));
-    return { nb: nb, active: active, byId: byId, occ: g, ring: ring };
+    return { nb: nb, active: active, byId: byId, occ: g, ring: {} };
   };
   // Combos you already know that are exactly one facility short, and the free spots where it could go.
   Z.nearMisses = function (S) {
@@ -426,7 +399,7 @@
         const f = missing[0].slice(4); if (!S.research['fac:' + f]) return;
         const free = [], seen = {};
         const tryAt = (q, r) => { const k = q + ',' + r; if (seen[k]) return; seen[k] = 1; if (Z.canPlace(S, 'fac', f, q, r, 0)) free.push([q, r]); };
-        Z.cells(it).forEach(cell => DIRS.forEach(d => { const q = cell[0] + d[0], r = cell[1] + d[1]; tryAt(q, r); if (it.k === 'hab' && L.ring[q + ',' + r]) DIRS.forEach(e => tryAt(q + e[0], r + e[1])); }));
+        Z.cells(it).forEach(cell => DIRS.forEach(d => tryAt(cell[0] + d[0], cell[1] + d[1])));
         if (free.length) out.push({ combo: c.id, fac: f, anchor: it.id, cells: free });
       });
     });

@@ -300,8 +300,7 @@ check('rule lookups the interface used to copy', () => {
 check('reports raised inside an action are in S.reports when it returns', () => {
   const S = NG(); S.money = 1e6; S.reports = []; const h = S.items[0];
   let placed = false;
-  for (const c of Z.cells(h)) for (const d of Z.DIRS) ok(!Z.canPlace(S, 'fac', 'bench', c[0] + d[0], c[1] + d[1], 0), 'R7: nothing can be built on the walkway ring');
-  for (const c of Z.ringCells(S, h.id)) for (const d of Z.DIRS) { if (!placed && Z.canPlace(S, 'fac', 'bench', c[0] + d[0], c[1] + d[1], 0)) { ok(Z.build(S, 'fac', 'bench', c[0] + d[0], c[1] + d[1], 0).ok); placed = true; } }
+  for (const c of Z.cells(h)) for (const d of Z.DIRS) { if (!placed && Z.canPlace(S, 'fac', 'bench', c[0] + d[0], c[1] + d[1], 0)) { ok(Z.build(S, 'fac', 'bench', c[0] + d[0], c[1] + d[1], 0).ok); placed = true; } }
   ok(placed); ok(S.reports.some(r => r.type === 'combo' && r.id === 'picnic'), 'combo report straight after building');
 });
 
@@ -551,46 +550,36 @@ check('short labels', () => {
   eq(long, []);
 });
 
-// ---------- R7 (update 7): walkway ring, best of kind, next goal, star expeditions, rare treats, challenge mode ----------
+// ---------- R7 (update 7): best of kind, next goal, star expeditions, rare treats, challenge mode ----------
+// (Update 8 replaced the R7 walkway ring: habitats take exactly their own hexes again and the walkway is a strip the renderer
+// draws inside each habitat's border, so visitors can walk everywhere. The checks below are the Update 8 rules.)
 const keyOf = c => c[0] + ',' + c[1];
 const sortedKeys = cells => cells.map(keyOf).sort();
-// worked out here independently of the engine: the owned free hexes that border a habitat
-function borderOf(S, h) { const own = {}, out = {}, occ = Z.occupancy(S); Z.cells(h).forEach(c => { own[keyOf(c)] = 1; }); Z.cells(h).forEach(c => Z.DIRS.forEach(d => { const q = c[0] + d[0], r = c[1] + d[1], k = q + ',' + r; if (!own[k] && !occ[k] && Z.inLand(S, q, r)) out[k] = 1; })); return Object.keys(out).sort(); }
-// nothing at all stands on a hex bordering a habitat (so no two habitats touch and every ring is whole)
-function ringsWhole(S) { const occ = Z.occupancy(S); S.items.forEach(h => { if (h.k !== 'hab') return; Z.cells(h).forEach(c => Z.DIRS.forEach(d => { const o = occ[(c[0] + d[0]) + ',' + (c[1] + d[1])]; if (o && o !== h.id) throw new Error((Z.item(S, o).k === 'hab' ? 'two habitats touch' : 'a building stands on a walkway') + ' at ' + (c[0] + d[0]) + ',' + (c[1] + d[1])); })); }); return true; }
 function allSpots(S, kind, t, fn) { for (let y = 0; y < D.GRID_H; y++) for (let x = 0; x < D.GRID_W; x++) { const a = Z.fromOffset(x, y); for (let rot = 0; rot < (kind === 'hab' ? 6 : 1); rot++) if (fn(a[0], a[1], rot) === false) return; } }
 const rich = S => { S.money = 1e9; D.BIOME_ORDER.forEach(b => { S.regions[b] = true; }); D.FAC_ORDER.forEach(f => { S.research['fac:' + f] = true; }); return S; };
+const touches = (S, a, b) => Z.cells(a).some(c => Z.DIRS.some(d => Z.cells(b).some(o => o[0] === c[0] + d[0] && o[1] === c[1] + d[1])));
 
-check('walkway ring: laid with the habitat at no extra cost, nothing can be built on it, shared by neighbours, follows a move, goes with a sale', () => {
+check('Update 8 walkways: a habitat takes exactly its own hexes, no ring hexes, the old ring calls are harmless stubs', () => {
   const S = rich(Z.newGame()), at = Z.starterSpots(), m0 = S.money;
-  const r = Z.build(S, 'hab', 'savanna', at.hab.q, at.hab.r, 0); ok(r.ok); eq(S.money, m0 - D.BIOMES.savanna.hab, 'the ring costs nothing');
-  const h = Z.item(S, r.id), ring = Z.ringCells(S, h.id); eq(sortedKeys(ring), borderOf(S, h), 'ring = every free owned hex bordering the habitat'); eq(ring.length, 9);
-  eq(sortedKeys(Z.ringCells(S)), sortedKeys(ring), 'ringCells with no id lists every ring hex'); eq(sortedKeys(Z.ringAt(S, 'savanna', at.hab.q, at.hab.r, 0, h.id)), sortedKeys(ring), 'ringAt preview');
-  ring.forEach(c => { ok(Z.isRing(S, c[0], c[1])); eq(Z.c(S).ring[keyOf(c)], [h.id]); const pc = Z.placeCheck(S, 'fac', 'bench', c[0], c[1], 0); eq([pc.ok, pc.why], [false, 'ring']); ok(pc.msg && pc.cells.length === 1); const b = Z.build(S, 'fac', 'bench', c[0], c[1], 0); ok(!b.ok && b.msg === pc.msg, 'a building on the ring is refused'); });
-  ok(!Z.isRing(S, at.snack.q, at.snack.r) && Z.build(S, 'fac', 'snack', at.snack.q, at.snack.r, 0).ok, 'the starter snack stand stands just outside the ring');
-  ok(!('ring' in JSON.parse(Z.serialize(S))) && !S.items.some(i => 'ring' in i), 'the ring is worked out, never stored');
-  // a second habitat exactly one walkway away shares ring hexes
-  let spot = null; allSpots(S, 'hab', 'savanna', (q, r2, rot) => { if (Z.canPlace(S, 'hab', 'savanna', q, r2, rot) && Z.ringAt(S, 'savanna', q, r2, rot).some(c => Z.isRing(S, c[0], c[1]))) { spot = [q, r2, rot]; return false; } });
-  ok(spot, 'a spot one walkway away exists'); const before = sortedKeys(Z.ringCells(S, h.id));
-  const r2 = Z.build(S, 'hab', 'savanna', spot[0], spot[1], spot[2]); ok(r2.ok); const h2 = Z.item(S, r2.id);
-  const shared = Object.keys(Z.c(S).ring).filter(k => Z.c(S).ring[k].length === 2); ok(shared.length >= 1, 'shared ring hexes'); shared.forEach(k => eq(Z.c(S).ring[k].slice().sort(), [h.id, h2.id].sort()));
-  eq(sortedKeys(Z.ringCells(S, h2.id)), borderOf(S, h2)); ringsWhole(S);
-  ok(Z.c(S).nb[h.id].some(o => o.id === h2.id) && Z.c(S).nb[h2.id].some(o => o.id === h.id), 'habitats that share a walkway are next to each other');
-  // moving: the ring follows
-  let far = null; allSpots(S, 'hab', 'savanna', (q, r3, rot) => { if (Z.canPlace(S, 'hab', 'savanna', q, r3, rot, h2.id) && !Z.ringAt(S, 'savanna', q, r3, rot, h2.id).some(c => before.indexOf(keyOf(c)) >= 0)) { far = [q, r3, rot]; return false; } });
-  ok(far && Z.move(S, h2.id, far[0], far[1], far[2]).ok, 'moved away'); eq(sortedKeys(Z.ringCells(S, h2.id)), borderOf(S, h2), 'ring moved with it'); eq(sortedKeys(Z.ringCells(S, h.id)), before); ok(Object.keys(Z.c(S).ring).every(k => Z.c(S).ring[k].length === 1), 'no shared hexes left');
-  ok(Z.move(S, h2.id, spot[0], spot[1], spot[2]).ok, 'moved back');
-  // selling: only the hexes no other habitat needs go
-  ok(Z.remove(S, h2.id).ok); eq(sortedKeys(Z.ringCells(S)), before, 'after the sale only the first habitat\'s ring is left'); eq(sortedKeys(Z.ringCells(S, h2.id)), []);
-  ok(Z.remove(S, h.id).ok); eq(Z.ringCells(S), [], 'no habitats, no ring');
-  return ring.length + ' ring hexes around a Savanna habitat, ' + shared.length + ' shared with a neighbour';
+  const r = Z.build(S, 'hab', 'savanna', at.hab.q, at.hab.r, 0); ok(r.ok); eq(S.money, m0 - D.BIOMES.savanna.hab, 'nothing extra to pay');
+  const h = Z.item(S, r.id), occ = Z.occupancy(S);
+  eq(Object.keys(occ).sort(), sortedKeys(Z.cells(h)), 'the footprint is the habitat\'s own hexes only'); eq(Z.cells(h).length, D.SHAPES.savanna.length);
+  eq(Z.ringCells(S), []); eq(Z.ringCells(S, h.id), []); eq(Z.ringAt(S, 'savanna', at.hab.q, at.hab.r, 0, h.id), []); eq(Z.c(S).ring, {});
+  Z.cells(h).forEach(c => Z.DIRS.forEach(d => ok(!Z.isRing(S, c[0] + d[0], c[1] + d[1]), 'no ring hex anywhere')));
+  // every free hex bordering it is still free land: a bench may stand on each one
+  let free = 0; const seenB = {}; Z.cells(h).forEach(c => Z.DIRS.forEach(d => { const q = c[0] + d[0], r2 = c[1] + d[1]; if (!seenB[q + ',' + r2] && (seenB[q + ',' + r2] = 1) && !occ[q + ',' + r2] && Z.inLand(S, q, r2) && !Z.isEntrance(q, r2)) { free++; eq(Z.placeCheck(S, 'fac', 'bench', q, r2, 0), { ok: true }, 'a bench right against the habitat'); } }));
+  ok(free >= 6, free + ' free hexes round it');
+  // the starter Snack Stand touches the habitat again
+  const sn = Z.build(S, 'fac', 'snack', at.snack.q, at.snack.r, 0); ok(sn.ok, 'the starter Snack Stand spot is free'); ok(touches(S, h, Z.item(S, sn.id)), 'the starter Snack Stand touches the habitat');
+  ok(!('ring' in JSON.parse(Z.serialize(S))) && !S.items.some(i => 'ring' in i), 'nothing about walkways is stored');
+  return free + ' free bordering hexes, all buildable';
 });
 
-check('habitats can never touch and no building ever stands on a walkway (6 maps x 300 random builds, moves and sales; then every spot)', () => {
-  let built = 0, refused = 0, spots = 0;
+check('habitats may touch each other and buildings; a building closed in by habitats is allowed (6 maps x 300 random builds, moves and sales; then every spot)', () => {
+  let built = 0, refused = 0, spots = 0, habTouch = 0, facTouch = 0;
   const why = {};
   for (let t = 0; t < 6; t++) {
-    const S = rich(NG()); S.rows = t % 2 ? D.GRID_H : 12; ringsWhole(S);
+    const S = rich(NG()); S.rows = t % 2 ? D.GRID_H : 12;
     const facs = D.FAC_ORDER.filter(f => !D.FAC[f].limit);
     for (let i = 0; i < 300; i++) {
       const kind = Math.random() < 0.45 ? 'hab' : 'fac', tt = kind === 'hab' ? D.BIOME_ORDER[Math.floor(Math.random() * D.BIOME_ORDER.length)] : facs[Math.floor(Math.random() * facs.length)];
@@ -599,60 +588,63 @@ check('habitats can never touch and no building ever stands on a walkway (6 maps
       if (roll < 0.7 || !S.items.length) { const pc = Z.placeCheck(S, kind, tt, a[0], a[1], rot), r = Z.build(S, kind, tt, a[0], a[1], rot); eq(r.ok, pc.ok, 'build agrees with placeCheck'); if (r.ok) built++; else { refused++; why[pc.why] = 1; ok(r.msg === pc.msg && pc.cells.length > 0); } }
       else if (roll < 0.9) { const it = S.items[Math.floor(Math.random() * S.items.length)], pc = Z.placeCheck(S, it.k, it.t, a[0], a[1], rot, it.id); eq(Z.move(S, it.id, a[0], a[1], rot).ok, pc.ok, 'move agrees with placeCheck'); }
       else { const it = S.items[Math.floor(Math.random() * S.items.length)]; Z.remove(S, it.id); }
-      ringsWhole(S);
-      S.items.forEach(h => { if (h.k === 'hab') eq(sortedKeys(Z.ringCells(S, h.id)), borderOf(S, h), 'ring of every habitat'); });
     }
-    // every spot the engine calls legal really keeps the rule
+    const hs = S.items.filter(i => i.k === 'hab');
+    hs.forEach(h => S.items.forEach(o => { if (o.id !== h.id && touches(S, h, o)) { if (o.k === 'hab') habTouch++; else facTouch++; ok(Z.c(S).nb[h.id].some(x => x.id === o.id), 'touching counts as next to'); } }));
+    // every spot is legal exactly when its hexes are owned, free and not the gate
     const occ = Z.occupancy(S);
-    D.BIOME_ORDER.forEach(b => allSpots(S, 'hab', b, (q, r, rot) => { if (!Z.canPlace(S, 'hab', b, q, r, rot)) return; spots++; const cells = Z.cellsOf('hab', b, q, r, rot), own = {}; cells.forEach(c => { own[keyOf(c)] = 1; }); cells.forEach(c => { ok(Z.inLand(S, c[0], c[1]) && !occ[keyOf(c)] && !Z.isEntrance(c[0], c[1])); Z.DIRS.forEach(d => { const k = (c[0] + d[0]) + ',' + (c[1] + d[1]); ok(own[k] || !occ[k], 'a legal habitat spot touches something'); }); }); }));
-    allSpots(S, 'fac', 'bench', (q, r) => { if (Z.canPlace(S, 'fac', 'bench', q, r, 0)) { spots++; ok(!Z.isRing(S, q, r), 'a legal building spot is on a ring'); } else if (Z.isRing(S, q, r) && !Z.isEntrance(q, r)) eq(Z.placeCheck(S, 'fac', 'bench', q, r, 0).why, 'ring'); });
+    D.BIOME_ORDER.forEach(b => allSpots(S, 'hab', b, (q, r, rot) => { const fine = Z.cellsOf('hab', b, q, r, rot).every(c => Z.inLand(S, c[0], c[1]) && !occ[keyOf(c)] && !Z.isEntrance(c[0], c[1])); eq(Z.canPlace(S, 'hab', b, q, r, rot), fine, 'habitat spot ' + b + ' ' + q + ',' + r + ' rot ' + rot); if (fine) spots++; }));
+    allSpots(S, 'fac', 'bench', (q, r) => { const fine = Z.inLand(S, q, r) && !occ[q + ',' + r] && !Z.isEntrance(q, r); eq(Z.canPlace(S, 'fac', 'bench', q, r, 0), fine, 'bench spot ' + q + ',' + r); if (fine) spots++; });
   }
-  ['land', 'taken', 'touch', 'crowd', 'ring'].forEach(k => ok(why[k], 'never saw the refusal reason ' + k));
-  return built + ' built, ' + refused + ' refused, ' + spots + ' legal spots checked';
+  Object.keys(why).forEach(k => ok(['land', 'entrance', 'taken'].indexOf(k) >= 0, 'unexpected refusal reason ' + k));
+  ['land', 'taken'].forEach(k => ok(why[k], 'never saw the refusal reason ' + k));
+  ok(habTouch > 0 && facTouch > 0, 'touching habitats ' + habTouch + ', buildings against habitats ' + facTouch);
+  // a building with habitats on every side is allowed (visitors reach it along the habitats' border walkways)
+  const B = rich(Z.newGame()); B.rows = D.GRID_H; const mid = Z.fromOffset(6, D.GRID_H - 6); ok(Z.build(B, 'fac', 'bench', mid[0], mid[1], 0).ok);
+  for (const d of Z.DIRS) {
+    const q = mid[0] + d[0], r = mid[1] + d[1]; if (Z.occupancy(B)[q + ',' + r]) continue; let done = false;
+    for (let rot = 0; rot < 6 && !done; rot++) for (const o of D.SHAPES.savanna) { const p = Z.rot(o[0], o[1], rot), aq = q - p[0], ar = r - p[1]; if (Z.canPlace(B, 'hab', 'savanna', aq, ar, rot)) { done = Z.build(B, 'hab', 'savanna', aq, ar, rot).ok; break; } }
+  }
+  ok(Z.DIRS.every(d => Z.occupancy(B)[(mid[0] + d[0]) + ',' + (mid[1] + d[1])]), 'the bench is closed in on all six sides by habitats');
+  return built + ' built, ' + refused + ' refused, ' + spots + ' legal spots checked, ' + habTouch + ' touching habitat pairs';
 });
 
-check('placeCheck says why not: land, entrance, taken, touch, crowd, ring; where it stands is always fine', () => {
+check('placeCheck says why not: land, entrance, taken (nothing else); where it stands is always fine', () => {
   const S = rich(NG()), h = S.items[0], snack = S.items[1], e = Z.entrance(S), c0 = Z.cells(h)[0];
   eq(Z.placeCheck(S, 'fac', 'bench', 0, 0, 0).why, 'land'); eq(Z.placeCheck(S, 'fac', 'bench', e.q, e.r, 0).why, 'entrance'); eq(Z.placeCheck(S, 'fac', 'bench', c0[0], c0[1], 0).why, 'taken'); eq(Z.placeCheck(S, 'fac', 'bench', snack.q, snack.r, 0).why, 'taken');
-  const ring = Z.ringCells(S, h.id); eq(Z.placeCheck(S, 'fac', 'bench', ring[0][0], ring[0][1], 0).why, 'ring');
-  let touch = 0, crowd = 0; allSpots(S, 'hab', 'savanna', (q, r, rot) => { const pc = Z.placeCheck(S, 'hab', 'savanna', q, r, rot); if (pc.why === 'touch') { touch++; ok(pc.cells.every(c => Z.c(S).occ[keyOf(c)] === h.id), 'cells = the habitat hexes in the way'); } if (pc.why === 'crowd') { crowd++; ok(pc.cells.every(c => Z.c(S).occ[keyOf(c)] === snack.id)); } if (!pc.ok) ok(pc.msg.length <= 36 && !Z.canPlace(S, 'hab', 'savanna', q, r, rot)); else eq(pc, { ok: true }); });
-  ok(touch > 0 && crowd > 0, 'touch ' + touch + ', crowd ' + crowd);
+  let beside = 0; allSpots(S, 'hab', 'savanna', (q, r, rot) => { const pc = Z.placeCheck(S, 'hab', 'savanna', q, r, rot); if (!pc.ok) { ok(['land', 'entrance', 'taken'].indexOf(pc.why) >= 0 && pc.msg.length <= 36 && !Z.canPlace(S, 'hab', 'savanna', q, r, rot)); return; } eq(pc, { ok: true }); if (Z.cellsOf('hab', 'savanna', q, r, rot).some(c => Z.DIRS.some(d => Z.c(S).occ[(c[0] + d[0]) + ',' + (c[1] + d[1])]))) beside++; });
+  ok(beside > 0, beside + ' legal habitat spots right against the starter');
   eq(Z.placeCheck(S, 'hab', 'savanna', h.q, h.r, h.rot, h.id), { ok: true }); eq(Z.placeCheck(S, 'fac', 'snack', snack.q, snack.r, 0, snack.id), { ok: true });
   ok(Z.move(S, h.id, h.q, h.r, h.rot).ok, 'moving something onto its own spot');
 });
 
-check('"next to" reaches across the walkway: facility bonuses, facility combos and habitat pairs all still work', () => {
+check('"next to" is plain touching again: facility bonuses, facility combos and habitat pairs', () => {
   const S = rich(NG()), h = S.items[0], d0 = Z.c(S).hab[h.id].draw; S.reports = [];
   ok(Z.c(S).nb[h.id].some(o => o.t === 'snack'), 'the starter snack stand counts as next to the habitat');
-  let spot = null; for (const c of Z.ringCells(S, h.id)) for (const d of Z.DIRS) if (!spot && Z.canPlace(S, 'fac', 'bench', c[0] + d[0], c[1] + d[1], 0)) spot = [c[0] + d[0], c[1] + d[1]];
+  let spot = null; for (const c of Z.cells(h)) for (const d of Z.DIRS) if (!spot && Z.canPlace(S, 'fac', 'bench', c[0] + d[0], c[1] + d[1], 0)) spot = [c[0] + d[0], c[1] + d[1]];
   const ghost = { id: -1, k: 'fac', t: 'bench', q: spot[0], r: spot[1], rot: 0 }; ok(Z.layout(S, S.items.concat([ghost])).active.some(a => a.id === 'picnic'), 'layout preview shows the combo');
-  ok(Z.build(S, 'fac', 'bench', spot[0], spot[1], 0).ok); ok(Z.c(S).active.some(a => a.id === 'picnic' && a.anchor === h.id), 'Safari Picnic across the walkway'); ok(S.reports.some(r => r.type === 'combo' && r.id === 'picnic'));
+  ok(Z.build(S, 'fac', 'bench', spot[0], spot[1], 0).ok); ok(Z.c(S).active.some(a => a.id === 'picnic' && a.anchor === h.id), 'Safari Picnic with the bench against the habitat'); ok(S.reports.some(r => r.type === 'combo' && r.id === 'picnic'));
   ok(Z.c(S).hab[h.id].adj >= D.FAC.bench.adjDraw - 1e-9 && Z.c(S).hab[h.id].draw > d0, 'the bench lifts the habitat');
-  // a facility two walkways away is not next to it
-  const T = rich(NG()), th = T.items[0]; let farSpot = null; allSpots(T, 'fac', 'bench', (q, r) => { if (!farSpot && Z.canPlace(T, 'fac', 'bench', q, r, 0) && !Z.ringCells(T, th.id).some(c => Z.DIRS.some(d => c[0] + d[0] === q && c[1] + d[1] === r))) { farSpot = [q, r]; } });
-  const fb = Z.build(T, 'fac', 'bench', farSpot[0], farSpot[1], 0); ok(fb.ok); ok(!Z.c(T).nb[th.id].some(o => o.id === fb.id) && !Z.c(T).active.some(a => a.id === 'picnic'), 'too far away to count');
-  // near misses point at spots that are legal and complete the combo
+  // a facility one hex away (not touching) is not next to it any more
+  const T = rich(NG()), th = T.items[0]; let farSpot = null;
+  for (const c of Z.cells(th)) for (const d of Z.DIRS) for (const e of Z.DIRS) { const q = c[0] + d[0] + e[0], r = c[1] + d[1] + e[1]; if (!farSpot && Z.canPlace(T, 'fac', 'bench', q, r, 0) && !T.items.some(it => touches(T, it, { k: 'fac', t: 'bench', q: q, r: r, rot: 0 }))) farSpot = [q, r]; }
+  const fb = Z.build(T, 'fac', 'bench', farSpot[0], farSpot[1], 0); ok(fb.ok); ok(!Z.c(T).nb[th.id].some(o => o.id === fb.id) && !Z.c(T).active.some(a => a.id === 'picnic'), 'one hex away does not count');
+  // near misses point at spots that are legal, touch the habitat and complete the combo
   const N = rich(NG()); N.knownCombos.picnic = true; const nm = Z.nearMisses(N).find(x => x.combo === 'picnic'); ok(nm && nm.fac === 'bench' && nm.cells.length > 0, 'near miss listed');
-  nm.cells.forEach(c => { ok(Z.canPlace(N, 'fac', 'bench', c[0], c[1], 0), 'near-miss spot is legal'); ok(Z.layout(N, N.items.concat([{ id: -1, k: 'fac', t: 'bench', q: c[0], r: c[1], rot: 0 }])).active.some(a => a.id === 'picnic'), 'near-miss spot completes it'); });
-  // habitat pairs: Ice and Fire with one walkway between them
+  nm.cells.forEach(c => { ok(Z.canPlace(N, 'fac', 'bench', c[0], c[1], 0), 'near-miss spot is legal'); ok(touches(N, N.items[0], { k: 'fac', t: 'bench', q: c[0], r: c[1], rot: 0 }), 'near-miss spot touches'); ok(Z.layout(N, N.items.concat([{ id: -1, k: 'fac', t: 'bench', q: c[0], r: c[1], rot: 0 }])).active.some(a => a.id === 'picnic'), 'near-miss spot completes it'); });
+  // habitat pairs: Ice and Fire with the two habitats touching
   const P = rich(Z.newGame()); P.rows = D.GRID_H; const a = firstSpot(P, 'hab', 'arctic'); const ar = Z.build(P, 'hab', 'arctic', a[0], a[1], a[2]); ok(ar.ok);
   let ds = null; allSpots(P, 'hab', 'desert', (q, r, rot) => { if (!ds && Z.canPlace(P, 'hab', 'desert', q, r, rot) && Z.layout(P, P.items.concat([{ id: -1, k: 'hab', t: 'desert', q: q, r: r, rot: rot }])).active.some(x => x.id === 'icefire')) ds = [q, r, rot]; });
-  ok(ds, 'a desert spot one walkway from the polar habitat'); ok(Z.build(P, 'hab', 'desert', ds[0], ds[1], ds[2]).ok); ok(Z.c(P).active.some(x => x.id === 'icefire'), 'Ice and Fire'); ringsWhole(P);
+  ok(ds, 'a desert spot touching the polar habitat'); const dr = Z.build(P, 'hab', 'desert', ds[0], ds[1], ds[2]); ok(dr.ok); ok(touches(P, Z.item(P, ar.id), Z.item(P, dr.id)), 'they touch'); ok(Z.c(P).active.some(x => x.id === 'icefire'), 'Ice and Fire');
 });
 
-check('a layout built before R7 (things touching) loads untouched, keeps its bonuses, and gets rings on its free bordering hexes', () => {
-  const S = rich(NG()), h = S.items[0]; let bq = null;
-  for (const c of Z.cells(h)) for (const d of Z.DIRS) { const q = c[0] + d[0], r = c[1] + d[1]; if (!bq && Z.inLand(S, q, r) && !Z.c(S).occ[q + ',' + r] && !Z.isEntrance(q, r)) bq = [q, r]; }
-  const bench = { id: S.nextId++, k: 'fac', t: 'bench', q: bq[0], r: bq[1], rot: 0 }; S.items.push(bench); // the old way: a bench right against the fence
-  let hs = null; allSpots(S, 'hab', 'savanna', (q, r, rot) => { if (hs) return; const cells = Z.cellsOf('hab', 'savanna', q, r, rot), occ = Z.occupancy(S); if (cells.every(c => Z.inLand(S, c[0], c[1]) && !occ[keyOf(c)] && !Z.isEntrance(c[0], c[1])) && cells.some(c => Z.DIRS.some(d => occ[(c[0] + d[0]) + ',' + (c[1] + d[1])] === h.id))) hs = [q, r, rot]; });
-  const h2 = { id: S.nextId++, k: 'hab', t: 'savanna', n: 2, q: hs[0], r: hs[1], rot: hs[2], lvl: 1, buzz: 0, buzzAt: 0, lastTheme: null, eventAt: -99 }; S.items.push(h2); S.habN.savanna = 2; // and a habitat touching the first
-  Z.refresh(S); const str = Z.serialize(S), L = Z.deserialize(str); ok(L, 'loads'); eq(L.items, JSON.parse(str).items, 'layout untouched'); eq(Z.serialize(L), str, 'round trip is exact');
-  L.items.forEach(it => { if (it.k === 'hab') eq(sortedKeys(Z.ringCells(L, it.id)), borderOf(L, it), 'ring on the free bordering hexes'); });
-  ok(!Z.isRing(L, bench.q, bench.r), 'the old bench is not a ring hex'); ok(Z.c(L).nb[h.id].some(o => o.id === bench.id) && Z.c(L).nb[h.id].some(o => o.id === h2.id), 'touching still counts as next to');
-  ok(Z.c(L).active.some(a => a.id === 'picnic'), 'the old Safari Picnic still stands'); ok(Z.c(L).hab[h.id].adj > 0);
-  ok(Z.move(L, bench.id, bench.q, bench.r).ok && Z.move(L, h2.id, h2.q, h2.r, h2.rot).ok, 'old items may stay where they are');
-  const ring = Z.ringCells(L, h.id); ok(!Z.move(L, bench.id, ring[0][0], ring[0][1]).ok, 'but a move must follow the new rule');
-  tickN(L, 30); eq(L.week, S.week + 30); ok(Z.remove(L, bench.id).ok); ok(Z.isRing(L, bench.q, bench.r), 'once the old bench is sold its hex becomes walkway');
+check('a layout built under Update 7 (a gap round the habitat, the Snack Stand one hex out) loads untouched and keeps working', () => {
+  const S = rich(Z.newGame()), at = Z.starterSpots(); ok(Z.build(S, 'hab', 'savanna', at.hab.q, at.hab.r, 0).ok); ok(Z.build(S, 'fac', 'snack', at.snack.q + 1, at.snack.r, 0).ok);
+  const str = Z.serialize(S), L = Z.deserialize(str); ok(L, 'loads'); eq(L.items, JSON.parse(str).items, 'layout untouched'); eq(Z.serialize(L), str, 'round trip is exact');
+  L.items.forEach(it => ok(Z.placeCheck(L, it.k, it.t, it.q, it.r, it.rot, it.id).ok, 'every old item may stay where it is'));
+  ok(!Z.c(L).nb[L.items[0].id].some(o => o.k === 'fac'), 'a Snack Stand one hex out is not next to the habitat');
+  ok(Z.move(L, L.items[1].id, at.snack.q, at.snack.r, 0).ok && Z.c(L).nb[L.items[0].id].some(o => o.k === 'fac'), 'moved against the habitat it counts again');
+  tickN(L, 30); eq(L.week, S.week + 30);
 });
 
 check('bestOf: the best of two or more of the same species and sex; habAnimals: who lives where, in display order', () => {

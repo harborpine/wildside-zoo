@@ -28,9 +28,9 @@ async function run(name) {
   const lastTap = () => page.evaluate(() => RT.taps[RT.taps.length - 1] || null);
   const tapCount = () => page.evaluate(() => RT.taps.length);
 
-  // Update 7: nothing may stand against a habitat (walkway ring), so the harness's own "touching" facility spots are refused by the
-  // engine now. The five demo facilities are built here instead, one hex out across the walkway, through the real engine.
-  { const built = await page.evaluate(rsetup.facSetup); ok(built.length === 5, 'the five demo facilities should all find a legal spot one hex out from a habitat, built: ' + JSON.stringify(built)); notes.push('demo facilities built across the walkway: ' + built.join(', ')); }
+  // The harness page looks for its facility spots with the Update 7 ring (now always empty), so the five demo facilities are
+  // built here instead, right against their habitats (Update 8), through the real engine.
+  { const built = await page.evaluate(rsetup.facSetup); ok(built.length === 5, 'the five demo facilities should all find a legal spot against a habitat, built: ' + JSON.stringify(built)); notes.push('demo facilities built across the walkway: ' + built.join(', ')); }
   await page.evaluate(() => ZRender.watchAlpha(true)); // nothing on the floor may be drawn see-through (checked at the end)
   await sleep(3500);
   const d0 = await dbg(), K = await page.evaluate(() => ZGeo.DENSITY || 1); // K = buffer pixels per old art pixel (2 with the style-D art)

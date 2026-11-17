@@ -314,7 +314,7 @@ const say = (...a) => { const s = a.join(' '); console.log(s); out.push(s); };
     if (g0.p && !g0.p.ok) T.find('place:ghost-starts-invalid', 'the placement ghost starts on an invalid spot ("' + g0.p.msg + '") so the first Place tap does nothing until the player moves it', 'tester-' + T.tag + '-place-' + label + '-start.png');
     const cands = await page.evaluate(() => {
       const S = ZT.S, res = []; const hab = S.items.filter(i => i.k === 'hab' && i.t === 'savanna'); const near = new Set();
-      for (const h of hab) for (const c of ZE.ringCells(S, h.id)) for (const d of ZE.DIRS) near.add((c[0] + d[0]) + ',' + (c[1] + d[1]));   // Update 7: "next to" a habitat now means across its walkway ring
+      for (const h of hab) for (const c of ZE.cells(h)) for (const d of ZE.DIRS) near.add((c[0] + d[0]) + ',' + (c[1] + d[1]));   // Update 8: "next to" a habitat is plain touching again; was: across its walkway ring
       const fid = ZRender.debug().placement && ZRender.debug().placement.t;
       for (let r = -2; r < 25; r++) for (let q = -12; q < 14; q++) {
         if (!ZE.inGrid(q, r) || !ZE.inLand(S, q, r)) continue; const p = ZRender.hexToClient(q, r); if (!p || !(p.x > 30 && p.x < 360 && p.y > 90 && p.y < 640)) continue;

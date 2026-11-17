@@ -161,6 +161,55 @@
   // ---------------------------------------------------------------- the map cache (floor, statics, walk graph)
   const toCol = (q, r) => Z.toCol ? Z.toCol(q, r) : q + (r - (r & 1)) / 2;
   const fromOffset = (c, r) => Z.fromOffset ? Z.fromOffset(c, r) : [c - (r - (r & 1)) / 2, r];
+  // ---------------------------------------------------------------- habitat border walkways (Update 8)
+  // Every habitat has a narrow walkway strip just inside its outer edge, within its own hexes; the fence stands on the inner side of
+  // the strip. Where two habitats touch, their strips meet into one shared walkway. A hex's strip depends only on which of its six
+  // edges are outer (mask bit ei = edge G.EDGES[ei] faces something that is not this habitat). STRIP_T = strip width as a share of
+  // the distance from the hex centre to an edge. edgeG(x, y, ei) = 1 at the hex centre, 0 on edge ei (x, y relative to the centre).
+  const STRIP_T = 0.27, GDET = G.A[0] * G.B[1] - G.B[0] * G.A[1];
+  function edgeG(x, y, ei) { const qf = (x * G.B[1] - y * G.B[0]) / GDET, rf = (y * G.A[0] - x * G.A[1]) / GDET, d = G.EDGES[ei][0]; return 1 - (qf * d[0] + rf * d[1] + (qf + rf) * (d[0] + d[1])); }
+  function onStrip(x, y, mask) { for (let ei = 0; ei < 6; ei++) if ((mask >> ei) & 1 && edgeG(x, y, ei) < STRIP_T) return true; return false; }
+  function insideFence(x, y, mask, extra) { for (let ei = 0; ei < 6; ei++) if ((mask >> ei) & 1 && edgeG(x, y, ei) < STRIP_T + (extra || 0)) return false; return true; }
+  const habMaskOf = (cellSet, q, r) => { let m = 0; G.EDGES.forEach((e, ei) => { if (!cellSet[key(q + e[0][0], r + e[0][1])]) m |= 1 << ei; }); return m; };
+  // where the strip's inner edge (h = STRIP_T, the fence line) or its middle (h = STRIP_T / 2, where people walk) meets a corner:
+  // at an outer corner it is pulled toward the hex centre; where the habitat's edge turns into its next hex it slides along the shared edge
+  function stripCorner(ci, prevOuter, h) { const C = G.CORNERS, V = C[ci], W = prevOuter ? [0, 0] : C[(ci + 5) % 6]; return [V[0] + h * (W[0] - V[0]), V[1] + h * (W[1] - V[1])]; }
+  function stripEnds(ei, mask, h) { const i = G.EDGES[ei][1], j = G.EDGES[ei][2], C = G.CORNERS;
+    const a = stripCorner(i, (mask >> ((ei + 5) % 6)) & 1, h);
+    const nOut = (mask >> ((ei + 1) % 6)) & 1, Vj = C[j], Wj = nOut ? [0, 0] : C[(j + 1) % 6], b = [Vj[0] + h * (Wj[0] - Vj[0]), Vj[1] + h * (Wj[1] - Vj[1])];
+    return [a, b]; }
+  const stripCache = {};
+  function stripSprite(mask) { // the path pixels of one hex's strip (top face only), solid; empty elsewhere
+    const kk = mask + '|' + (ready('tile') ? 1 : 0); if (stripCache[kk]) return stripCache[kk];
+    const tl = spr('tile', 'path', 0); let src = null; try { src = tl.c.getContext('2d').getImageData(0, 0, tl.c.width, tl.c.height); } catch (e) { src = null; }
+    return (stripCache[kk] = mk(W, HH * 2, HW, HH, x => {
+      const img = x.createImageData(W, HH * 2), d = img.data;
+      for (let y = -HH; y < HH; y++) { const sp = hexSpan(y); for (let px = sp[0]; px < sp[1]; px++) {
+        if (!onStrip(px + 0.5, y + 0.5, mask)) continue;
+        const o = ((y + HH) * W + px + HW) * 4; let rr = 0xdc, gg = 0xc8, bb = 0x98;
+        if (src) { const sx = Math.round(tl.ax) + px, sy = Math.round(tl.ay) + y; if (sx >= 0 && sy >= 0 && sx < src.width && sy < src.height) { const so = (sy * src.width + sx) * 4; if (src.data[so + 3] > 200) { rr = src.data[so]; gg = src.data[so + 1]; bb = src.data[so + 2]; } } }
+        // a darker kerb along the fence side so the walkway reads as a tidy path
+        if (onStrip(px + 0.5, y + 0.5, mask) && !onStripInner(px + 0.5, y + 0.5, mask)) { rr = Math.round(rr * 0.82); gg = Math.round(gg * 0.8); bb = Math.round(bb * 0.76); }
+        d[o] = rr; d[o + 1] = gg; d[o + 2] = bb; d[o + 3] = 255; } }
+      x.putImageData(img, 0, 0);
+    }));
+  }
+  function onStripInner(x, y, mask) { for (let ei = 0; ei < 6; ei++) if ((mask >> ei) & 1 && edgeG(x, y, ei) < STRIP_T - 0.07) return true; return false; }
+  const fenceCache = {};
+  // The habitat's own fence sprite for edge ei, moved in to the strip's inner edge and cut or lengthened to meet its neighbours there:
+  // two copies of the original picture, one lined up on each end, each kept on its own side of the middle (whole pixel columns).
+  function insetFence(biome, ei, mask) {
+    const s = spr('fence', biome, ei), kk = biome + '|' + ei + '|' + (((mask >> ((ei + 5) % 6)) & 1) * 2 + ((mask >> ((ei + 1) % 6)) & 1)) + '|' + (ready('fence') ? 1 : 0);
+    if (fenceCache[kk]) return fenceCache[kk];
+    const ca = G.CORNERS[G.EDGES[ei][1]], cb = G.CORNERS[G.EDGES[ei][2]], ends = stripEnds(ei, mask, STRIP_T), pa = ends[0], pb = ends[1];
+    const dA = [Math.round(pa[0] - ca[0]), Math.round(pa[1] - ca[1])], dB = [Math.round(pb[0] - cb[0]), Math.round(pb[1] - cb[1])];
+    const m = Math.ceil(STRIP_T * HW) + 4 * K, w = s.c.width, h = s.c.height, split = Math.round(s.ax + m + (pa[0] + pb[0]) / 2);
+    const out = mk(w + 2 * m, h + 2 * m, s.ax + m, s.ay + m, x => {
+      const part = (d, lo, hi) => { const x0 = Math.max(lo, m + d[0]), x1 = Math.min(hi, m + d[0] + w); if (x1 > x0) x.drawImage(s.c, x0 - m - d[0], 0, x1 - x0, h, x0, m + d[1], x1 - x0, h); };
+      if (pa[0] <= pb[0]) { part(dA, 0, split); part(dB, split, w + 2 * m); } else { part(dB, 0, split); part(dA, split, w + 2 * m); }
+    });
+    out.sortDy = (pa[1] + pb[1]) / 2; return (fenceCache[kk] = out);
+  }
   function inGrid(S, q, r) {
     if (typeof Z.inGrid === 'function') { try { return !!(Z.inGrid.length >= 3 ? Z.inGrid(S, q, r) : Z.inGrid(q, r)); } catch (e) { /* fall through */ } }
     const c = toCol(q, r); return r >= 0 && r < D.GRID_H && c >= 0 && c < D.GRID_W;
@@ -187,7 +236,7 @@
   function chain(dj, to) { const out = []; let k = to; while (k != null) { out.push(k); k = dj.prev[k]; } return out.reverse(); }
   function route(a, b) {
     if (!M.nodes[a] || !M.nodes[b]) return null;
-    const dj = M.routes[a] || (M.routes[a] = dijkstra(M, a, k => M.path[k] ? 1 : 3));
+    const dj = M.routes[a] || (M.routes[a] = dijkstra(M, a, k => M.nodes[k].strip ? 0.5 : M.path[k] ? 1 : 3));
     return dj.dist[b] == null ? null : chain(dj, b);
   }
 
@@ -228,9 +277,32 @@
     cells.forEach(c => { if (c.owned && !m.occ[c.k]) m.nodes[c.k] = c; });
     if (ent && !m.nodes[ent.k] && !m.occ[ent.k]) m.nodes[ent.k] = ent;
     Object.keys(m.nodes).forEach(k => { const c = m.nodes[k]; c.nb = []; DIR6.forEach(d => { const nk = key(c.q + d[0], c.r + d[1]); if (m.nodes[nk]) c.nb.push(nk); }); });
-    // walkway rings (R7): every free owned hex bordering a habitat is walkway. The engine works them out; here they are ordinary path.
-    m.ring = {}; try { if (typeof Z.ringCells === 'function') (Z.ringCells(S) || []).forEach(c => { const k = key(c[0], c[1]); if (m.nodes[k]) m.ring[k] = 1; }); } catch (e) { m.ring = {}; }
-    for (const k in m.ring) if (!ent || k !== ent.k) m.path[k] = 1;
+    // border walkways (Update 8): every habitat's border strip is part of the walk graph. Nodes sit on the middle line of the strip, one
+    // at the middle of each outer edge and one at each corner; they link to the free hex outside that edge and, where two habitats
+    // touch, straight across to the other habitat's strip. Nobody ever walks inside a fence.
+    m.habMask = {}; m.edgeNode = {}; m.stripN = 0;
+    (S.items || []).forEach(it => { if (it.k !== 'hab') return; const set = {}, cs = itemCells(it); cs.forEach(c => { set[key(c[0], c[1])] = 1; }); cs.forEach(c => { m.habMask[key(c[0], c[1])] = { id: it.id, mask: habMaskOf(set, c[0], c[1]) }; }); });
+    {
+      const HS = STRIP_T / 2, sNode = (x, y, q, r) => { const k = 's' + x.toFixed(1) + ',' + y.toFixed(1); return m.nodes[k] || (m.nodes[k] = { k: k, x: x, y: y, q: q, r: r, nb: [], strip: true }); };
+      const link = (a, b) => { if (a === b) return; if (a.nb.indexOf(b.k) < 0) a.nb.push(b.k); if (b.nb.indexOf(a.k) < 0) b.nb.push(a.k); };
+      for (const hk in m.habMask) {
+        const hm = m.habMask[hk], qr = hk.split(',').map(Number), p = G.toScreen(qr[0], qr[1]);
+        G.EDGES.forEach((e, ei) => {
+          if (!((hm.mask >> ei) & 1)) return;
+          const C = G.CORNERS, i = e[1], j = e[2], at = (V, Wd) => sNode((p.x + V[0]) + HS * Wd[0], (p.y + V[1]) + HS * Wd[1], qr[0], qr[1]);
+          const prevOut = (hm.mask >> ((ei + 5) % 6)) & 1, nextOut = (hm.mask >> ((ei + 1) % 6)) & 1;
+          const a = at(C[i], prevOut ? [-C[i][0], -C[i][1]] : [C[(i + 5) % 6][0] - C[i][0], C[(i + 5) % 6][1] - C[i][1]]);
+          const b = at(C[j], nextOut ? [-C[j][0], -C[j][1]] : [C[(j + 1) % 6][0] - C[j][0], C[(j + 1) % 6][1] - C[j][1]]);
+          const mx = (C[i][0] + C[j][0]) / 2 * (1 - HS), my = (C[i][1] + C[j][1]) / 2 * (1 - HS), n = sNode(p.x + mx, p.y + my, qr[0], qr[1]);
+          link(n, a); link(n, b); m.edgeNode[hk + ',' + ei] = n; m.stripN++;
+          const ok2 = key(qr[0] + e[0][0], qr[1] + e[0][1]), out = m.nodes[ok2]; if (out && !out.strip) link(n, out);
+        });
+      }
+      for (const ek in m.edgeNode) { // two touching habitats: their strips meet
+        const pr = ek.split(',').map(Number), d = G.EDGES[pr[2]][0], o = m.edgeNode[key(pr[0] + d[0], pr[1] + d[1]) + ',' + ((pr[2] + 3) % 6)];
+        if (o) link(m.edgeNode[ek], o);
+      }
+    }
     // a short road leading in from outside the map
     m.road = [];
     if (ent) { // step to whichever down-screen neighbour keeps the road straight below the gate
@@ -246,17 +318,22 @@
       order.sort((a, b) => { const pa = G.toScreen(a.q, a.r), pb = G.toScreen(b.q, b.r); return (Math.abs(pa.x - ent.x) + Math.abs(pa.y - ent.y) * 2) - (Math.abs(pb.x - ent.x) + Math.abs(pb.y - ent.y) * 2); });
       order.forEach(it => {
         const cands = [];
-        itemCells(it).forEach(c => { const cp = G.toScreen(c[0], c[1]); DIR6.forEach(d => { const nk = key(c[0] + d[0], c[1] + d[1]); if (m.nodes[nk] && nk !== ent.k) cands.push({ k: nk, cx: cp.x, cy: cp.y }); }); });
-        const info = { it: it, stands: [], main: null, cands: cands }; m.dests.push(info);
+        const own = [];
+        itemCells(it).forEach(c => { const cp = G.toScreen(c[0], c[1]); DIR6.forEach((d, ei) => {
+          const nk = key(c[0] + d[0], c[1] + d[1]); if (m.nodes[nk] && nk !== ent.k) cands.push({ k: nk, cx: cp.x, cy: cp.y });
+          if (it.k === 'hab') { const sn = m.edgeNode[key(c[0], c[1]) + ',' + ei]; if (sn) own.push({ k: sn.k, cx: cp.x, cy: cp.y, strip: true }); }
+          else { const sn = m.edgeNode[nk + ',' + ((ei + 3) % 6)]; if (sn) cands.push({ k: sn.k, cx: cp.x, cy: cp.y, strip: true }); } }); });
+        if (!cands.length) own.forEach(o => cands.push(o)); // a habitat closed in on every side is looked at from its own strip
+        const info = { it: it, stands: [], main: null, cands: cands, own: own }; m.dests.push(info);
         if (!cands.length) return;
-        const dj = dijkstra(m, ent.k, k => (m.path[k] ? 0.3 : 1) + hash(m.nodes[k].q, m.nodes[k].r, 5) * 0.05);
+        const dj = dijkstra(m, ent.k, k => (m.nodes[k].strip ? 0.6 : m.path[k] ? 0.3 : 1) + hash(m.nodes[k].q, m.nodes[k].r, 5) * 0.05);
         let best = null; cands.forEach(c => { if (dj.dist[c.k] != null && (!best || dj.dist[c.k] < dj.dist[best.k])) best = c; });
         if (!best) return;
         chain(dj, best.k).forEach(k => { m.path[k] = 1; }); info.main = best;
       });
-      m.dests.forEach(info => { if (!info.main) return; const seen = {}; info.stands.push(info.main); seen[info.main.k] = 1; info.cands.forEach(c => { if (m.path[c.k] && !seen[c.k]) { seen[c.k] = 1; info.stands.push(c); } }); });
+      m.dests.forEach(info => { if (!info.main) return; const seen = {}; info.stands.push(info.main); seen[info.main.k] = 1; info.cands.forEach(c => { if ((m.path[c.k] || c.strip) && !seen[c.k]) { seen[c.k] = 1; info.stands.push(c); } }); (info.own || []).forEach((c, i) => { if (i % 2 === 0 && !seen[c.k]) { seen[c.k] = 1; info.stands.push(c); } }); });
     }
-    m.pathKeys = Object.keys(m.path); m.ringN = Object.keys(m.ring).length;
+    m.pathKeys = Object.keys(m.path).filter(k => !m.nodes[k] || !m.nodes[k].strip);
     // floor canvas
     // (floor rectangle fx0, fy0, fw, fh was worked out above with the bounds)
     const fl = document.createElement('canvas'); fl.width = fw; fl.height = fh; const fc = fl.getContext('2d');
@@ -268,6 +345,7 @@
       const it = m.occ[c.k], seed = Math.floor(hash(c.q, c.r, 1) * 1000); let t;
       if (it && c.owned) t = it.k === 'hab' ? 'hab:' + it.t : 'path'; else if (!c.grid) t = c.road ? 'path' : 'locked'; else if (!c.owned) t = 'locked'; else if (m.path[c.k]) t = 'path'; else t = 'grass';
       c.tile = t; put(spr('tile', t, seed), c.x, c.y);
+      if (it && c.owned && it.k === 'hab' && m.habMask[c.k] && m.habMask[c.k].mask) put(stripSprite(m.habMask[c.k].mask), c.x, c.y);
     });
     m.floor = fl; m.fx0 = fx0; m.fy0 = fy0;
     // statics: fences, buildings, gate, decorations
@@ -284,7 +362,7 @@
         h.cells.forEach(c => { if (!h.top || c.y < h.top.y || (c.y === h.top.y && Math.abs(c.x - sx) < Math.abs(h.top.x - sx))) h.top = c; });
         const behind = DIR6.filter(d => G.toScreen(d[0], d[1]).y < -HH * 0.6); let bestScore = 1e9;
         h.cells.forEach(c => { let sc = (c.y - h.top.y) * 0.5; behind.forEach(d => { const k2 = key(c.q + d[0], c.r + d[1]); if (set[k2]) sc += 1000; else if (m.occ[k2]) sc += 60; }); if (sc < bestScore) { bestScore = sc; h.mark = c; } });
-        cs.forEach(c => { const p = G.toScreen(c[0], c[1]); G.EDGES.forEach((e, ei) => { if (set[key(c[0] + e[0][0], c[1] + e[0][1])]) return; const s = spr('fence', it.t, ei); add(s, p.x, p.y, G.depth(c[0], c[1], m.fenceDy(s, ei)), { id: it.id }); }); });
+        cs.forEach(c => { const p = G.toScreen(c[0], c[1]); G.EDGES.forEach((e, ei) => { if (set[key(c[0] + e[0][0], c[1] + e[0][1])]) return; const s = insetFence(it.t, ei, habMaskOf(set, c[0], c[1])); add(s, p.x, p.y, G.depth(c[0], c[1], s.sortDy), { id: it.id }); }); });
       } else {
         const p = G.toScreen(it.q, it.r); add(spr('building', it.t, {}), p.x, p.y, G.depth(it.q, it.r, 0) + 0.2, { id: it.id });
       }
@@ -310,7 +388,7 @@
         return;
       }
       if (ent && c.k === ent.k) return;
-      if (m.path[c.k]) { if (!standKeys[c.k] && !m.ring[c.k] && h < 0.16) addDeco(spr('deco', 'lamp', seed), c.x + (ox < 0 ? -17 : 17) * K, c.y - K, c.y - K); return; }
+      if (m.path[c.k]) { if (!standKeys[c.k] && h < 0.16) addDeco(spr('deco', 'lamp', seed), c.x + (ox < 0 ? -17 : 17) * K, c.y - K, c.y - K); return; }
       let kind = h < 0.2 ? 'tree' : h < 0.38 ? 'bush' : h < 0.6 ? 'flowers' : h < 0.68 ? 'rock' : null;
       if (kind === 'tree' && builtAbove(c)) kind = 'bush';
       if (!kind) return;
@@ -338,8 +416,12 @@
     // two standing spots per hex (back-left and front-right) so a pair never stands on top of each other
     const slot = other ? 1 - other.slot : (Math.random() < 0.5 ? 0 : 1), oy = Math.round(slot ? rnd(HH * 0.12, HH * 0.4) : rnd(-HH * 0.4, -HH * 0.12));
     // keep the whole body inside the hex: wide animals stand nearer the middle
-    const bw = a.sp ? spr('animal', a.sp, { juv: a.juv }).w : 16 * K, sp2 = hexSpan(oy), lo = sp2[0] + 3 * K + bw / 2, hi = sp2[1] - 3 * K - bw / 2, mid = (lo + hi) / 2, ox = Math.round(hi <= lo ? mid : slot ? rnd(mid + (hi - mid) * 0.4, hi) : rnd(lo, mid - (mid - lo) * 0.4));
-    a.cell = ci; a.slot = slot; a.ox = ox; a.tx = c.x + ox; a.ty = c.y + oy;
+    const bw = a.sp ? spr('animal', a.sp, { juv: a.juv }).w : 16 * K, sp2 = hexSpan(oy), lo = sp2[0] + 3 * K + bw / 2, hi = sp2[1] - 3 * K - bw / 2, mid = (lo + hi) / 2;
+    let ox = Math.round(hi <= lo ? mid : slot ? rnd(mid + (hi - mid) * 0.4, hi) : rnd(lo, mid - (mid - lo) * 0.4)), oy2 = oy;
+    const hm = M.habMask && M.habMask[key(c.q, c.r)], mask = hm ? hm.mask : 0, fits = (x, y) => insideFence(x - bw * 0.4, y, mask, 0.06) && insideFence(x + bw * 0.4, y, mask, 0.06) && insideFence(x, y, mask, 0.1);
+    for (let i = 0; i < 40 && mask && !fits(ox, oy2); i++) { oy2 = Math.round(rnd(-HH * 0.4, HH * 0.4) * (1 - i / 50)); ox = Math.round(rnd(-HW * 0.5, HW * 0.5) * (1 - i / 50)); }
+    if (mask && !fits(ox, oy2)) { ox = 0; oy2 = 0; }
+    a.cell = ci; a.slot = slot; a.ox = ox; a.tx = c.x + ox; a.ty = c.y + oy2;
     if (snap) { a.x = a.tx; a.y = a.ty; }
   }
   function syncAnimals(S) {
@@ -374,8 +456,8 @@
   function newWalker(kind, seed) { return { kind: kind, seed: seed, x: 0, y: 0, wp: [], wait: 0, t: rnd(0, 9), flip: false, moving: false, speed: rnd(11, 16) * K, ox: Math.round(rnd(-7, 7) * K), oy: Math.round(rnd(-HH * 0.25, HH * 0.25)), node: null, left: 0, last: null, dead: false, hidden: false, post: null, staff: null }; }
   function goTo(w, destKey, stand) { // queue hex-by-hex waypoints from the walker's node to destKey; optional stand = look-at spot
     const r = route(w.node, destKey); if (!r) return false;
-    r.forEach(k => { const n = M.nodes[k]; w.wp.push({ x: n.x + w.ox, y: n.y + w.oy, k: k }); });
-    if (stand) { const n = M.nodes[destKey]; w.wp.push({ x: n.x + (stand.cx - n.x) * 0.3 + w.ox * 0.8, y: n.y + (stand.cy - n.y) * 0.3 + w.oy * 0.6, wait: stand.wait, face: stand.cx < n.x }); }
+    r.forEach(k => { const n = M.nodes[k], f = n.strip ? 0.12 : 1; w.wp.push({ x: n.x + w.ox * f, y: n.y + w.oy * f, k: k }); });
+    if (stand) { const n = M.nodes[destKey]; if (n.strip) w.wp.push({ x: n.x + w.ox * 0.12, y: n.y + w.oy * 0.12, wait: stand.wait, face: stand.cx < n.x }); else w.wp.push({ x: n.x + (stand.cx - n.x) * 0.3 + w.ox * 0.8, y: n.y + (stand.cy - n.y) * 0.3 + w.oy * 0.6, wait: stand.wait, face: stand.cx < n.x }); }
     return true;
   }
   function planWalker(w) {
@@ -434,7 +516,7 @@
       const n = M.nodes[startK]; w.node = n.k; w.x = n.x + w.ox; w.y = n.y + w.oy; w.wait = rnd(0, 2); walkers.push(w); }
       w.kind = s.role; const p = busy[s.id], hid = p ? projectHab(S, p) : null, post = p && hid != null && M.habs[hid] ? hid : null;
       w.hidden = !!p && post == null;
-      if (post !== w.post) { w.post = post; w.wp = []; w.wait = 0.01; if (first && post != null) { const d = M.habs[post].dest; if (d && d.main) { const n = M.nodes[d.main.k]; w.node = n.k; w.x = n.x + w.ox; w.y = n.y + w.oy; } } }
+      if (post !== w.post) { w.post = post; w.wp = []; w.wait = 0.01; if (first && post != null) { const d = M.habs[post].dest; if (d && d.main) { const n = M.nodes[d.main.k], f = n.strip ? 0.12 : 1; w.node = n.k; w.x = n.x + w.ox * f; w.y = n.y + w.oy * f; } } }
     });
     walkers = walkers.filter(w => !w.dead && (w.staff == null || seen[w.staff]));
     // callers and happening characters at the gate
@@ -454,7 +536,7 @@
     for (const k in gatePeople) if (!keep[k]) delete gatePeople[k];
   }
   function reseat(S) { // after the map changed: put every actor somewhere that still exists
-    walkers.forEach(w => { w.wp = []; if (w.wait > 1e8) w.wait = 0.01; const n = M.nodes[w.node]; if (!n && M.pathKeys.length) { const p = M.nodes[pick(M.pathKeys)]; w.node = p.k; w.x = p.x + w.ox; w.y = p.y + w.oy; } else if (n && Math.hypot(w.x - n.x, w.y - n.y) > W) { w.x = n.x + w.ox; w.y = n.y + w.oy; } if (w.post != null) w.post = -1; });
+    walkers.forEach(w => { w.wp = []; if (w.wait > 1e8) w.wait = 0.01; const n = M.nodes[w.node]; if (!n && M.pathKeys.length) { const p = M.nodes[pick(M.pathKeys)]; w.node = p.k; w.x = p.x + w.ox; w.y = p.y + w.oy; } else if (n && Math.hypot(w.x - n.x, w.y - n.y) > W) { const f = n.strip ? 0.12 : 1; w.x = n.x + w.ox * f; w.y = n.y + w.oy * f; } if (w.post != null) w.post = -1; });
     walkers = walkers.filter(w => M.nodes[w.node]);
     for (const k in gatePeople) delete gatePeople[k];
     if (S) { syncAnimals(S); syncWalkers(S, !walkers.some(w => w.staff == null)); syncStatus(S); }
@@ -584,6 +666,9 @@
   }
   function clientToWorld(x, y) { const rect = canvas.getBoundingClientRect(); return { x: cam.x + (x - rect.left) * (devW / rect.width) / N, y: cam.y + (y - rect.top) * (devH / rect.height) / N }; }
   R.clientToHex = function (x, y) { const w = clientToWorld(x, y); return G.toAxial(w.x, w.y); };
+  R.bufToClient = function (x, y) { const rect = canvas.getBoundingClientRect(); return { x: rect.left + (x - cam.x) * N * (rect.width / devW), y: rect.top + (y - cam.y) * N * (rect.height / devH) }; };
+  // test hook: the middle of every habitat's border strip on each outer edge (buffer px), front = the edge faces the viewer
+  R.stripSpots = function () { const out = []; if (!M) return out; for (const k in M.edgeNode) { const p = k.split(',').map(Number), n = M.edgeNode[k], hm = M.habMask[p[0] + ',' + p[1]]; out.push({ q: p[0], r: p[1], ei: p[2], id: hm ? hm.id : null, x: n.x, y: n.y, front: G.edgeMidY(p[2]) > 0, shared: !!M.edgeNode[key(p[0] + G.EDGES[p[2]][0][0], p[1] + G.EDGES[p[2]][0][1]) + ',' + ((p[2] + 3) % 6)] }); } return out; };
   R.hexToClient = function (q, r) { const p = G.toScreen(q, r), rect = canvas.getBoundingClientRect(); return { x: rect.left + (p.x - cam.x) * N * (rect.width / devW), y: rect.top + (p.y - cam.y) * N * (rect.height / devH) }; };
 
   // ---------------------------------------------------------------- input
@@ -645,7 +730,7 @@
     for (const k in M.cells) { const c = M.cells[k]; if (!c.owned || (skipCurrent && c.q === P.q && c.r === P.r)) continue; const d = (c.x - x) * (c.x - x) + (c.y - y) * (c.y - y) * 1.6; if (d < fd) { fd = d; fall = c; } if (d < bd && canHere(S, c.q, c.r)) { bd = d; best = c; } }
     const c = best || fall; if (c) { P.q = c.q; P.r = c.r; } return !!best;
   }
-  function showGhost() { if (P) bringIntoView(Z.cellsOf(P.spec.kind, P.spec.t, P.q, P.r, P.rot).concat(P.ring || [])); }
+  function showGhost() { if (P) bringIntoView(Z.cellsOf(P.spec.kind, P.spec.t, P.q, P.r, P.rot)); }
   // Place is the one prominent (green) button, grey while the spot is invalid; Rotate and Cancel/Done are neutral. Set inline so it holds
   // whichever position each button has in the bar. Colours come from the Shell's theme variables, with fallbacks.
   function paintButtons(ok) {
@@ -670,8 +755,6 @@
     const badSet = {}; bad.forEach(c => { badSet[key(c[0], c[1])] = 1; });
     P.cells = cs.map(c => ({ q: c[0], r: c[1], ok: !badSet[key(c[0], c[1])] }));
     P.bad = bad; P.why = why;
-    // the walkway ring this habitat would get (free owned hexes round it), shown as part of the ghost
-    P.ring = []; if (sp.kind === 'hab' && typeof Z.ringAt === 'function') { try { P.ring = (Z.ringAt(S, sp.t, P.q, P.r, P.rot, sp.moveId) || []).filter(c => !mine[key(c[0], c[1])]).sort((a, b) => G.toScreen(a[0], a[1]).y - G.toScreen(b[0], b[1]).y); } catch (e) { P.ring = []; } }
     P.ok = ok; P.makes = []; P.breaks = [];
     if (ok) {
       try {
@@ -809,21 +892,20 @@
     list.length = 0; over.length = 0;
     if (P && P.cells) { // the ghost is drawn solid; fits / does not fit shows only in the blinking outline (and red crosses)
       const sp = P.spec;
-      // the walkway ring the habitat would get: path tiles (only the top face, so no lip spills onto the hex in front), back to front
-      if (P.ring && P.ring.length) { const tl = spr('tile', 'path', 0), th = Math.min(tl.c.height, Math.round(tl.ay) + HH); P.ring.forEach(rc => { const p = G.toScreen(rc[0], rc[1]); c.drawImage(tl.c, 0, 0, tl.c.width, th, Math.round(p.x - tl.ax) - cx, Math.round(p.y - tl.ay) - cy, tl.c.width, th); }); }
-      if (sp.kind === 'hab') P.cells.forEach(cell => { const p = G.toScreen(cell.q, cell.r), tl = spr('tile', 'hab:' + sp.t, 0); c.drawImage(tl.c, Math.round(p.x - tl.ax) - cx, Math.round(p.y - tl.ay) - cy); });
+      const gset = {}; P.cells.forEach(cell => { gset[key(cell.q, cell.r)] = 1; });
+      if (sp.kind === 'hab') P.cells.slice().sort((a, b) => G.toScreen(a.q, a.r).y - G.toScreen(b.q, b.r).y).forEach(cell => { const p = G.toScreen(cell.q, cell.r), tl = spr('tile', 'hab:' + sp.t, 0), ss = stripSprite(habMaskOf(gset, cell.q, cell.r)); c.drawImage(tl.c, Math.round(p.x - tl.ax) - cx, Math.round(p.y - tl.ay) - cy); c.drawImage(ss.c, Math.round(p.x - ss.ax) - cx, Math.round(p.y - ss.ay) - cy); });
       const bl = Math.floor(P.t * 3) & 1;
       c.drawImage(P.outline.f[bl].c, P.outline.x - cx, P.outline.y - cy);
       if (P.badOutline) over.push({ s: { c: P.badOutline.f[bl].c, ax: 0, ay: 0 }, x: P.badOutline.x, y: P.badOutline.y }); // the things in the way: red outline on top
       (P.bad || []).forEach(bc => { const p = G.toScreen(bc[0], bc[1]); over.push({ s: crossSprite(), x: p.x, y: p.y }); }); // and a solid red cross on each hex in the way
       if (sp.kind === 'hab') {
         const set = {}; P.cells.forEach(cell => { set[key(cell.q, cell.r)] = 1; });
-        P.cells.forEach(cell => { const p = G.toScreen(cell.q, cell.r); G.EDGES.forEach((e, ei) => { if (set[key(cell.q + e[0][0], cell.r + e[0][1])]) return; const s = spr('fence', sp.t, ei); list.push({ s: s, x: p.x, y: p.y, key: G.depth(cell.q, cell.r, M.fenceDy(s, ei)) + 0.01, a: 1 }); }); });
+        P.cells.forEach(cell => { const p = G.toScreen(cell.q, cell.r); G.EDGES.forEach((e, ei) => { if (set[key(cell.q + e[0][0], cell.r + e[0][1])]) return; const s = insetFence(sp.t, ei, habMaskOf(set, cell.q, cell.r)); list.push({ s: s, x: p.x, y: p.y, key: G.depth(cell.q, cell.r, s.sortDy) + 0.01, a: 1 }); }); });
       } else { const p = G.toScreen(P.q, P.r), s = spr('building', sp.t, {}); list.push({ s: s, x: p.x, y: p.y, key: G.depth(P.q, P.r, 0) + 0.21, a: 1 }); }
     }
     // one depth-sorted list
     const L = cx - 40 * K, Rr = cx + bw + 40 * K, T = cy - 10 * K, B = cy + bh + 60 * K, moveId = P ? P.spec.moveId : null;
-    let under = null; if (P && P.cells) { under = {}; P.cells.forEach(cell => { under[key(cell.q, cell.r)] = 1; }); (P.ring || []).forEach(rc => { under[key(rc[0], rc[1])] = 1; }); P.cells.forEach(cell => DIR6.forEach(d => { const k2 = key(cell.q + d[0], cell.r + d[1]); if (G.toScreen(d[0], d[1]).y > 0 && !under[k2]) under[k2] = 2; })); } // (2 = the hex is just in front of the ghost: only tall things there are hidden) // decorations under the ghost are hidden so they never fight a placement
+    let under = null; if (P && P.cells) { under = {}; P.cells.forEach(cell => { under[key(cell.q, cell.r)] = 1; }); P.cells.forEach(cell => DIR6.forEach(d => { const k2 = key(cell.q + d[0], cell.r + d[1]); if (G.toScreen(d[0], d[1]).y > 0 && !under[k2]) under[k2] = 2; })); } // (2 = the hex is just in front of the ghost: only tall things there are hidden) // decorations under the ghost are hidden so they never fight a placement
     for (let i = 0; i < M.statics.length; i++) { const e = M.statics[i]; if (e.x < L || e.x > Rr || e.y < T || e.y > B) continue; if (under && e.ck && under[e.ck] && (under[e.ck] === 1 || e.tall)) continue; if (moveId != null && e.id === moveId) continue; /* the item being moved is shown only as the ghost (nothing see-through) */ list.push(e); }
     const AF = frames('ANIMAL_FRAMES'), PF = frames('PERSON_FRAMES');
     for (const id in animals) {
@@ -917,6 +999,11 @@
   R.getZoom = () => zoom;
   R.resize = resize;
   R.entrance = () => (M && M.ent ? { q: M.ent.q, r: M.ent.r } : null);
+  // what is under a floor point: 'strip' (a habitat's border walkway), 'fenced' (inside a fence), 'building', or null (open ground)
+  function whereOn(x, y) { const a = G.toAxial(x, y), k = key(a.q, a.r), it = M.occ[k]; if (!it) return null; if (it.k !== 'hab') return 'building'; const hm = M.habMask[k], p = G.toScreen(a.q, a.r); return hm && onStrip(x - p.x, y - p.y, hm.mask) ? 'strip' : 'fenced'; }
+  R.whereOn = (x, y) => (M ? whereOn(x, y) : null);
+  R.reach = id => { if (!M || !M.ent) return null; const d = M.dests.find(x => x.it.id === id); if (!d || !d.main) return { ok: false }; const r = route(M.ent.k, d.main.k); return { ok: !!r, strip: !!M.nodes[d.main.k].strip, steps: r ? r.length : 0, viaStrip: r ? r.filter(k => M.nodes[k].strip).length : 0 }; }; // test hook: the walk from the gate to an item
+  R.stripPeople = () => (M ? walkers.filter(w => !w.hidden).map(w => ({ x: Math.round(w.x), y: Math.round(w.y), on: whereOn(w.x, w.y), node: w.node, strip: !!(M.nodes[w.node] && M.nodes[w.node].strip) })) : []);
   R.debug = function () {
     return { sprites: stats.sprites, fps: stats.fps, frameMs: stats.frameMs, cam: { x: cam.x, y: cam.y }, buffer: { w: Math.round(vw), h: Math.round(vh), scale: N / dpr, deviceScale: N, dpr: dpr, density: K, artScale: N * K / dpr },
       running: running, zoom: zoom, realSprites: usingReal(), spriteGetters: spriteState(), spriteErrors: Object.assign({}, stats.warned), animals: Object.keys(animals).length, visitors: walkers.filter(w => w.staff == null).length, staff: walkers.filter(w => w.staff != null && !w.hidden).length,
@@ -926,12 +1013,13 @@
       gate: Object.keys(gatePeople).length, gateKinds: Object.keys(gatePeople).map(k => gatePeople[k].kind), gateArrived: Object.keys(gatePeople).filter(k => !gatePeople[k].wp.length).length, gateMarks: Object.keys(gatePeople).filter(k => gatePeople[k].mark).map(k => gatePeople[k].kind),
       icons: (() => { const o = {}; for (const id in statuses) if (id !== '_exp') { const s2 = statuses[id]; o[id] = iconsOf(s2).concat(s2.busy && s2.progress != null ? ['bar'] : []); } return o; })(), moving: (() => { const o = {}; for (const id in animals) if (animals[id].moving) o[animals[id].hab] = (o[animals[id].hab] || 0) + 1; return o; })(), floaters: floaters.length, combos: M ? M.combos.length : 0, statics: M ? M.statics.length : 0, paths: M ? M.pathKeys.length : 0,
       animalAlpha: stats.animalAlpha, animalCheck: stats.actorCheck || null,
-      ring: M ? M.ringN : 0, ringPath: M ? Object.keys(M.ring).filter(k => M.path[k] && M.cells[k] && M.cells[k].tile === 'path').length : 0, ringDeco: M ? M.statics.filter(e => e.ck && (M.ring[e.ck] || (() => { const a = G.toAxial(e.x, e.y); return M.ring[key(a.q, a.r)]; })())).length : 0,
+      strips: M ? M.stripN : 0, unreached: M ? M.dests.filter(d => !d.main).map(d => d.it.id) : [], stripNodes: M ? Object.keys(M.nodes).filter(k => M.nodes[k].strip).length : 0, ringPath: 0, ringDeco: 0,
       speed: stats.speed, worldTime: stats.wtime, clock: clock, walked: stats.walk, walkSecs: stats.walkT, roamed: stats.roam, maxStep: stats.maxStep,
-      offPath: M ? walkers.filter(w => { if (w.hidden) return false; const a = G.toAxial(w.x, w.y), c = M.cells[key(a.q, a.r)]; return !!M.occ[key(a.q, a.r)] || (c && c.grid && !M.nodes[c.k]); }).length : 0,
-      onRing: M ? walkers.filter(w => { const a = G.toAxial(w.x, w.y); return !w.hidden && M.ring[key(a.q, a.r)]; }).length : 0,
+      offPath: M ? walkers.filter(w => { if (w.hidden) return false; const a = G.toAxial(w.x, w.y), c = M.cells[key(a.q, a.r)]; if (M.occ[key(a.q, a.r)]) return whereOn(w.x, w.y) !== 'strip'; return !!(c && c.grid && !M.nodes[c.k]); }).length : 0,
+      onStrip: M ? walkers.filter(w => !w.hidden && whereOn(w.x, w.y) === 'strip').length : 0, inFence: M ? walkers.filter(w => !w.hidden && whereOn(w.x, w.y) === 'fenced').length : 0,
+      animalsOut: M ? Object.keys(animals).filter(id => whereOn(animals[id].tx, animals[id].ty) !== 'fenced').length : 0,
       editing: !!E, selected: sel ? sel.id : null, barCover: Math.round(barCov), bounds: M ? M.bounds : null,
-      placement: P ? { q: P.q, r: P.r, rot: P.rot, ok: P.ok, state: P.state, msg: P.msg, why: P.why || '', bad: P.bad || [], ring: P.ring || [], makes: P.makes, breaks: P.breaks } : null };
+      placement: P ? { q: P.q, r: P.r, rot: P.rot, ok: P.ok, state: P.state, msg: P.msg, why: P.why || '', bad: P.bad || [], ring: [], makes: P.makes, breaks: P.breaks } : null };
   };
   root.ZRender = R;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -31,8 +31,8 @@ function run(skill, verbose, opts) {
   const freeStaff = () => Z.freeStaff(S);
   // scan from the front row to the back of the owned land
   function place(kind, t) { for (let y = D.GRID_H - 1; y >= D.GRID_H - S.rows; y--) for (let x = 0; x < D.GRID_W; x++) { const a = Z.fromOffset(x, y); for (let rot = 0; rot < 6; rot++) if (Z.canPlace(S, kind, t, a[0], a[1], rot)) return [a[0], a[1], rot]; } return null; }
-  // a facility goes just outside the habitat's walkway ring (that still counts as next to it)
-  function placeNear(kind, t, hab) { for (const c of Z.ringCells(S, hab.id)) for (const d of Z.DIRS) { if (Z.canPlace(S, kind, t, c[0] + d[0], c[1] + d[1], 0)) return [c[0] + d[0], c[1] + d[1], 0]; } return place(kind, t); }
+  // a facility goes right against the habitat (Update 8: touching counts as next to it again)
+  function placeNear(kind, t, hab) { for (const c of Z.cells(hab)) for (const d of Z.DIRS) { if (Z.canPlace(S, kind, t, c[0] + d[0], c[1] + d[1], 0)) return [c[0] + d[0], c[1] + d[1], 0]; } return place(kind, t); }
   // pick an option the way a sensible player would: pay when it is cheap next to the bank, take good odds, otherwise the safe default
   function choose(options, def) {
     for (let i = 0; i < options.length; i++) {
@@ -213,7 +213,7 @@ function run(skill, verbose, opts) {
     console.log('choices asked', choices.asked, 'answered', choices.answered, '| seen', JSON.stringify(seen));
     console.log('reputation by source', JSON.stringify(S.life.repBy));
     console.log('optional spending over the run $' + Math.round(S.life.spent).toLocaleString('en-US'), '| saveKB with log', kb, 'without', Math.round(Z.serialize(S).length / 1024));
-    console.log('items at the end:', S.items.filter(i => i.k === 'hab').length, 'habitats,', S.items.filter(i => i.k === 'fac').length, 'facilities,', Z.ringCells(S).length, 'walkway hexes of', S.rows * D.GRID_W, 'land hexes');
+    console.log('items at the end:', S.items.filter(i => i.k === 'hab').length, 'habitats,', S.items.filter(i => i.k === 'fac').length, 'facilities,', 'on', S.rows * D.GRID_W, 'land hexes');
   }
   return { S, rows, haps, hapN, choices, seen };
 }

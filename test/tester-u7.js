@@ -1,7 +1,7 @@
 /* Tester, Update 7: new playthroughs by real touch (headless only, through test/pw.js).
    Usage: node test/tester-u7.js [chromium|webkit] [section ...]
    Sections (default: all, one after another):
-     edit      Edit mode on the map: add a habitat and see its walkway ring, a second habitat touching it is refused, move, upgrade, sell (asks once), time paused while editing
+     edit      Edit mode on the map: add a habitat and see its border walkway, a habitat or bench touching it is allowed (Update 8), move, upgrade, sell (asks once), time paused while editing
      exp       an expedition at every star level (1 and 2 as a new zoo, then 3 to 5 after the rank is raised by the test hook) and a locked star
      where     the where list shows who lives in each habitat; the best-of-kind crown
      colours   success green, failure red on result cards
@@ -60,35 +60,30 @@ async function secEdit() {
   const w1 = await week(); await sleep(2300); const w2 = await week(); s = await T.state(); check(w2 === w1 && !s.running, 'paused', 'time is paused while editing (week ' + w1 + ' -> ' + w2 + ' in 2.3 s)');
   // each group tab by touch
   for (const g of b.tabs) { await L.tapSel(T, '#edit-bar .mn-et[data-grp="' + g + '"]', 350); const bb = await E.bar(); say('   group ' + g + ': ' + bb.cards.join(' ')); check(bb.on === g && bb.cards.length > 0 && bb.small.length === 0 && bb.vScroll <= 1, 'tab-' + g, 'tab "' + g + '" shows its things in one sideways row (' + bb.cards.length + ' cards, sideways ' + bb.hScroll + ' px, up-and-down ' + bb.vScroll + ' px)'); await T.look('edit-tab-' + g); }
-  // ---- add a habitat, see its ring
-  const before = await page.evaluate(() => ({ n: ZT.S.items.length, ring: ZE.ringCells(ZT.S).length, hab: ZT.S.items.find(i => i.k === 'hab').id }));
+  // ---- add a habitat, see its border walkway (Update 8: a strip inside the habitat's own hexes)
+  const before = await page.evaluate(() => ({ n: ZT.S.items.length, strips: ZRender.debug().strips, hab: ZT.S.items.find(i => i.k === 'hab').id }));
   let ghost = null; const r = await E.add('hab:savanna', { before: async g => { ghost = g; await T.look('hab-ghost'); } });
   s = await T.state(); if (s.stack.length) { await T.look('after-hab-popup'); await T.tapText(/^(Not now|Move in)/, { sel: 'button, .btn', wait: 500 }); }
   check(r.ok, 'add-hab', 'a second Savanna habitat was added from the strip on a legal spot (' + JSON.stringify(ghost && { q: ghost.q, r: ghost.r, note: ghost.note }) + ')' + (r.ok ? '' : ': ' + r.why));
-  check(ghost && ghost.ring > 0, 'ghost-ring', 'the ghost showed the walkway ring it would get (' + (ghost && ghost.ring) + ' hexes)');
-  const nh = await page.evaluate(hab0 => { const S = ZT.S, h = S.items.filter(i => i.k === 'hab' && i.id !== hab0).pop(); if (!h) return null; const ring = ZE.ringCells(S, h.id), d = ZRender.debug(); return { id: h.id, q: h.q, r: h.r, lvl: h.lvl, ring: ring.length, all: ZE.ringCells(S).length, drawn: d.ring, onItem: ring.filter(c => S.items.some(it => ZE.cells(it).some(x => x[0] === c[0] && x[1] === c[1]))).length, offPath: d.offPath, cost: ZE.habUpgradeCost(h, S) }; }, before.hab);
+  check(ghost && ghost.ring === 0, 'ghost-no-ring', 'the ghost shows no Update 7 ring hexes (' + (ghost && ghost.ring) + ')');
+  const nh = await page.evaluate(hab0 => { const S = ZT.S, h = S.items.filter(i => i.k === 'hab' && i.id !== hab0).pop(); if (!h) return null; const d = ZRender.debug(); return { id: h.id, q: h.q, r: h.r, lvl: h.lvl, strips: d.strips, inFence: d.inFence, unreached: d.unreached.length, offPath: d.offPath, cost: ZE.habUpgradeCost(h, S) }; }, before.hab);
   say('   new habitat:', JSON.stringify(nh));
-  check(nh && nh.ring > 0 && nh.onItem === 0, 'ring', 'the new habitat has a walkway ring (' + (nh && nh.ring) + ' hexes), none of it under a building');
-  check(nh && nh.drawn === nh.all, 'ring-drawn', 'the renderer draws every ring hex as walkway (' + (nh && nh.drawn) + ' of ' + (nh && nh.all) + ')');
+  check(nh && nh.strips > before.strips, 'strip', 'the new habitat has its border walkway (strip edges ' + before.strips + ' -> ' + (nh && nh.strips) + ')');
+  check(nh && nh.inFence === 0 && nh.unreached === 0, 'strip-walk', 'nobody walks inside a fence and everything can be reached (' + JSON.stringify(nh && { inFence: nh.inFence, unreached: nh.unreached }) + ')');
   s = await T.state(); check(s.editing && (await E.bar()).shown, 'still-editing', 'after placing, Edit mode is still on and the strip is back'); await T.look('hab-added');
-  // ---- a habitat touching it must be refused, with a clear reason
+  // ---- a habitat or a bench right against it is allowed now (Update 8); nothing is built here, the ghost is only looked at
   let c = await E.card('hab:savanna'); check(c.found && c.placing, 'touch-start', 'tapping the Savanna card again starts another placement');
-  let sp = await E.spot('hab', 'savanna', { why: 'touch', near: [nh.q, nh.r] });
-  if (check(!!sp, 'touch-spot', 'there is a spot where a habitat would touch another (' + (sp && sp.n) + ' such spots)')) {
-    await T.tapXY(sp.x, sp.y, 500); const g = await E.ghost(); const n0 = await page.evaluate(() => ZT.S.items.length), m0 = await money(T); const dis = await page.evaluate(() => document.querySelector('#placement-bar .zr-place').getAttribute('aria-disabled'));
-    const tl = await T.look('touch-refused'); await E.place(600); const n1 = await page.evaluate(() => ZT.S.items.length); const toast = await T.toast();
-    say('   touching ghost:', JSON.stringify(g), 'Place aria-disabled', dis, 'toast after Place:', toast);
-    check(g.q === sp.q && g.r === sp.r && !g.ok && g.why === 'touch', 'touch-refused', 'a habitat touching another is refused (ghost at ' + g.q + ',' + g.r + ': ' + g.why + ')', tl.shot);
-    check(/walkway|touch|habitat/i.test(g.note), 'touch-reason', 'the note says why in plain words: "' + g.note + '"', tl.shot);
-    check(g.noteState === 'bad' || g.noteState === 'no' || g.noteState === 'err' || /bad|no|err|block/.test(String(g.noteState)), 'touch-note-state', 'the note is shown as a refusal (state "' + g.noteState + '")');
-    check(g.bad > 0, 'touch-cells', 'the hexes in the way are marked (' + g.bad + ')');
-    check(n1 === n0 && (await money(T)) === m0, 'touch-place-nothing', 'tapping Place on the refused spot builds nothing and costs nothing');
+  let sp = await E.spot('hab', 'savanna', { near: [nh.q, nh.r] });
+  if (check(!!sp, 'touch-spot', 'there is a legal spot next to the new habitat')) {
+    await T.tapXY(sp.x, sp.y, 500); const g = await E.ghost(); const tl = await T.look('touch-allowed');
+    const touches = await page.evaluate(([q, r, rot, id]) => { const S = ZT.S, mine = ZE.cellsOf('hab', 'savanna', q, r, rot); return ZE.cells(ZE.item(S, id)).some(c => mine.some(m => ZE.DIRS.some(d => m[0] + d[0] === c[0] && m[1] + d[1] === c[1]))); }, [g.q, g.r, (await page.evaluate(() => ZRender.debug().placement.rot)), nh.id]);
+    say('   touching ghost:', JSON.stringify(g), 'touches the new habitat:', touches);
+    check(g.ok && !/walkway/i.test(g.note), 'touch-allowed', 'a habitat right against another fits (note "' + g.note + '"' + (touches ? '' : ', nearest legal spot does not touch it') + ')', tl.shot);
   }
   await E.endPlacement();
-  // ---- a building on the walkway is refused too
-  c = await E.card('fac:bench'); sp = c.placing ? await E.spot('fac', 'bench', { why: 'ring', near: [nh.q, nh.r] }) : null;
-  if (check(!!sp, 'ringfac-spot', 'a bench can be tried on a walkway ring hex')) { await T.tapXY(sp.x, sp.y, 500); const g = await E.ghost(); const n0 = await page.evaluate(() => ZT.S.items.length); const tl = await T.look('ring-refused'); await E.place(600); const n1 = await page.evaluate(() => ZT.S.items.length);
-    check(!g.ok && g.why === 'ring' && n1 === n0 && /walkway/i.test(g.note), 'ringfac-refused', 'a bench on the walkway is refused with a reason: "' + g.note + '"', tl.shot); }
+  c = await E.card('fac:bench'); sp = c.placing ? await E.spot('fac', 'bench', { near: [nh.q, nh.r] }) : null;
+  if (check(!!sp, 'benchnear-spot', 'a bench can be tried right beside the new habitat')) { await T.tapXY(sp.x, sp.y, 500); const g = await E.ghost(); const tl = await T.look('bench-beside');
+    check(g.ok && !/walkway/i.test(g.note), 'bench-beside', 'a bench beside a habitat fits: "' + g.note + '"', tl.shot); }
   await E.endPlacement();
   // ---- pick the new habitat on the map: Move, Upgrade, Sell
   const picked = await E.pick(nh.id); b = await E.bar(); say('   picked:', picked, JSON.stringify(b.acts), '::', b.actText); const pl = await T.look('hab-picked');
@@ -99,8 +94,8 @@ async function secEdit() {
   await L.tapSel(T, '#edit-bar .mn-ea.move', 700); s = await T.state(); check(s.placing, 'move-start', 'Move starts placement for that habitat');
   let to = null; for (let k = 0; k < 8 && !to; k++) { const x = await E.spot('hab', 'savanna', { ignoreId: nh.id, near: [nh.q, nh.r], nth: k }); if (x && (x.q !== nh.q || x.r !== nh.r)) to = x; }
   if (to) { await T.tapXY(to.x, to.y, 500); await T.look('move-ghost'); await E.place(800); }
-  const mv = await page.evaluate(id => { const S = ZT.S, h = ZE.item(S, id), d = ZRender.debug(); return { q: h.q, r: h.r, ring: ZE.ringCells(S, id).length, all: ZE.ringCells(S).length, drawn: d.ring, sel: ZRender.selected() }; }, nh.id); s = await T.state();
-  check(to && mv.q === to.q && mv.r === to.r, 'move', 'the habitat moved to the tapped spot (' + nh.q + ',' + nh.r + ' -> ' + mv.q + ',' + mv.r + ')'); check(mv.ring > 0 && mv.drawn === mv.all, 'move-ring', 'its walkway ring moved with it (' + mv.ring + ' hexes; drawn ' + mv.drawn + ' of ' + mv.all + ')');
+  const mv = await page.evaluate(id => { const S = ZT.S, h = ZE.item(S, id), d = ZRender.debug(); return { q: h.q, r: h.r, strips: d.strips, inFence: d.inFence, sel: ZRender.selected() }; }, nh.id); s = await T.state();
+  check(to && mv.q === to.q && mv.r === to.r, 'move', 'the habitat moved to the tapped spot (' + nh.q + ',' + nh.r + ' -> ' + mv.q + ',' + mv.r + ')'); check(mv.strips === nh.strips && mv.inFence === 0, 'move-strip', 'its border walkway moved with it (strip edges ' + mv.strips + ', nobody inside a fence)');
   check(s.editing && !s.placing, 'move-edit', 'after the move Edit mode is still on'); await T.look('moved');
   // upgrade
   if (!(await E.bar()).acts.length) await E.pick(nh.id); const m0 = await money(T); await L.tapSel(T, '#edit-bar .mn-eact .mn-up', 700);
@@ -113,10 +108,10 @@ async function secEdit() {
   check(s.stack.join('>') === 'confirm' && (await page.evaluate(() => ZT.S.items.length)) === n0, 'sell-asks', 'Sell asks before it happens ("' + (q1.text || '').slice(0, 60) + '")', q1.shot);
   await T.tapText(/^No/, { sel: 'button, .btn', wait: 500 }); check((await page.evaluate(() => ZT.S.items.length)) === n0 && (await money(T)) === ms0 && !(await T.state()).stack.length, 'sell-no', 'answering No sells nothing');
   if (!(await E.bar()).acts.length) await E.pick(nh.id); await L.tapSel(T, '#edit-bar .mn-ea.sell', 500); const qt = (await describe(T)).text || ''; await T.tapText(/^Sell/, { sel: 'button, .btn', wait: 600 }); s = await T.state();
-  const sold = await page.evaluate(() => ({ n: ZT.S.items.length, money: Math.round(ZT.S.money), ring: ZE.ringCells(ZT.S).length, drawn: ZRender.debug().ring, sel: ZRender.selected() })); const said = +((qt.match(/\$([\d,]+)/) || [])[1] || '').replace(/,/g, '');
+  const sold = await page.evaluate(() => ({ n: ZT.S.items.length, money: Math.round(ZT.S.money), strips: ZRender.debug().strips, sel: ZRender.selected() })); const said = +((qt.match(/\$([\d,]+)/) || [])[1] || '').replace(/,/g, '');
   check(sold.n === n0 - 1 && !s.stack.length, 'sell', 'answering Sell removes the habitat and asks nothing more (asked once)');
   check(sold.money > ms0 && sold.money - ms0 === said, 'sell-money', 'the money comes back: $' + ms0 + ' -> $' + sold.money + ' (+' + (sold.money - ms0) + '; the question said $' + said + ')');
-  check(sold.ring === before.ring && sold.drawn === sold.ring, 'sell-ring', 'its walkway ring went with it (ring hexes ' + sold.ring + ', as before it was built: ' + before.ring + ')'); await T.look('sold');
+  check(sold.strips === before.strips, 'sell-strip', 'its border walkway went with it (strip edges ' + sold.strips + ', as before it was built: ' + before.strips + ')'); await T.look('sold');
   // Done: time resumes
   const w3 = await week(); await E.done(); await sleep(1900); const w4 = await week(); s = await T.state();
   check(!s.editing && !s.editBar && s.running && w4 > w3, 'done', 'Done leaves Edit mode and time runs again (week ' + w3 + ' -> ' + w4 + ')'); check(w3 === w1, 'paused-all', 'no week passed during the whole edit (week ' + w1 + ' at the start, ' + w3 + ' at Done)');

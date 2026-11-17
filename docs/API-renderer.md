@@ -35,18 +35,27 @@ that shows. The allowance eases in and out, so nothing jumps. If `#edit-bar` doe
 **Menus:** keep `#edit-bar` inside `#floor-wrap`, docked at the bottom, and hide it (`display:none`) while `ZRender.placing()`: it
 would otherwise cover the Place / Rotate / Cancel bar. The strip may change height at any time.
 
-### Walkway ring (note 7)
-- Every hex of `ZE.ringCells(S)` is laid as ordinary walkway (same path tile) and is part of the walk graph like any path, so
-  visitors and staff walk round habitats and stop anywhere on the ring to look in. The trunk paths from the gate reuse ring hexes.
-- No decoration of any kind stands on a ring hex (no trees, bushes, flowers, rocks, and no lamps either). The holding-pen crate
-  keeps off them as it does off every path.
-- Placement uses `ZE.placeCheck`. The note line shows the engine's own `msg` (`Leave a walkway between habitats.`,
-  `Leave room for its walkway.`, `Keep the walkway clear.`, `That spot is taken.`, `That is off your land.`,
-  `Keep the entrance clear.`); the old `Something is in the way.` / `Outside your land.` wording is only a fallback for an engine
-  without `placeCheck`. Every hex in `cells` gets the solid red cross, and hexes in the way that are not under the ghost (the
-  habitat it would touch, say) also get their own blinking red outline, drawn on top.
-- A habitat ghost shows the ring it would get (`ZE.ringAt`, with `moveId` as `ignoreId`) as walkway tiles round it, and the
-  decorations on those hexes step aside while the ghost is there. The ring is shown for refused spots too.
+### Border walkways (note 8, replaces the Update 7 walkway ring)
+- Every habitat draws a narrow walkway strip just inside its outer edge, within its own hexes (`STRIP_T` = 0.27 of the distance
+  from a hex centre to its edge). A hex's strip depends only on which of its six edges are outer, so it is one cached solid
+  picture per edge pattern, made from the path tile's own pixels with a slightly darker kerb on the fence side. It is laid right
+  after the hex's own tile, so the hexes in front still cover the lips.
+- The fence stands on the inner edge of the strip: each fence piece is the habitat's own fence sprite, moved in and cut or
+  lengthened to meet its neighbours (two copies of the original picture, one lined up on each end, each kept on its own side of
+  the middle in whole pixel columns). Corners look exactly like the old corners. The animals' area is a little smaller to the eye;
+  the footprint is unchanged. Where two habitats touch, their two strips sit side by side and read as one shared walkway.
+- Walk graph: on top of the free hexes, every outer edge of every habitat hex has a node on the middle line of its strip, plus one
+  at each corner. They link along the strip, to the free hex outside that edge, and straight across to another habitat's strip
+  where two habitats touch. So people walk round habitats, between touching habitats and up to a building closed in by habitats
+  (its visitors stand on the strip beside it). Strip nodes get almost no random scatter and nobody leans in, so nobody steps
+  inside a fence. Habitats are also watched from their own strip (about half its edge spots are extra stands).
+- Animals pick their standing spots inside the fence line (a few tries, falling back to the hex centre).
+- The placement ghost shows the habitat's strip and inset fences. There is no ghost ring and no ring refusal any more.
+- Test hooks: `debug()` has `strips` (outer edges with a strip), `stripNodes`, `onStrip` (people on strips now), `inFence`
+  (people inside a fence: must be 0), `animalsOut` (animals heading outside their fence: must be 0) and `unreached` (item ids
+  nobody can walk to: must be empty). `ZRender.whereOn(x, y)` says 'strip', 'fenced', 'building' or null for a buffer point;
+  `ZRender.stripSpots()` lists the strip middles; `ZRender.stripPeople()` lists the people; `ZRender.bufToClient(x, y)`.
+  `debug().placement.ring` is always `[]`; `ring`, `ringPath`, `ringDeco`, `onRing` are gone or 0.
 
 ### Speed 2
 Animals, visitors, staff, gate people, the arrival hop and the floating pop-ups run on game time = real time x `getSpeed()`; walk
@@ -68,8 +77,8 @@ density 2; the pill allows 24 x 30 per symbol), pop-up symbols sit beside their 
 No change was needed.
 
 ### Test files added
-`test/render-edit.js` (ring, refusals, ghost ring, speed, Edit mode, challenge maps; screenshots `test/shots/render-r7-*.png`) and
-`test/render-setup.js` (page-side helpers: the demo facilities one hex out across the walkway, pixel helpers).
+`test/render-edit.js` (border walkways, a closed-in building, refusals, ghost strip, speed, Edit mode, challenge maps; screenshots
+`test/shots/render-r7-*.png`) and `test/render-setup.js` (page-side helpers: the demo facilities against their habitats, pixel helpers).
 `test/render-floor.html` still tries its old "touching a habitat" facility spots, which the engine now refuses (it logs
 `no spot for ...`); the tests build those five facilities themselves through `render-setup.js`.
 

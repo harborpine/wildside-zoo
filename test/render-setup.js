@@ -1,13 +1,13 @@
 /* Renderer tests: shared page-side helpers (each is a function handed to page.evaluate; nothing here runs in Node).
-   facSetup: since Update 7 nothing may stand against a habitat (walkway ring), so the floor harness can no longer put its five
-   demo facilities "touching" a habitat. This builds them through the real engine one hex out, across the walkway: a free hex
-   that touches the habitat's ring, nearest the gate, never in front of the gate arch. Returns the facility ids it built. */
+   facSetup: the floor harness page still looks for its five demo facility spots with the Update 7 ring (now always empty), so this
+   builds them through the real engine right against their habitat (Update 8: touching is allowed again): a free hex touching the
+   habitat, nearest the gate, never in front of the gate arch. Returns the facility kinds it built. */
 exports.facSetup = () => {
   const S = RT.S, H = RT.H, K = ZGeo.DENSITY || 1, ent = ZE.entrance(S), ex = ZGeo.toScreen(ent.q, ent.r), built = [];
   [['bench', 'savanna', 1], ['icecream', 'arctic', 0], ['gift', 'jungle', 1], ['photo', 'desert', 1], ['fountain', 'mythic', 0]].forEach(w => {
     const t = w[0], hab = H[w[1]], list = [], seen = {}; if (!hab) return;
     if (S.items.some(i => i.k === 'fac' && i.t === t)) { built.push(t); return; } // the harness page already built it
-    ZE.ringCells(S, hab.id).forEach(rc => ZE.DIRS.forEach(d => {
+    ZE.cells(hab).forEach(rc => ZE.DIRS.forEach(d => {
       const q = rc[0] + d[0], r = rc[1] + d[1], k = q + ',' + r; if (seen[k]) return; seen[k] = 1;
       if (!ZE.placeCheck(S, 'fac', t, q, r, 0).ok) return; const p = ZGeo.toScreen(q, r);
       if (Math.abs(p.x - ex.x) < 60 * K && ex.y - p.y < 70 * K) return;
