@@ -968,8 +968,10 @@ async function run(name) {
     await page.setViewportSize({ width: 375, height: 667 }); await sleep(400); c = await cardInfo(); fitsCheck(c, 'failed result @375x667'); await shot('challenge-failed-small');
     await page.setViewportSize({ width: 393, height: 852 }); await sleep(300);
     await page.locator('.mo-foot .btn.mo-levels').tap(); await sleep(800);
-    const left = await ev(() => ({ inCh: ZCore.inChallenge(), saved: ZCore.challengeSaved(), stars: ZCore.challengeStars(), stack: ZT.stack(), mo: ZT.stack().some(i => /^mo-/.test(i)) }));
+    const left = await ev(() => ({ inCh: ZCore.inChallenge(), saved: ZCore.challengeSaved(), stars: ZCore.challengeStars(), stack: ZT.stack(), mo: ZT.stack().some(i => /^mo-/.test(i)), menusFn: !!(window.ZMenus && typeof ZMenus.openLevels === 'function'), cards: (() => { const l = [...document.querySelectorAll('.layer')].filter(x => !x.hidden).pop(); const line = l && l.querySelector('.mn-lvline'); return line ? line.children.length : 0; })() }));
     check(!left.inCh && !left.mo && left.stack.length > 0 && left.saved === null && left.stars.broke === 3, 'Levels: back on the title, out of the challenge, the finished run is not offered again, best stars kept ' + JSON.stringify(left));
+    // tester finding (round 7): Levels must open the level list, not leave the player on the bare title
+    check(left.menusFn && left.stack[0] === 'title' && left.stack[left.stack.length - 1] === 'challenges' && left.cards === 5, 'Levels: the challenge level list is open on top of the title, showing the five levels (' + JSON.stringify({ fn: left.menusFn, stack: left.stack, cards: left.cards }) + ')');
     await shot('challenge-after-levels');
 
     // ---- failed, then Retry
@@ -984,7 +986,7 @@ async function run(name) {
     await sleep(2300); c = await cardInfo(); v = await verdict(); await shot('challenge-last');
     check(isGreen(v) && v.title === 'Level 5' && c.btns.map(b => b.t).join(',') === 'Retry,Levels', 'the last level (5) passed: green, Retry and Levels only, no Next level (' + c.btns.map(b => b.t).join(', ') + ')');
     await page.locator('.mo-foot .btn.mo-levels').tap(); await sleep(700);
-    check(await ev(() => !ZCore.inChallenge()), 'Levels from the last level leaves the challenge');
+    { const t = await ev(() => ({ inCh: ZCore.inChallenge(), stack: ZT.stack() })); check(!t.inCh && t.stack[0] === 'title' && t.stack[t.stack.length - 1] === 'challenges', 'Levels from the last level leaves the challenge and opens the level list (' + t.stack + ')'); }
     // every level's card: number, name and goal read correctly
     for (const id of ['small', 'savanna', 'breed']) {
       await gotoLevel(id);

@@ -1135,7 +1135,12 @@
         M.verdict(ok, title); goal.classList.add(ok ? 'good' : 'bad');
         goal.appendChild(pic(iUrl(ok ? 'ok' : 'no', 3)));
         const retry = ui.btn('Retry', () => { Z.startChallenge(sameId); }, { cls: (ok ? '' : 'primary ') + 'big mo-retry' });
-        const levels = ui.btn('Levels', () => { M.end(); try { Z.leaveChallenge(); } catch (e) { rec(e, 'leave challenge'); } }, { cls: 'ghost big mo-levels' });
+        // Levels: leave the run (back to the title), then open the level list on top of it when Menus provides one
+        const levels = ui.btn('Levels', () => {
+          M.end();
+          try { Z.leaveChallenge(); } catch (e) { rec(e, 'leave challenge'); }
+          try { if (window.ZMenus && typeof ZMenus.openLevels === 'function') ZMenus.openLevels(); } catch (e) { rec(e, 'open levels'); }
+        }, { cls: 'ghost big mo-levels' });
         const nx = next ? ui.btn('Next level', () => { Z.startChallenge(next.id); }, { cls: 'primary big mo-next', icon: iUrl('level', 3), sub: next.n + ' ' + (next.name || '') }) : null;
         M.foot(el('div', { cls: 'mo-sec stack' }, ok ? [nx, retry, levels] : [retry, levels]));
       });

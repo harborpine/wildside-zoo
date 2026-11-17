@@ -32,7 +32,7 @@ Tests: `--only=` also takes `where`, `colours`, `expstar`, `challenge`, `rare` (
   stars (`star-off`) that light one by one (`star-on`). Only after the last star has resolved does the bar turn green ("Level n" with a
   tick) or red (with a cross), the goal chip turn green or red, and the buttons appear, pinned and 56 px tall: **Next level** (only when
   stars > 0 and a next level exists; `ZCore.startChallenge(nextId)`), **Retry** (`ZCore.startChallenge(sameId)`), **Levels**
-  (`done()`, then `ZCore.leaveChallenge()`). A failed level shows Retry first (green), then Levels. Taps on the card never close it.
+  (`done()`, then `ZCore.leaveChallenge()`, then `ZMenus.openLevels()` when Menus has it, so the level list opens on the title). A failed level shows Retry first (green), then Levels. Taps on the card never close it.
   Quitting with the card up brings it back on return.
 * **Rare treats (note 9).** Nothing in Moments waits for a choice: a project whose choices do not come up goes straight to its result
   card. Tests that need a choice call `ZE.debug.alwaysChoices(true)` first (`realplay`, `reopen`, `choices`, `colours`); `--only=rare`
