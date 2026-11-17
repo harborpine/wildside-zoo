@@ -70,6 +70,11 @@ Where this section disagrees with older text further down, this section wins.
   `ZCore.openMenu()` do nothing, and `body` carries class `editing` while it is on (kept in step by the 50 ms loop, like `placing`). `#goal` and `#news` hide under `body.editing`.
 * `ZCore.saveLegacy()` returns `false` and writes nothing while a challenge is in play. The shell itself has no 20-year or legacy logic beyond storing that record.
 
+### Round 7 tester fixes
+* **Challenges begin at speed 2.** `startChallenge` and `resumeChallenge` always set 2x (the player can still switch to 1x in System). The speed the zoos were using is
+  remembered and put back when the challenge is left (title, `loadSlot`, `newGame({slot})`); a zoo's saved speed is never changed by a challenge.
+* **Toasts in Edit mode** sit 8 px above the top of `#edit-bar` (measured each time a toast is shown, while `body.editing` is set and the bar is visible); otherwise the usual place above the Back button.
+
 ## Start-up order
 
 `index.html` loads `data, engine, geo, sprites, render, core, menus, moments` (the optional ones with `onerror` so the page still loads without them).

@@ -15,6 +15,7 @@
   const MAX_CUR_EVENTS = 800, KEEP_DETAIL_QUARTERS = 6, MAX_ARG_LEN = 80;
 
   let S = null, ghost = null, slot = null, speed = 1, acc = 0, lastT = 0, lastRunning = null, timer = 0;
+  let zooSpeed = null;   // the zoos' own speed, remembered while a challenge forces 2x
   let chId = null, chOver = false, goalKey = null, goalErr = false;   // challenge level being played (null in a normal zoo); its result has arrived
   let busy = null;                          // the report currently on screen (or null)
   let busySince = 0, emptyStackSince = 0, token = 0;
@@ -160,8 +161,13 @@
     return wrap;
   }
   let toastN = 0;
+  function placeToasts() {   // in Edit mode toasts sit above the whole #edit-bar (its height belongs to Menus, so it is measured); otherwise the stylesheet's place above the Back button
+    let b = '';
+    try { const bar = $('edit-bar'); if (bar && !bar.hidden && document.body.classList.contains('editing') && $stage) { const r = bar.getBoundingClientRect(), sr = $stage.getBoundingClientRect(); if (r.height > 0) b = Math.round(sr.bottom - r.top + 8) + 'px'; } } catch (e) { b = ''; }
+    $toasts.style.bottom = b;
+  }
   function toast(msg, kind) {
-    if (!$toasts || !msg) return; const t = el('div', { cls: 'toast ' + (kind || '') }, String(msg));
+    if (!$toasts || !msg) return; placeToasts(); const t = el('div', { cls: 'toast ' + (kind || '') }, String(msg));
     while ($toasts.children.length >= 3) $toasts.firstChild.remove();
     $toasts.appendChild(t); const id = ++toastN; void id; setTimeout(() => t.remove(), kind === 'bad' ? 3400 : 2400);
   }
@@ -397,7 +403,7 @@
     if (!St) return false;
     if (E.SAVE_VERSION && St.v !== E.SAVE_VERSION) return false;
     if (S && chId != null) save();   // leaving a challenge for a zoo: keep the run
-    chId = null; chOver = false;
+    chId = null; chOver = false; zooSpeedBack();
     S = St; slot = n; ghost = null; ensureState(S); busy = null; token++; acc = 0;
     if (doc.speed === 1 || doc.speed === 2) speed = doc.speed;
     afterNewState(); return true;
@@ -410,7 +416,7 @@
   }
   function toTitle(noSave) {
     if (S && !noSave) save();
-    if (S) ghost = S; S = null; slot = null; chId = null; chOver = false; busy = null; token++; acc = 0; lastRunning = null;
+    if (S) ghost = S; S = null; slot = null; chId = null; chOver = false; zooSpeedBack(); busy = null; token++; acc = 0; lastRunning = null;
     popAll(); syncRunning(); updateStrip(); showTitle();
   }
   function showTitle() {
@@ -429,6 +435,8 @@
   }
   // ---- challenge mode: one run in progress under its own key, best stars under another; the three zoo slots and the carry-over record are never touched
   const inChallenge = () => !!S && chId != null;
+  function challengeSpeed() { if (zooSpeed == null) zooSpeed = speed; speed = 2; }   // levels are timed for double speed: every start and resume begins at 2x (System can still switch to 1x)
+  function zooSpeedBack() { if (zooSpeed != null) { speed = zooSpeed; zooSpeed = null; } }   // leaving a challenge never changes the speed the zoos were using
   function challengeStars() { try { const o = JSON.parse(localStorage.getItem(CH_STARS_KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
   function challengeSaved() {
     try { const raw = localStorage.getItem(CH_KEY), doc = raw ? JSON.parse(raw) : null; return doc && doc.v === SAVE_V && typeof doc.json === 'string' ? { levelId: doc.levelId, week: doc.week, savedAt: doc.savedAt, over: !!doc.over } : null; } catch (e) { return null; }
@@ -453,7 +461,7 @@
     let St = null; try { St = E.newChallenge(levelId); } catch (e) { recordError(e, 'newChallenge'); }
     if (!St) { toast('That level could not start', 'bad'); return null; }
     if (S) save();   // whatever was in play (a zoo, or another run) is kept first
-    S = St; slot = null; ghost = null; chId = S.ch && S.ch.id != null ? S.ch.id : levelId; chOver = false; ensureState(S); acc = 0;
+    S = St; slot = null; ghost = null; chId = S.ch && S.ch.id != null ? S.ch.id : levelId; chOver = false; ensureState(S); acc = 0; challengeSpeed();
     log('start', { challenge: chId }); afterNewState(); save(); return S;
   }
   function resumeChallenge() {
@@ -463,7 +471,7 @@
     if (!St || !St.ch) return false;
     if (S && slot) save();
     S = St; slot = null; ghost = null; chId = St.ch.id != null ? St.ch.id : doc.levelId; chOver = !!doc.over; ensureState(S); busy = null; token++; acc = 0;
-    if (doc.speed === 1 || doc.speed === 2) speed = doc.speed;
+    challengeSpeed();
     afterNewState(); return true;
   }
   function leaveChallenge() { if (!inChallenge()) return false; toTitle(); return true; }   // saves the run (so it can be resumed) and shows the title
@@ -482,7 +490,7 @@
     opts = opts || {};
     if (chId != null && !okSlot(opts.slot)) { toast('Leave the challenge first', 'bad'); return null; }   // a challenge never overwrites a zoo slot by accident
     if (S && chId != null) save();
-    chId = null; chOver = false;
+    chId = null; chOver = false; zooSpeedBack();
     const sl = okSlot(opts.slot) ? opts.slot : (slot || 1);
     if (S) { try { localStorage.setItem(PREV_LOG_KEY, logText()); } catch (e) { /* ignore */ } }
     S = E.newGame(legacy, opts); slot = sl; ghost = null; ensureState(S); S.ui.tutorial = { on: !!opts.tutorial, step: 0 }; S.elog = []; acc = 0;
