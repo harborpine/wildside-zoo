@@ -23,7 +23,7 @@
   const now = () => (root.performance && performance.now ? performance.now() : Date.now());
 
   let canvas = null, ctx = null, buf = null, bctx = null, opts = {}, started = false;
-  let running = true, zoom = 1, N = 2, dpr = 1, devW = 0, devH = 0, cssW = 0, cssH = 0, vw = 0, vh = 0;
+  let running = true, zoomOff = 0, nFar = 1, nClose = 2, nMax = 3, N = 2, dpr = 1, devW = 0, devH = 0, cssW = 0, cssH = 0, vw = 0, vh = 0;
   const cam = { x: 0, y: 0, vx: 0, vy: 0, tx: null, ty: null, placed: false };
   let M = null, P = null, mapDirty = true, clock = 0, slowAt = 0, lastT = 0, lastWeek = null, shopTurn = 0, engineMoneyFx = false;
   let animals = {}, walkers = [], gatePeople = {}, floaters = [], statuses = {}, lastS = null, animalsSeeded = false;
@@ -646,20 +646,38 @@
     if (a0 - HW < cam.x + 4 * K || a1 + HW > cam.x + vw - 4 * K || b0 - HH - 20 * K < cam.y || b1 + HH > cam.y + vh - barH) { const ox = cam.x, oy = cam.y; cam.x = (a0 + a1) / 2 - vw / 2; cam.y = (b0 + b1) / 2 - (vh - cov) * 0.46; clampCam(); cam.tx = cam.x; cam.ty = cam.y; cam.x = ox; cam.y = oy; cam.vx = cam.vy = 0; }
     covE = was;
   }
-  function resize() {
-    if (!canvas) return; const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return;
-    const cx = cam.x + vw / 2, cy = cam.y + vh / 2, had = vw > 0;
-    dpr = root.devicePixelRatio || 1; cssW = rect.width; cssH = rect.height;
-    devW = Math.max(1, Math.round(cssW * dpr)); devH = Math.max(1, Math.round(cssH * dpr));
-    const n1 = Math.max(1, Math.round(devW / (195 * K))), n0 = Math.max(1, Math.min(n1 - 1, Math.round(devW / (280 * K))));
-    N = zoom ? n1 : n0;
+  // Zoom (Update 9): the floor is always drawn at a WHOLE number of device pixels per buffer pixel (N), so the art stays crisp.
+  // The steps run from nFar (the old "Far" setting) through nClose (the old "Close", the default) to nMax (at least one closer).
+  // The player's choice is kept as an offset from nClose (zoomOff), in memory only, so it survives a new game, a resize or a
+  // turned phone, and is forgotten when the page is closed.
+  function zoomSteps() {
+    nClose = Math.max(1, Math.round(devW / (195 * K))); nFar = Math.max(1, Math.min(nClose - 1, Math.round(devW / (280 * K))));
+    nMax = Math.max(nClose + 1, Math.round(devW / (150 * K)));
+  }
+  // set the scale and size the buffer; anchor = a client point that keeps showing the same spot of the floor (default: the middle)
+  function applyScale(n, ax, ay) {
+    const rect = canvas.getBoundingClientRect(), had = vw > 0;
+    const fx = ax == null ? 0.5 : clamp((ax - rect.left) / (rect.width || 1), 0, 1), fy = ay == null ? 0.5 : clamp((ay - rect.top) / (rect.height || 1), 0, 1);
+    const wx = cam.x + vw * fx, wy = cam.y + vh * fy;
+    N = clamp(Math.round(n), nFar, nMax);
     if (canvas.width !== devW) canvas.width = devW; if (canvas.height !== devH) canvas.height = devH;
     vw = devW / N; vh = devH / N; if (M && M.cover && (vw > M.cover.w || vh > M.cover.h)) mapDirty = true;
     const bw = Math.ceil(vw) + 2, bh = Math.ceil(vh) + 2;
     if (!buf) buf = document.createElement('canvas');
     if (buf.width !== bw || buf.height !== bh) { buf.width = bw; buf.height = bh; }
     bctx = buf.getContext('2d'); bctx.imageSmoothingEnabled = false; watchCtx(bctx); ctx.imageSmoothingEnabled = false;
-    if (had) { cam.x = cx - vw / 2; cam.y = cy - vh / 2; clampCam(); }
+    if (had) { cam.x = wx - vw * fx; cam.y = wy - vh * fy; clampCam(); }
+  }
+  function resize() {
+    if (!canvas) return; const rect = canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return;
+    dpr = root.devicePixelRatio || 1; cssW = rect.width; cssH = rect.height;
+    devW = Math.max(1, Math.round(cssW * dpr)); devH = Math.max(1, Math.round(cssH * dpr));
+    zoomSteps(); applyScale(nClose + zoomOff);
+  }
+  // change the zoom to scale n (whole number, kept within the steps), keeping the floor under client point (ax, ay) still
+  function zoomTo(n, ax, ay) {
+    if (!canvas || !vw) return false; n = clamp(Math.round(n), nFar, nMax); if (n === N) return false;
+    cam.vx = cam.vy = 0; cam.tx = cam.ty = null; applyScale(n, ax, ay); zoomOff = N - nClose; return true;
   }
   function watchCtx(x) { // test hook: every draw onto the floor buffer notes the alpha it was drawn with (see ZRender.alphaReport)
     if (x.__zw) return; x.__zw = 1; ['drawImage', 'fillRect'].forEach(fn => { const f0 = x[fn]; x[fn] = function () { if (stats.alphaWatch) { stats.alphaDraws++; if (x.globalAlpha < stats.alphaMin) stats.alphaMin = x.globalAlpha; if (x.globalCompositeOperation !== 'source-over') stats.alphaOps++; } return f0.apply(x, arguments); }; });
@@ -672,15 +690,39 @@
   R.hexToClient = function (q, r) { const p = G.toScreen(q, r), rect = canvas.getBoundingClientRect(); return { x: rect.left + (p.x - cam.x) * N * (rect.width / devW), y: rect.top + (p.y - cam.y) * N * (rect.height / devH) }; };
 
   // ---------------------------------------------------------------- input
-  const ptr = { id: null, sx: 0, sy: 0, lx: 0, ly: 0, moved: 0, drag: false, samples: [] };
+  // One finger (or the mouse) drags the camera or taps. A second finger starts a pinch: from then on, until every finger is up, the
+  // gesture is never a tap (so it never picks, opens a habitat or moves a placement ghost) and leaves no fling. During the pinch
+  // the floor follows the middle of the two fingers and the scale snaps to the whole step nearest (start scale x finger spread).
+  const ptr = { id: null, sx: 0, sy: 0, lx: 0, ly: 0, moved: 0, drag: false, pinched: false, samples: [] };
+  const pts = {}; let pinch = null, gestAt = -1e9;
+  const nPts = () => Object.keys(pts).length;
+  function startPinch() {
+    const ids = Object.keys(pts).slice(0, 2); if (ids.length < 2) return; const a = pts[ids[0]], b = pts[ids[1]];
+    pinch = { a: +ids[0], b: +ids[1], d0: Math.max(10, Math.hypot(a.x - b.x, a.y - b.y)), n0: N, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+    ptr.pinched = true; ptr.drag = true; cam.vx = cam.vy = 0; cam.tx = cam.ty = null; stats.pinches = (stats.pinches || 0) + 1;
+  }
+  function movePinch() {
+    const a = pts[pinch.a], b = pts[pinch.b]; if (!a || !b) return;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, k = (devW / cssW) / N;
+    cam.x -= (mx - pinch.mx) * k; cam.y -= (my - pinch.my) * k; pinch.mx = mx; pinch.my = my; clampCam();
+    const want = pinch.n0 * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d0, n = clamp(Math.round(want), nFar, nMax);
+    // a little stickiness so a spread halfway between two steps does not flicker: leave the current step only past 0.7 of the way
+    if (n !== N && Math.abs(want - N) > 0.7) zoomTo(n, mx, my);
+  }
   function onDown(e) {
-    if (ptr.id != null || (e.pointerType === 'mouse' && e.button !== 0)) return;
-    ptr.id = e.pointerId; ptr.sx = ptr.lx = e.clientX; ptr.sy = ptr.ly = e.clientY; ptr.moved = 0; ptr.drag = false; ptr.samples = [{ t: now(), x: e.clientX, y: e.clientY }];
-    cam.vx = cam.vy = 0; cam.tx = cam.ty = null;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (pts[e.pointerId] == null) pts[e.pointerId] = { x: e.clientX, y: e.clientY };
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
     e.preventDefault();
+    if (ptr.id == null) {
+      ptr.id = e.pointerId; ptr.sx = ptr.lx = e.clientX; ptr.sy = ptr.ly = e.clientY; ptr.moved = 0; ptr.drag = false; ptr.pinched = false; ptr.samples = [{ t: now(), x: e.clientX, y: e.clientY }];
+      cam.vx = cam.vy = 0; cam.tx = cam.ty = null;
+    }
+    if (!pinch && nPts() >= 2) startPinch();
   }
   function onMove(e) {
+    const p = pts[e.pointerId]; if (p) { p.x = e.clientX; p.y = e.clientY; }
+    if (pinch) { if (e.pointerId === pinch.a || e.pointerId === pinch.b) movePinch(); e.preventDefault(); return; }
     if (e.pointerId !== ptr.id) return;
     const k = (devW / cssW) / N, dx = e.clientX - ptr.lx, dy = e.clientY - ptr.ly; ptr.lx = e.clientX; ptr.ly = e.clientY;
     ptr.moved = Math.max(ptr.moved, Math.hypot(e.clientX - ptr.sx, e.clientY - ptr.sy));
@@ -690,8 +732,16 @@
     e.preventDefault();
   }
   function onUp(e) {
-    if (e.pointerId !== ptr.id) return; ptr.id = null;
+    if (pts[e.pointerId] == null && e.pointerId !== ptr.id) return;
+    delete pts[e.pointerId];
     try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* fine */ }
+    if (pinch && (e.pointerId === pinch.a || e.pointerId === pinch.b)) { pinch = null; if (nPts() >= 2) startPinch(); }
+    if (ptr.pinched) { // after a pinch: a finger still down carries on dragging (no jump); nothing is a tap, nothing flings
+      const left = Object.keys(pts); if (e.pointerId === ptr.id || pts[ptr.id] == null) ptr.id = left.length ? +left[0] : null;
+      if (ptr.id != null && pts[ptr.id]) { ptr.lx = pts[ptr.id].x; ptr.ly = pts[ptr.id].y; ptr.samples = []; }
+      return;
+    }
+    if (e.pointerId !== ptr.id) return; ptr.id = null;
     if (e.type === 'pointercancel') return;
     if (!ptr.drag) {
       const h = R.clientToHex(e.clientX, e.clientY), S = st();
@@ -703,7 +753,27 @@
     const a = ptr.samples[0], b = ptr.samples[ptr.samples.length - 1], dt = (b.t - a.t) / 1000, k = (devW / cssW) / N;
     if (dt > 0.02 && now() - b.t < 90) { cam.vx = clamp(-(b.x - a.x) * k / dt, -900 * K, 900 * K); cam.vy = clamp(-(b.y - a.y) * k / dt, -900 * K, 900 * K); }
   }
-  function onWheel(e) { cam.x += e.deltaX / N; cam.y += e.deltaY / N; cam.vx = cam.vy = 0; cam.tx = cam.ty = null; clampCam(); e.preventDefault(); }
+  // Desktop: a plain wheel scrolls the floor; ctrl + wheel (also what Chrome, Edge and Firefox send for a trackpad pinch) zooms
+  // around the pointer. The amount is added up so one mouse-wheel notch is one step and a trackpad pinch steps smoothly.
+  let wheelAcc = 0, wheelAt = 0;
+  function onWheel(e) {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      const t = now(); if (t - wheelAt > 350) wheelAcc = 0; wheelAt = t;
+      wheelAcc -= e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+      if (Math.abs(wheelAcc) >= 60) { zoomTo(N + (wheelAcc > 0 ? 1 : -1), e.clientX, e.clientY); wheelAcc = 0; }
+      return;
+    }
+    cam.x += e.deltaX / N; cam.y += e.deltaY / N; cam.vx = cam.vy = 0; cam.tx = cam.ty = null; clampCam();
+  }
+  // Safari on a Mac sends its own gesture events for a trackpad pinch (iPhone Safari sends them alongside the touches: those are
+  // ignored, the fingers are already handled above). Always prevented so the page itself never zooms.
+  function onGesture(e) {
+    e.preventDefault(); if (nPts() || pinch) { gestAt = -1e9; return; }
+    if (e.type === 'gesturestart') { gestAt = N; return; }
+    if (e.type === 'gesturechange' && gestAt > 0 && e.scale > 0) { const w = gestAt * e.scale, n = clamp(Math.round(w), nFar, nMax); if (n !== N && Math.abs(w - N) > 0.7) zoomTo(n, e.clientX, e.clientY); }
+    if (e.type === 'gestureend') gestAt = -1e9;
+  }
 
   // ---------------------------------------------------------------- placement mode
   function ensureDom() {
@@ -968,7 +1038,7 @@
     try { if (root.ZSprites && root.ZSprites.init) root.ZSprites.init(); } catch (e) { stats.warned.init = String(e && e.message || e); }
     if (!started) {
       canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointermove', onMove); canvas.addEventListener('pointerup', onUp); canvas.addEventListener('pointercancel', onUp);
-      canvas.addEventListener('wheel', onWheel, { passive: false }); canvas.addEventListener('contextmenu', e => e.preventDefault());
+      canvas.addEventListener('wheel', onWheel, { passive: false }); ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => canvas.addEventListener(t, onGesture, { passive: false })); canvas.addEventListener('contextmenu', e => e.preventDefault());
       root.addEventListener('resize', resize);
       if (root.ResizeObserver) new ResizeObserver(resize).observe(canvas);
     }
@@ -995,8 +1065,13 @@
     if (instant) { cam.tx = cam.ty = null; return; }
     cam.tx = cam.x; cam.ty = cam.y; cam.x = ox; cam.y = oy;
   };
-  R.setZoom = function (level) { zoom = level ? 1 : 0; resize(); };
-  R.getZoom = () => zoom;
+  // zoom (Update 9). setZoom/getZoom are the old two-step calls, kept: 0 = the old Far step, 1 = the old Close step (the default);
+  // getZoom() says 1 for Close or anything closer. zoomBy/zoomTo/zoomInfo cover the full set of whole-pixel steps.
+  R.setZoom = function (level) { zoomOff = level ? 0 : nFar - nClose; if (canvas && vw) { cam.vx = cam.vy = 0; cam.tx = cam.ty = null; applyScale(nClose + zoomOff); zoomOff = N - nClose; } else resize(); };
+  R.getZoom = () => (N >= nClose ? 1 : 0);
+  R.zoomBy = (steps, clientX, clientY) => zoomTo(N + (Math.round(steps) || 0), clientX, clientY);
+  R.zoomTo = (scale, clientX, clientY) => zoomTo(scale, clientX, clientY);
+  R.zoomInfo = () => ({ scale: N, far: nFar, close: nClose, max: nMax, steps: (() => { const a = []; for (let n = nFar; n <= nMax; n++) a.push(n); return a; })(), pinches: stats.pinches || 0, pinching: !!pinch });
   R.resize = resize;
   R.entrance = () => (M && M.ent ? { q: M.ent.q, r: M.ent.r } : null);
   // what is under a floor point: 'strip' (a habitat's border walkway), 'fenced' (inside a fence), 'building', or null (open ground)
@@ -1006,7 +1081,7 @@
   R.stripPeople = () => (M ? walkers.filter(w => !w.hidden).map(w => ({ x: Math.round(w.x), y: Math.round(w.y), on: whereOn(w.x, w.y), node: w.node, strip: !!(M.nodes[w.node] && M.nodes[w.node].strip) })) : []);
   R.debug = function () {
     return { sprites: stats.sprites, fps: stats.fps, frameMs: stats.frameMs, cam: { x: cam.x, y: cam.y }, buffer: { w: Math.round(vw), h: Math.round(vh), scale: N / dpr, deviceScale: N, dpr: dpr, density: K, artScale: N * K / dpr },
-      running: running, zoom: zoom, realSprites: usingReal(), spriteGetters: spriteState(), spriteErrors: Object.assign({}, stats.warned), animals: Object.keys(animals).length, visitors: walkers.filter(w => w.staff == null).length, staff: walkers.filter(w => w.staff != null && !w.hidden).length,
+      running: running, zoom: (N >= nClose ? 1 : 0), zoomScale: N, zoomSteps: [nFar, nClose, nMax], realSprites: usingReal(), spriteGetters: spriteState(), spriteErrors: Object.assign({}, stats.warned), animals: Object.keys(animals).length, visitors: walkers.filter(w => w.staff == null).length, staff: walkers.filter(w => w.staff != null && !w.hidden).length,
       inHab: (() => { let n = 0; for (const id in animals) { const a = animals[id], h = M && M.habs[a.hab]; if (h && h.cells.some(c => { const t = G.toAxial(a.x, a.y); return t.q === c.q && t.r === c.r; })) n++; } return n; })(), hopping: Object.keys(animals).filter(id => animals[id].hop > 0).length,
       staffAt: walkers.filter(w => w.staff != null && !w.hidden).map(w => [Math.round(w.x), Math.round(w.y)]), gateXY: M && M.ent ? [M.ent.x, M.ent.y] : null,
       pen: M && M.pen ? { q: M.pen.q, r: M.pen.r, crate: (() => { const c = crateSprite(); return c.c.width + 'x' + c.c.height; })(), count: penned.length, hidden: penHidden, onPath: !!M.path[M.pen.k] } : null,

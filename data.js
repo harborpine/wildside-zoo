@@ -86,6 +86,29 @@
   };
   D.FAC_ORDER = ['snack', 'bench', 'restroom', 'icecream', 'gift', 'photo', 'kiosk', 'fountain', 'cafe', 'playground', 'vet', 'lab', 'deck', 'gate', 'center', 'pavilion'];
 
+  // Animal pairings (R9, note 27): two species sharing one habitat. 'good' ones get along (more visitor draw), 'bad' ones clash
+  // (less). Every mix not listed is neutral. The holding pen never counts. [a, b, kind, name], same biome, biome order.
+  const PR = [
+    ['zebra', 'giraffe', 'good', 'Grazing buddies'], ['zebra', 'ostrich', 'good', 'Lookout partners'], ['warthog', 'meerkat', 'good', 'Burrow neighbours'],
+    ['lion', 'zebra', 'bad', 'Nervous neighbours'], ['lion', 'hyena', 'bad', 'Old rivals'], ['cheetah', 'hyena', 'bad', 'Snack snatchers'],
+    ['capybara', 'tapir', 'good', 'River friends'], ['macaw', 'toucan', 'good', 'Fruit sharers'], ['sloth', 'capybara', 'good', 'Easy-going crowd'],
+    ['jaguar', 'capybara', 'bad', 'Watchful eyes'], ['orangutan', 'spidermonkey', 'bad', 'Branch squabbles'],
+    ['kangaroo', 'emu', 'good', 'Outback mates'], ['wombat', 'koala', 'good', 'Sleepy heads'],
+    ['dingo', 'kangaroo', 'bad', 'Restless mob'], ['devil', 'dingo', 'bad', 'Night-time spats'],
+    ['reindeer', 'hare', 'good', 'Tundra grazers'], ['walrus', 'seal', 'good', 'Ice floe friends'],
+    ['polarbear', 'seal', 'bad', 'Thin ice'], ['arcticfox', 'hare', 'bad', 'Snowy chase'], ['owl', 'hare', 'bad', 'Watched from above'],
+    ['yak', 'goat', 'good', 'High pasture pals'], ['redpanda', 'panda', 'good', 'Bamboo buddies'],
+    ['snowleopard', 'goat', 'bad', 'Cliffside chase'], ['eagle', 'marmot', 'bad', 'Shadow overhead'],
+    ['clownfish', 'seahorse', 'good', 'Reef neighbours'], ['manta', 'whaleshark', 'good', 'Gentle giants'], ['turtle', 'stingray', 'good', 'Slow gliders'],
+    ['reefshark', 'dolphin', 'bad', 'Tail chasers'], ['octopus', 'clownfish', 'bad', 'Grabby arms'],
+    ['triceratops', 'mammoth', 'good', 'Ancient grazers'], ['trex', 'triceratops', 'bad', 'Prehistoric feud'], ['raptor', 'dodo', 'bad', 'Too quick for comfort'],
+    ['unicorn', 'jackalope', 'good', 'Meadow magic'], ['phoenix', 'dragon', 'good', 'Fire friends'], ['griffin', 'dragon', 'bad', 'Sky rivals']
+  ];
+  D.PAIR_DRAW = { good: 0.08, bad: -0.10 };
+  D.PAIR_CAP = [-0.25, 0.20]; // a habitat's pairings together stay inside this
+  D.PAIR_RP = 5;              // research for discovering a good pairing
+  D.PAIRS = PR.map(p => ({ id: p[0] + '-' + p[1], a: p[0], b: p[1], kind: p[2], name: p[3], draw: D.PAIR_DRAW[p[2]] }));
+
   // Named combos. anchor: 'hab:<biome>' or 'fac:<type>'. needs: neighbor kinds (same notation). All must touch the anchor.
   D.COMBOS = [
     { id: 'picnic',   name: 'Safari Picnic',    anchor: 'hab:savanna',  needs: ['fac:snack', 'fac:bench'],        draw: 0.20, hint: 'A savanna habitat with somewhere to eat and somewhere to sit.' },

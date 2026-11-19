@@ -200,7 +200,7 @@ check('expedition finds wait as arrivals; nothing deadlocks with a full pen', ()
   ok(Z.holding(S).length > Z.holdCap(S)); ok(!Z.startExpedition(S, 'savanna', [S.staff[1].id], 0).ok, 'over-full pen blocks a new expedition as before');
   ok(Z.sellAnimal(S, S.animals[S.animals.length - 1].id).ok && Z.sellAnimal(S, S.animals[S.animals.length - 1].id).ok); ok(Z.startExpedition(S, 'savanna', [S.staff[1].id], 0).ok);
   let rep = null; for (let t = 0; t < 10 && !rep; t++) { S.reports = []; Z.tick(S); rep = S.reports.find(r => r.type === 'expedition'); }
-  ok(rep && rep.found.length >= 1); rep.found.forEach(f => { ok(f.pending && f.hab === null && f.price > 0 && (f.sex === 'M' || f.sex === 'F')); ok(Z.arrival(S, f.id)); eq(Z.arrivalChoices(S, f.id).slice(-1)[0], { hab: null, room: Z.holdCap(S) - Z.holding(S).length, fit: true, best: Z.arrivalChoices(S, f.id).length === 1 || !Z.arrivalChoices(S, f.id).some(c => c.hab != null && c.best), animals: Z.habAnimals(S, null) }); }); // R7: each entry also lists who lives there
+  ok(rep && rep.found.length >= 1); rep.found.forEach(f => { ok(f.pending && f.hab === null && f.price > 0 && (f.sex === 'M' || f.sex === 'F')); ok(Z.arrival(S, f.id)); eq(Z.arrivalChoices(S, f.id).slice(-1)[0], { hab: null, room: Z.holdCap(S) - Z.holding(S).length, fit: true, best: Z.arrivalChoices(S, f.id).length === 1 || !Z.arrivalChoices(S, f.id).some(c => c.hab != null && c.best), animals: Z.habAnimals(S, null), pair: { kind: '', good: [], bad: [], draw: 0 } }); }); // R7: each entry also lists who lives there; R9: and the pairing it would start (none in the pen)
   rep.found.forEach(f => ok(Z.keepArrival(S, f.id, null).ok, 'the pen always takes a find'));
   ok(Z.sellAnimal(S, rep.found[0].id).ok, 'and it can be sold again later');
 });
@@ -874,6 +874,64 @@ check('removeRefund: half the list price for a placed item or a kind, 0 for noth
   S.research['fac:gift'] = true; const sp = firstSpot(S, 'fac', 'gift'), id = Z.build(S, 'fac', 'gift', sp[0], sp[1], 0).id; Z.debug.happening(S, 'sale'); // a Builder's deal is on: the refund is still from the list price
   const want = Z.removeRefund(S, id), m = S.money, r = Z.remove(S, id); ok(r.ok); eq([r.refund, S.money - m], [want, want], 'remove pays what removeRefund said (the list price, not a sale price)');
   const h = S.items.find(i => i.k === 'hab'), w2 = Z.removeRefund(S, h.id), m2 = S.money, r2 = Z.remove(S, h.id); eq([r2.refund, S.money - m2], [w2, w2]);
+});
+
+// ---------- R9 (Update 9) ----------
+const addSp = (S, sp, hab, sex) => { const a = Object.assign({}, S.animals[0], { id: S.nextId++, sp: sp, hab: hab, sex: sex || 'F', born: null, sick: 0, variant: false }); S.animals.push(a); return a; };
+check('pairings table: same biome, known species, unique ids and names, both kinds present', () => {
+  const ids = {}, names = {};
+  D.PAIRS.forEach(p => {
+    ok(D.SPECIES[p.a] && D.SPECIES[p.b] && p.a !== p.b, p.id + ': species'); eq(D.SPECIES[p.a].biome, D.SPECIES[p.b].biome, p.id + ' biome');
+    ok(!ids[p.id] && !names[p.name], p.id + ': duplicate'); ids[p.id] = names[p.name] = 1; ok(p.kind === 'good' || p.kind === 'bad');
+  });
+  const keys = {}; D.PAIRS.forEach(p => { const k = [p.a, p.b].sort().join('|'); ok(!keys[k], 'same pair twice: ' + k); keys[k] = 1; });
+  return D.PAIRS.filter(p => p.kind === 'good').length + ' good, ' + D.PAIRS.filter(p => p.kind === 'bad').length + ' bad';
+});
+check('pairings: active only in a habitat (never the pen), found on first sight, change the draw, preview is right', () => {
+  const S = NG(), h = S.items.find(i => i.k === 'hab'); Z.refresh(S);
+  const base = Z.c(S).hab[h.id].draw; eq(Z.pairsIn(S, h.id), []); eq(Z.pairsIn(S, null), []);
+  ok(Z.pairList(S).every(p => !p.found), 'nothing found at the start');
+  const g = addSp(S, 'giraffe', null); Z.refresh(S); ok(!S.pairs['zebra-giraffe'], 'the holding pen never counts');
+  const pv = Z.pairPreview(S, g.id, h.id); eq([pv.kind, pv.good.map(p => p.id), pv.draw], ['good', ['zebra-giraffe'], 0.08]); ok(!pv.good[0].found);
+  eq(Z.pairPreview(S, g.id, null).kind, '', 'pen preview');
+  S.reports = []; g.hab = h.id; Z.refresh(S);
+  ok(S.pairs['zebra-giraffe'] != null, 'discovered'); ok(S.reports.some(r => r.type === 'pair' && r.id === 'zebra-giraffe'), 'pair report');
+  eq(Z.pairsIn(S, h.id).map(p => [p.id, p.found]), [['zebra-giraffe', true]]); eq(Z.c(S).hab[h.id].pair, 0.08);
+  const l = addSp(S, 'lion', null, 'M'); eq(Z.pairPreview(S, l.id, h.id).kind, 'bad');
+  l.hab = h.id; Z.refresh(S); eq(Math.round(Z.c(S).hab[h.id].pair * 100), -2, 'good +0.08 and clash -0.10');
+  const cap = D.PAIR_CAP; D.PAIR_CAP = [0, 0]; const S3 = JSON.parse(Z.serialize(S)); Z.refresh(S3); D.PAIR_CAP = cap; ok(Math.abs(Z.c(S).hab[h.id].draw - Z.c(S3).hab[h.id].draw * 0.98) < 1e-6, 'the bonus is inside the draw');
+  ok(base > 0, 'draw measured');
+  const S2 = NG(), h2 = S2.items.find(i => i.k === 'hab'); ['lion', 'hyena', 'cheetah'].forEach(sp => addSp(S2, sp, h2.id)); Z.refresh(S2);
+  eq(Z.c(S2).hab[h2.id].pair, D.PAIR_CAP[0], 'clashes capped'); // zebra-lion, lion-hyena, cheetah-hyena = -0.30, capped at -0.25
+});
+check('pairings: auto-housing avoids a clash when another habitat has room; old saves load with S.pairs added', () => {
+  const S = NG(); S.money = 1e7; const h1 = S.items.find(i => i.k === 'hab'); const sp = firstSpot(S, 'hab', 'savanna'); const h2 = Z.build(S, 'hab', 'savanna', sp[0], sp[1], sp[2]).id;
+  const l = addSp(S, 'lion', null, 'M'); eq(Z.bestHab(S, l).id, h2, 'the lion goes to the empty habitat, not the zebras');
+  const o = JSON.parse(Z.serialize(S)); delete o.pairs; const L = Z.deserialize(JSON.stringify(o)); ok(L && L.pairs && typeof L.pairs === 'object');
+  ok(h1, 'starter habitat');
+});
+check('rpPerWeek equals what one week adds to research', () => {
+  const S = NG(); S.rp = 0; Z.refresh(S); const w = Z.rpPerWeek(S); S.reports = []; Z.tick(S); ok(w > 0, 'some research'); ok(Math.abs(S.rp - w) < 0.06 || S.rp > w, 'tick added ' + S.rp + ' vs ' + w); return w + ' per week';
+});
+check('expeditions: effort level wording, last mission remembered, default effort 1', () => {
+  const S = NG(); S.money = 1e6; const ex = S.staff.find(s => s.role === 'explorer') || S.staff[0];
+  eq(Z.lastMission(S, ex.id), null); eq(Z.defaultEffort(S, 'savanna', [ex.id]), 1);
+  const r5 = Z.startExpedition(S, 'savanna', [ex.id], 5); ok(!r5.ok && /Effort level 5/.test(r5.msg) && r5.why === 'lock', r5.msg);
+  ok(/effort level/.test(Z.startExpedition(S, 'savanna', [ex.id], 9).msg));
+  ok(Z.startExpedition(S, 'savanna', [ex.id], 2).ok); eq(Z.lastMission(S, ex.id), { region: 'savanna', effort: 2 }); eq(Z.defaultEffort(S, 'savanna', [ex.id]), 2);
+  eq(Z.defaultEffort(S, 'jungle', [ex.id]), 1, 'other region opens on 1');
+  ok(Z.rankUnlocks(2).some(t => /effort level 3/.test(t)) && !Z.rankUnlocks(2).some(t => /stars/.test(t)));
+  const L = Z.deserialize(Z.serialize(S)); eq(Z.lastMission(L, ex.id), { region: 'savanna', effort: 2 }, 'saved');
+});
+check('locked versus cannot afford: lists and refusals say which', () => {
+  const S = NG(); S.money = 0; S.rp = 0;
+  const st = Z.expStars(S, 'savanna', []); eq(st[0].why, 'money'); eq(st[0].lock, ''); eq(st[4].why, 'lock');
+  ok(Z.hireTiers(S).some(t => t.why === 'lock') && Z.hireTiers(S).some(t => t.why === 'money'), 'hire tiers');
+  ok(Z.campaigns(S).every(c => c.why === 'lock' || c.why === 'money'), 'campaigns');
+  const rl = Z.researchList(S); ok(rl.some(r => r.why === 'rp' && !r.lock) && rl.some(r => r.why === 'lock'), 'research');
+  eq(Z.buildCheck(S, 'fac', 'snack').why, 'money'); eq(Z.buildCheck(S, 'fac', 'gift').why, 'lock'); eq(Z.buildCheck(S, 'hab', 'jungle').why, 'lock');
+  S.money = 1e7; eq(Z.buildCheck(S, 'fac', 'snack').ok, true);
+  S.money = 0; eq(Z.advertise(S, 0).why, 'money'); eq(Z.advertise(S, 3).why, 'lock'); eq(Z.doResearch(S, rl.find(r => r.why === 'rp').id).why, 'rp');
 });
 
 console.log(failed ? '\nRULES CHECK: ' + failed + ' FAILED' : '\nRULES CHECK: ALL PASSED');

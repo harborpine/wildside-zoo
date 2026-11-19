@@ -1,5 +1,27 @@
 # render.js -> `ZRender`: API as built (Renderer)
 
+## Update 9 (2026-11-18): pinch zoom, no zoom setting (note 19)
+
+The player zooms with two fingers on the floor (pinch out = closer, pinch in = further). On a desktop: ctrl + mouse wheel, or a
+trackpad pinch (Chrome / Edge / Firefox send ctrl+wheel; Mac Safari's gesture events are handled too). A plain wheel still scrolls.
+- Always a whole number of device pixels per buffer pixel (crisp art). Steps run from the old "Far" scale through the old "Close"
+  scale (the default) to at least one step closer; a phone 393 px wide at 3x gets scales 2, 3, 4. During a pinch the scale snaps to
+  the nearest step (with a little stickiness), the floor under the fingers stays put and follows their middle, and the camera
+  limits still apply (no scrolling off the land).
+- A pinch is never a tap: no `onTap`, no Edit-mode `onPick`, the placement ghost does not move, no fling afterwards. A finger left
+  down after a pinch keeps dragging. One-finger drag and taps are unchanged.
+- The choice is kept in memory for this page only (survives a new game, `reset()`, a resize; forgotten on reload). Nothing is saved.
+
+| Call | What it does |
+|---|---|
+| `ZRender.setZoom(0 or 1)` / `getZoom()` | Kept for compatibility: 0 = the old Far step, 1 = the old Close step. `getZoom()` is 1 at Close or closer. No menu needs them now. |
+| `ZRender.zoomBy(steps, clientX?, clientY?)` | Zoom in (+) or out (-) by whole steps around a client point (default: the middle). Returns `true` if the scale changed. |
+| `ZRender.zoomTo(scale, clientX?, clientY?)` | Go to a given whole scale (kept within the steps). |
+| `ZRender.zoomInfo()` | `{ scale, far, close, max, steps, pinches, pinching }`. `debug()` also has `zoomScale` and `zoomSteps` ([far, close, max]). |
+
+Check: `node test/render-pinch.js both` (real touches in Chromium via CDP; synthetic touch pointer events in WebKit).
+Screenshots: `test/shots/render-r9-zoom-<scale>[-webkit].png`.
+
 ## Update 7 (2026-11-15): walkway ring, speed 2, Edit mode, challenge maps
 
 Where this section disagrees with older text further down, this section wins. Checks: `node test/render-shot.js both`,

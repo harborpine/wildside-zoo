@@ -3,7 +3,68 @@
 Written by the Rules teammate. Everything Menus and Moments need is here. In Node the same objects come from
 `require('./data.js')` and `require('./engine.js')`. Checks: `node test/rules-check.js`, `node test/bot.js 0.8` and `node test/bot.js challenge all 40`.
 
-## R7. Update 7 changes (read this first; it overrides anything older below)
+## R9. Update 9 changes (read this first; it overrides anything older below)
+
+Save version stays **3**. Old saves load: `deserialize` adds `S.pairs = {}` when missing; an explorer with no `lastMission` simply
+has none (first mission = effort level 1). Notes 17, 18 and 26 (harder game, trader, adverts) are NOT in this section yet.
+
+### R9.1 Animal pairings in a habitat (note 27)
+
+Some species get along when they share a habitat (a **good** pairing), some clash (a **bad** pairing); every other mix is neutral.
+The holding pen never counts. Habitats are single-biome, so every pairing is two species of the same biome.
+
+- Table: `D.PAIRS = [{ id, a, b, kind: 'good'|'bad', name, draw }]`, `a` and `b` species ids. `draw` is the change to that
+  habitat's visitor draw: **+0.08** for a good pairing, **-0.10** for a bad one. Several pairings in one habitat add up, kept
+  between **-0.25 and +0.20** (`D.PAIR_CAP`). No other effect (breeding and health are untouched).
+- A pairing is **active** in a habitat when at least one animal of each species lives there (babies count, sick animals count).
+- **Discovery:** the first time a pairing is active anywhere, `S.pairs[id] = week found` and a report
+  `{ type: 'pair', id, kind, name, a, b, hab }` is raised (plus a news line; a good one also gives +5 research). A report type
+  the moments layer has no handler for is skipped safely, so registering one is optional.
+- Auto-housing (`bestHab`, keep-all, the bot) now avoids a bad pairing and leans toward a good one when there is a choice.
+
+| Call | Returns |
+|---|---|
+| `ZE.pairsIn(S, habId)` | Active pairings in that habitat: `[{ id, a, b, kind, name, draw, found }]`. `[]` for `null` (the pen) or a non-habitat |
+| `ZE.pairList(S)` | Every pairing for the Combos screen, table order (biome order, good before bad): `[{ id, name, kind, found, a, b, biome }]`. Undiscovered: show **name only**, greyed; do not show `a`/`b` or kind (note 28 style) |
+| `ZE.pairPreview(S, animalId, habId)` | What putting this animal (owned **or** a waiting arrival) into that habitat would START: `{ kind: 'good'|'bad'|'mixed'|'', good: [pair], bad: [pair], draw }`. `draw` = net change to that habitat's pairing bonus (already capped). Pairings already active there are not repeated. `habId` null = the pen = always `kind: ''`. Each pair entry is the `pairsIn` shape including `found` |
+| `ZE.c(S).hab[habId].pair` | The habitat's capped pairing bonus, already inside `.draw` (so visitors, income and every existing appeal number feel it) |
+| `ZE.arrivalChoices(S, id)[i].pair` | Every where-list entry now carries `pairPreview` for that place (the pen entry has `kind: ''`) |
+
+Suggested display (UI's call): in the where-list a small green or red mark for `pair.kind`, with the pairing's name when `found`
+and a plain "Gets along" / "Clashes" when not.
+
+### R9.2 Research per week (note 24)
+
+`ZE.rpPerWeek(S)` -> research points the zoo gains each week right now, one decimal (e.g. `3.4`).
+This is exactly what the weekly tick adds to `S.rp`. Show `Math.round(S.rp)` with "+" and this value per week.
+
+### R9.3 Expeditions: effort levels and each explorer's last mission (notes 22, 32)
+
+- Internal names do not change (`star` fields, `expStars`, `startExpedition(S, region, team, star)`). The engine's own words now
+  say **effort level**: refusals `'Pick effort level 1 to 5.'`, `'Effort level 4 needs zoo rank 3.'`, rank-up line
+  `'Expeditions: effort level 3'`, and `expStars(...)[i].lock` reads `'Rank 3'` as before.
+- When an expedition starts, every team member gets `s.lastMission = { region, effort }`.
+- `ZE.lastMission(S, staffId)` -> `{ region, effort }` or `null` (never sent, or not on staff). For a team, UI opens on the
+  first picked explorer's last mission; with none, effort level **1**. `ZE.defaultEffort(S, region, staffIds)` does exactly this:
+  the first picked explorer's effort if they last went to this region and it is still unlocked, otherwise the region's lowest.
+
+### R9.4 Locked versus can't afford (note 16)
+
+A lock symbol must only mean "not unlocked yet". Every list entry that can be locked now also carries:
+
+- `why`: `'lock'` (not unlocked: zoo rank, research, a challenge rule, a job level), `'money'` (unlocked but the bank is short),
+  `'rp'` (unlocked but research points are short), `'busy'` (already running), or `''` (can do it now). Lock wins over the others.
+- `afford`: `true` / `false` (money or research points, ignoring locks).
+- `lock` keeps its old meaning and text: `''` unless it is a real lock.
+
+Lists with these fields: `ZE.expStars`, `ZE.hireTiers`, `ZE.campaigns`, `ZE.researchList`, `ZE.jobOptions` (`why` only),
+and new **`ZE.buildCheck(S, kind, t)`** -> `{ ok, why, msg, cost }` for the Build strip (`kind` 'hab' with a biome, or 'fac'
+with a facility id); its `why` can also be `'limit'` ("Only 1 allowed").
+
+Action refusals (`{ ok: false, msg }`) now also carry `why` where it is one of these: `'money'` from every "Not enough money",
+`'rp'` from research, `'lock'` from rank, research and challenge refusals. Other refusals have no `why`.
+
+## R7. Update 7 changes (overridden by R9 where they differ)
 
 Save version stays **3**; every old save loads with no migration needed (nothing new is stored for rings; a normal zoo has no
 `S.ch`; an expedition that was already out keeps its old `budget` and comes home under the old odds).
