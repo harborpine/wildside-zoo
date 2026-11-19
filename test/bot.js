@@ -19,6 +19,7 @@ function run(skill, verbose, opts) {
   if (opts && opts.level && !L) throw new Error('bot: no such level ' + opts.level);
   const S = L ? Z.newChallenge(L.id) : Z.newGame({ runs: 0 }, { starter: classic });
   const goal = L ? L.goal.kind : '';
+  let minMoney = Infinity;
   const first = !!(opts && opts.first), lastStar = {}; // the careful first-timer profile (challenges)
   if (L ? L.start !== 'starter' : !classic) {
     const at = Z.starterSpots(), a = Z.build(S, 'hab', 'savanna', at.hab.q, at.hab.r, 0), b = Z.build(S, 'fac', 'snack', at.snack.q, at.snack.r, 0);
@@ -169,7 +170,10 @@ function run(skill, verbose, opts) {
       // train (in a breeding level: Care first)
       S.staff.forEach(s => { if (!first && Z.trainWait(S, s) === 0 && S.money > Z.trainCost(s) * (L ? 3 : 6)) { const r = must(Z.train(S, s.id, goal === 'bred' ? 'care' : D.ROLES[s.role].main), 'train'); count(seen, r.super ? 'super' : 'train'); } });
       // advertising campaign
-      if (!OFF.campaign && Z.allowed(S, 'campaign').ok) D.CAMPAIGNS.forEach((C, i) => { const t = Z.campaigns(S)[i]; if (!t.lock && !t.weeksLeft && t.cost <= S.money * 0.6) { must(Z.runCampaign(S, i), 'campaign'); count(seen, 'campaign'); } });
+      // R9 adverts are switches: on while the weekly price is a small share of the profit and the bank has a cushion, off when money runs low
+      if (!OFF.campaign && Z.allowed(S, 'campaign').ok) { const cc = Z.c(S), profit = cc.income - (cc.cost - cc.ads); Z.adverts(S).forEach(t => {
+        if (t.on && S.money < t.weekly * 4) must(Z.setAdvert(S, t.key, false), 'advert off');
+        else if (!t.on && !t.why && t.weekly <= profit * 0.12 && S.money > t.weekly * 10) { must(Z.setAdvert(S, t.key, true), 'advert on'); count(seen, 'campaign'); } }); }
     }
     if (active) {
       // mid-point choices, happenings, Open Day / Festival plans
@@ -181,6 +185,7 @@ function run(skill, verbose, opts) {
     S.staff.forEach(s => { if (s.lvl >= 12 && !Z.busyStaff(S)[s.id]) { const o = Z.jobOptions(S, s).filter(x => !x.lock && D.ROLES[x.role].adv)[0]; if (o && S.money > Z.jobCost(s) * 3) must(Z.changeJob(S, s.id, o.role), 'job'); } });
     if (S.show) { const best = S.animals.slice().sort((x, y) => Z.showScore(S, y) - Z.showScore(S, x))[0]; if (best) must(Z.enterShow(S, best.id), 'show'); }
     Z.tick(S);
+    if (S.week <= 2 * D.WPY) minMoney = Math.min(minMoney, S.money); // lowest bank in the first two years
     idle.push(S.money / Math.max(1, S.incomeLast));
     if (!isFinite(S.money) || !isFinite(S.rep) || !isFinite(S.rp)) throw new Error('bot: a number went bad in week ' + S.week);
     S.reports.forEach((r, i) => {
@@ -215,7 +220,7 @@ function run(skill, verbose, opts) {
     console.log('optional spending over the run $' + Math.round(S.life.spent).toLocaleString('en-US'), '| saveKB with log', kb, 'without', Math.round(Z.serialize(S).length / 1024));
     console.log('items at the end:', S.items.filter(i => i.k === 'hab').length, 'habitats,', S.items.filter(i => i.k === 'fac').length, 'facilities,', 'on', S.rows * D.GRID_W, 'land hexes');
   }
-  return { S, rows, haps, hapN, choices, seen };
+  return { S, rows, haps, hapN, choices, seen, minMoney: Math.round(minMoney) };
 }
 module.exports = run;
 

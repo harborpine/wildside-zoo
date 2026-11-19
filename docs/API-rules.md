@@ -6,7 +6,8 @@ Written by the Rules teammate. Everything Menus and Moments need is here. In Nod
 ## R9. Update 9 changes (read this first; it overrides anything older below)
 
 Save version stays **3**. Old saves load: `deserialize` adds `S.pairs = {}` when missing; an explorer with no `lastMission` simply
-has none (first mission = effort level 1). Notes 17, 18 and 26 (harder game, trader, adverts) are NOT in this section yet.
+has none (first mission = effort level 1); `S.ads = {}` and `S.traderAt` are added (R9.5, R9.6). A timed campaign running in an
+old save simply finishes its weeks (its visitor boost stays until it ends) and then it is gone; nothing is charged for it again.
 
 ### R9.1 Animal pairings in a habitat (note 27)
 
@@ -63,6 +64,45 @@ with a facility id); its `why` can also be `'limit'` ("Only 1 allowed").
 
 Action refusals (`{ ok: false, msg }`) now also carry `why` where it is one of these: `'money'` from every "Not enough money",
 `'rp'` from research, `'lock'` from rank, research and challenge refusals. Other refusals have no `why`.
+
+### R9.5 Adverts are on/off switches with a weekly cost (note 26; replaces timed campaigns)
+
+Each advert (`D.CAMPAIGNS`: Flyers, Radio ad, TV ad, Blimp) is a switch. While it is **on** it is charged every week (inside the
+normal weekly costs, so `ZE.c(S).cost` and `S.costLast` include it; `ZE.c(S).ads` is the adverts' share) and every week it gives
+its visitor boost and a little reputation. No fixed length; it runs until switched off. Several can be on at once.
+
+| Call | Returns |
+|---|---|
+| `ZE.adverts(S)` | `[{ key, name, weekly, vis, rep, on, lock, why, afford, rank }]` in table order. `weekly` = cost per week now (grows with zoo rank). `vis` = visitor boost while on (0.02 = +2%). `rep` = reputation per week while on (one decimal). `why` / `afford` as R9.4 (`why` is `''` when it is on) |
+| `ZE.setAdvert(S, keyOrIndex, on)` | `{ ok, on, weekly }`. Switching on is refused with `why: 'lock'` (rank or challenge) or `why: 'money'` (bank below one week's cost). Switching off always works. Nothing is charged at the moment of switching; the first charge is the next weekly tick |
+| `ZE.toggleAdvert(S, keyOrIndex)` | Flips it; same result as `setAdvert` |
+| `ZE.adCost(S)` | Total weekly cost of the adverts that are on |
+
+- **Bank can't cover it:** at the start of a week, if the bank is below the adverts' weekly total, the most expensive ones switch
+  themselves off until the rest fit (bank below zero = all off). Each gives a news line ("Radio ad switched off: not enough money.")
+  and an `elog` event `ad_off`. No report, no pop-up.
+- `ZE.campaigns(S)` and `ZE.runCampaign(S, i)` stay as old names: `campaigns` = `adverts` plus `cost` (= weekly), `weeks: 0`,
+  `weeksLeft: 0`, `note`; `runCampaign` = switch it on. New screens should use the calls above.
+- Weekly prices at rank 1 / 3 / 5: Flyers $50 / $150 / $1,200, Radio $100 / $300 / $2,600, TV (from rank 3) $550 / $4,800,
+  Blimp (from rank 5) $8,000. Reputation per week about 1.3 / 1.5 / 2.1 / 2.2. Exact figures always come from `adverts`.
+
+### R9.6 The trader visits every 3 months (note 18)
+
+- The trader now comes every **13 weeks** (`D.TRADER_WEEKS`) on its own clock (`S.traderAt` = week of the next visit); the first
+  visit is still when the zoo opens. It brings **2 animals** you can see (`D.TRADER_ANIMALS`) and **3 mystery crates**
+  (`D.CRATES_PER_VISIT` = 3), all one rarity per visit as before; contents show only after buying (`openCrate`, unchanged).
+- The headhunter and the director keep their old rhythm (each about every 20 weeks). If the director is at the gate when the trader
+  is due, the trader comes the week after the director leaves (they share `S.offers`).
+- Fewer crates would have cut rare variants by about a third, so a crate's rare-variant chance is now 14% (`D.CRATE_VARIANT`, was 6%);
+  with it the bot's rare variants per run are back near the old figure (29 against 28).
+- Same calls as before: the `caller` report, `ZE.callersHere`, `S.offers`, `ZE.crateInfo` (`total` is now 3), `ZE.buyAnimal`.
+
+### R9.7 Tighter money in the long-term zoos (note 17)
+
+Wages are x`D.TIGHT.wage` and running costs (animal upkeep and building maintenance) x`D.TIGHT.run` in the three long-term zoos.
+Challenge levels are not affected. **`ZE.salary(s, S)` now takes the game as a second argument** (and `ZE.headhuntFee(s, S)`):
+pass `S` so a challenge shows its own (lower) wage; without `S` it shows the long-term-zoo wage. `ZE.c(S)` already includes everything.
+Current figure: x1.8 on wages, animal upkeep and building maintenance (the holding-pen surcharge is unchanged).
 
 ## R7. Update 7 changes (overridden by R9 where they differ)
 

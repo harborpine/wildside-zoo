@@ -863,11 +863,11 @@
       if (kind === 'headhunter') {
         const h = st.headhunt;
         if (!h) { if (M.hired) { M.end(); } else { body.appendChild(el('div', { cls: 'mo-line center' }, 'The headhunter has gone.')); M.foot(ui.btn('Close', () => M.end(), { cls: 'big' })); } return; }
-        const R = D.ROLES[h.role] || { name: h.role, main: 'care' }, fee = E.headhuntFee(h), full = st.staff.length >= E.staffCap(st), poor = st.money < fee;
+        const R = D.ROLES[h.role] || { name: h.role, main: 'care' }, fee = E.headhuntFee(h, S()), full = st.staff.length >= E.staffCap(st), poor = st.money < fee;
         const card = el('div', { cls: 'mo-card' }, el('div', { cls: 'mo-kicker' }, 'The headhunter'),
           el('div', { cls: 'mo-pic small' }, pic(pUrl(h.role, 5))), el('div', { cls: 'mo-title' }, h.name), el('div', { cls: 'mo-line hi' }, R.name + ' · level ' + (h.lvl || 1)),
           el('div', { cls: 'mo-chips' }, ['care', 'sci', 'exp', 'charm'].map(k => ui.skillChip ? ui.skillChip(k, h[k]) : el('span', { cls: 'mo-chip' + (R.main === k ? ' main' : '') }, skillSym(k), el('b', String(h[k]))))),
-          el('div', { cls: 'mo-chips' }, chip('coin', fmt.money(E.salary(h)) + ' /'), sym('time', '', 'per week', 3), chip('coin', fmt.money(fee))));
+          el('div', { cls: 'mo-chips' }, chip('coin', fmt.money(E.salary(h, S())) + ' /'), sym('time', '', 'per week', 3), chip('coin', fmt.money(fee))));
         body.appendChild(card);
         M.foot(ui.btn('Hire for ' + fmt.money(fee), () => {
           const r = Z.act('hireHeadhunt'); if (r && r.ok) { M.hired = true; ui.toast(h.name + ' joins the team', 'good'); M.end(); }

@@ -49,7 +49,8 @@
   Z.busyAnimals = S => { const b = {}; S.projects.forEach(p => { if (p.type === 'breed') { b[p.a] = p; b[p.b] = p; } }); return b; };
   Z.speciesCount = S => Object.keys(S.book).length;
   Z.variantCount = S => Object.values(S.book).filter(b => b.variant).length;
-  Z.salary = s => Math.round(30 + s.lvl * 22 + (s.care + s.sci + s.exp + s.charm) * 0.6 + (s.mastered ? s.mastered.length * 80 : 0));
+  Z.tight = (S, k) => S && S.ch ? 1 : D.TIGHT[k]; // R9: tighter money in the long-term zoos only
+  Z.salary = (s, S) => Math.round((30 + s.lvl * 22 + (s.care + s.sci + s.exp + s.charm) * 0.6 + (s.mastered ? s.mastered.length * 80 : 0)) * Z.tight(S, 'wage'));
   Z.trainCost = s => Math.round(400 * Math.pow(s.lvl, 1.5) / 50) * 50;
   Z.trainWait = (S, s) => Math.max(0, 10 - (S.week - s.trainAt));      // weeks until this person can train again
   Z.ticketAt = rank => 6 + 1.0 * (rank - 1);                           // ticket price per visitor at a given zoo rank
@@ -100,6 +101,7 @@
     out.push('Tickets ' + usd(Z.ticketAt(rank)));
     return out;
   };
+  function adWeekly(S, C) { return price(C.k * Z.scale(S) / C.weeks * D.AD_WEEK_K); }
   const repChunk = (S, f) => Math.max(5, Math.round(Z.rankGap(S) * f));
   const TREAT = D.HAP_TREAT; // good news from a happening pays this many times the old amount
   function gain(S, o) { // money, reputation and research from a one-off moment, with floor pop-ups
@@ -145,13 +147,14 @@
     } else {
       const maxR = rank >= 6 ? 3 : 2;
       const pool = D.SPECIES_LIST.filter(s => S.regions[s.biome] && s.rarity <= maxR && !D.BIOMES[s.biome].secret);
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < D.TRADER_ANIMALS; i++) {
         const sp = pick(pool), a = makeAnimal(S, sp.id, 13 + rank * 2 + ri(0, 6));
         oppositeIfLonely(S, a);
         list.push({ a: a, price: Math.round(Z.animalValue(a) * 2.2 / 50) * 50 });
       }
     }
     S.offers = { kind: kind, at: S.week, list: list, crates: kind === 'trader' ? D.CRATES_PER_VISIT : 0, crateRarity: kind === 'trader' ? rollCrateRarity(S) : null };
+    if (kind === 'trader') S.traderAt = S.week + D.TRADER_WEEKS; // R9: the next visit, 3 months on
   }
   // One rarity for all of this trader visit's crates (rarer rarities come on rarer visits; better odds at higher ranks).
   function rollCrateRarity(S) {
@@ -160,8 +163,18 @@
     for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0 && w[i] > 0) return i + 1; }
     return 1;
   }
-  function callerArrive(S) {
-    const n = S.callerN = (S.callerN || 0) + 1, kind = n % 4 === 2 ? 'headhunter' : n % 4 === 0 ? 'director' : 'trader';
+  const here = (S, kind) => !!S.offers && S.offers.kind === kind && S.week - S.offers.at < 5;
+  function callerArrive(S) { // every 5 weeks: the headhunter and the director take turns at their old pace (the trader has its own clock)
+    const n = (S.callerN || 0) + 1, kind = n % 4 === 2 ? 'headhunter' : n % 4 === 0 ? 'director' : null;
+    if (kind === 'director' && here(S, 'trader')) return; // waits for the trader to leave; tries again next time
+    S.callerN = n; if (!kind) return;
+    callerCome(S, kind);
+  }
+  function traderArrive(S) {
+    if (here(S, 'director')) { S.traderAt = S.offers.at + 5; return; } // comes once the director has gone
+    callerCome(S, 'trader');
+  }
+  function callerCome(S, kind) {
     if (kind === 'headhunter') { S.headhunt = makeStaff(S, hireRole(), 22 + Z.rank(S) * 5); S.headhuntAt = S.week; } else rollOffers(S, kind);
     ev(S, 'caller', { kind: kind }); report(S, { type: 'caller', kind: kind });
   }
@@ -172,7 +185,7 @@
     if (S.headhunt && S.week - (S.headhuntAt || 0) < 5) out.push({ kind: 'headhunter', since: S.headhuntAt || 0, role: S.headhunt.role, name: S.headhunt.name });
     return out;
   };
-  Z.headhuntFee = s => Z.salary(s) * 20;
+  Z.headhuntFee = (s, S) => Z.salary(s, S) * 20;
   function discover(S, a, how) {
     let b = S.book[a.sp];
     const sp = Z.sp(a);
@@ -329,7 +342,7 @@
       v: Z.SAVE_VERSION, runId: 'run' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36), zooName: opts.zooName || 'Wildside Zoo',
       ng: legacy.runs || 0, startedAt: Date.now(), week: 0, money: (opts.starter ? D.START_MONEY_CLASSIC : D.START_MONEY) + Math.min(legacy.runs || 0, 5) * 6000, rp: 0, rep: 0, rows: D.START_ROWS,
       items: [], animals: [], arrivals: [], staff: [], candidates: [], candAt: 0, hiring: null, projects: [], reports: [], news: [], elog: [],
-      offers: null, headhunt: null, headhuntAt: 0, show: null, yearly: null, happening: null, hapAt: ri(5, 7), hapLast: [], openedAt: null, mods: [], campaigns: {}, habN: {}, fx: [], callerN: 0,
+      offers: null, headhunt: null, headhuntAt: 0, show: null, yearly: null, happening: null, hapAt: ri(5, 7), hapLast: [], openedAt: null, mods: [], campaigns: {}, ads: {}, traderAt: null, habN: {}, fx: [], callerN: 0,
       research: {}, regions: { savanna: true }, aff: Object.assign({}, legacy.aff || {}), combos: {}, knownCombos: Object.assign({}, legacy.combos || {}), pairs: {},
       book: {}, fragments: 0, flags: {}, vips: {}, trophies: 0, history: [], nextId: 1, finished: false, score: null,
       yr: newYearStats(), life: { events: 0, expeditions: 0, births: 0, income: 0, bestReview: 0, hof: 0, spent: 0, repBy: {} },
@@ -496,14 +509,15 @@
     shops.forEach(s => { const i = idx[s.t] = (idx[s.t] || 0) + 1; const v = s.v / (1 + 0.3 * (i - 1)) * shopMult; shopVal[s.id] = v; spend += v; });
     const rpw = (sci / 12 + rpFlat + rpAdj) * (1 + rpMult) * (1 + 0.1 * Math.min(5, S.ng)) * (1 + clamp(Z.modSum(S, 'rp'), -0.6, 1));
     // costs
-    let salaries = 0; S.staff.forEach(s => { salaries += Z.salary(s); });
+    let salaries = 0; S.staff.forEach(s => { salaries += Z.salary(s, S); });
     let upkeep = 0, penUpkeep = 0; S.animals.forEach(a => { const u = D.RARITY.upkeep[Z.sp(a).rarity]; if (a.hab == null) penUpkeep += u; else upkeep += u; });
+    const open = Z.isOpen(S);
     const holdFull = Z.holdUpkeep(S).full; // the pen surcharge before the safety cap (0 while closed); cost multiplier already in holdFee
     let maint = 0; S.items.forEach(i => { maint += i.k === 'hab' ? D.BIOMES[i.t].hab * 0.003 * i.lvl : D.FAC[i.t].cost * 0.004; });
-    const costMult = 1 + clamp(Z.modSum(S, 'cost'), -0.5, 0.3); upkeep *= costMult; maint *= costMult; penUpkeep *= costMult;
+    const costMult = (1 + clamp(Z.modSum(S, 'cost'), -0.5, 0.3)) * Z.tight(S, 'run'); upkeep *= costMult; maint *= costMult; penUpkeep *= costMult;
     const mkt = (S.research['tech:mkt1'] ? 1 : 0) + (S.research['tech:mkt2'] ? 1 : 0) + (S.research['tech:mkt3'] ? 1 : 0);
-    const boost = clamp(Z.modSum(S, 'visitors'), -0.4, 0.8);
-    const open = Z.isOpen(S);
+    const adOn = open ? D.CAMPAIGNS.filter(C => S.ads && S.ads[C.key]) : [], adVis = adOn.reduce((t, C) => t + C.vis, 0), ads = adOn.reduce((t, C) => t + adWeekly(S, C), 0);
+    const boost = clamp(Z.modSum(S, 'visitors') + adVis, -0.4, 0.8);
     const visitors = !open ? 0 : (3.2 * Math.pow(total, 0.8) + 40) * D.SEASONS[season].mult * (1 + 0.05 * (Z.rank(S) - 1)) * (1 + 0.1 * mkt) * (1 + crowd) * (1 + boost);
     const income = visitors * (Z.ticket(S) + spend);
     // Holding pen safety: the pen (its animals' normal upkeep plus the surcharge) never costs more than D.HOLD_PROFIT_SHARE of
@@ -516,7 +530,7 @@
     S._c = { nb: nb, active: active, occ: L.occ, ring: L.ring, hab: hab, total: total, spend: spend, shopVal: shopVal, crowd: crowd, boost: boost, rpw: rpw, repw: repw, vet: vet, salaries: salaries, upkeep: upkeep, maint: maint, hold: open ? hold : 0,
       holdFull: open ? holdFull : 0, holdCapped: holdCapped, holdWaived: open && debt && holdFull > 0, penUpkeep: open ? penUpkeep : 0, penPaid: open ? penBase + hold : 0,
       profitNoPen: open ? income - (salaries + upkeep - penBase + maint) : 0,
-      open: open, visitors: visitors, ticket: Z.ticket(S), income: income, cost: open ? salaries + upkeep + maint + hold : 0, duty: { care: care, sci: sci, charm: charm } };
+      open: open, visitors: visitors, ticket: Z.ticket(S), income: income, ads: ads, cost: open ? salaries + upkeep + maint + hold + ads : 0, duty: { care: care, sci: sci, charm: charm } };
     return S._c;
   };
   Z.c = S => S._c || Z.refresh(S);
@@ -777,7 +791,7 @@
   Z.hireHeadhunt = function (S) {
     const s = S.headhunt; if (!s) return fail('Nobody is on offer.');
     if (S.staff.length >= Z.staffCap(S)) return fail('Staff room is full.');
-    const fee = Z.headhuntFee(s); if (!pay(S, fee)) return need(fee);
+    const fee = Z.headhuntFee(s, S); if (!pay(S, fee)) return need(fee);
     S.headhunt = null; S.staff.push(s); ev(S, 'hire', { role: s.role, fee: fee, headhunt: true, stats: [s.care, s.sci, s.exp, s.charm] }); Z.refresh(S); return { ok: true, staff: s };
   };
   Z.jobOptions = function (S, s) {
@@ -846,23 +860,37 @@
     ev(S, 'research', { id: id, rp: r.rp }); news(S, 'Research done: ' + r.name + '.', 'good'); Z.refresh(S); return OK();
   };
 
-  // ----- money ladders: advertising campaigns -----
-  const campCost = (S, C) => price(C.k * Z.scale(S));
-  const campLeft = (S, C) => Math.max(0, (S.campaigns[C.key] || 0) - S.week);
-  // One of each kind can run at a time. weeksLeft > 0 means that one is running now.
-  Z.campaigns = S => D.CAMPAIGNS.map(C => ({ key: C.key, name: C.name, cost: campCost(S, C), vis: C.vis, weeks: C.weeks, rep: repChunk(S, C.rep), weeksLeft: campLeft(S, C), lock: C.rank && Z.rank(S) < C.rank ? 'Rank ' + C.rank : '', note: '+' + Math.round(C.vis * 100) + '% visitors, ' + C.weeks + ' weeks' })).map(o => {
-    o.afford = S.money >= o.cost; o.why = o.lock || !Z.allowed(S, 'campaign').ok ? 'lock' : o.weeksLeft ? 'busy' : o.afford ? '' : 'money'; return o; });
-  Z.runCampaign = function (S, i) {
+  // ----- adverts (R9, note 26): on/off switches charged every week while on -----
+  const adOf = k => typeof k === 'number' ? D.CAMPAIGNS[k] : D.CAMPAIGNS.find(C => C.key === k);
+  const adRepWeek = (S, C) => Math.max(Z.rankGap(S) * C.rep, 5 * C.vis / 0.02) / C.weeks; // the old campaign's reputation spread over its old length (bigger adverts never give less)
+  Z.adCost = S => D.CAMPAIGNS.reduce((t, C) => t + (S.ads && S.ads[C.key] ? adWeekly(S, C) : 0), 0);
+  Z.adverts = S => D.CAMPAIGNS.map(C => {
+    const weekly = adWeekly(S, C), on = !!(S.ads && S.ads[C.key]), lock = C.rank && Z.rank(S) < C.rank ? 'Rank ' + C.rank : '', afford = S.money >= weekly;
+    return { key: C.key, name: C.name, weekly: weekly, vis: C.vis, rep: Math.round(adRepWeek(S, C) * 10) / 10, on: on, lock: lock, rank: C.rank || 1, afford: afford,
+      why: on ? '' : lock || !Z.allowed(S, 'campaign').ok || !Z.isOpen(S) ? 'lock' : afford ? '' : 'money' };
+  });
+  Z.setAdvert = function (S, k, on) {
+    const C = adOf(k); if (!C) return fail('Pick an advert.');
+    if (!S.ads) S.ads = {};
+    if (!on) { if (S.ads[C.key]) { delete S.ads[C.key]; ev(S, 'ad', { key: C.key, on: false }); } Z.refresh(S); return { ok: true, on: false, weekly: adWeekly(S, C) }; }
     const no = ban(S, 'campaign'); if (no) return no;
-    const C = D.CAMPAIGNS[i]; if (!C) return fail('Pick a campaign.');
     if (C.rank && Z.rank(S) < C.rank) return failW('Needs zoo rank ' + C.rank + '.', 'lock');
-    if (campLeft(S, C)) return fail('Already running, ' + campLeft(S, C) + ' weeks left.');
-    const c = campCost(S, C), rep = repChunk(S, C.rep); if (!spendOpt(S, c)) return need(c);
-    S.campaigns[C.key] = S.week + C.weeks;
-    addMod(S, 'visitors', C.vis, C.weeks, 'campaign'); gain(S, { rep: rep, src: 'campaign' });
-    ev(S, 'campaign', { key: C.key, cost: c, rep: rep }); news(S, C.name + ' campaign started.', 'good'); Z.refresh(S);
-    return { ok: true, cost: c, rep: rep, weeks: C.weeks, vis: C.vis };
+    if (!Z.isOpen(S)) return failW('Open the zoo first.', 'lock');
+    const w = adWeekly(S, C); if (!S.ads[C.key] && S.money < w) return need(w);
+    if (!S.ads[C.key]) { S.ads[C.key] = true; ev(S, 'ad', { key: C.key, on: true, weekly: w }); news(S, C.name + ' switched on.', 'good'); }
+    Z.refresh(S); return { ok: true, on: true, weekly: w };
   };
+  Z.toggleAdvert = (S, k) => { const C = adOf(k); return C ? Z.setAdvert(S, C.key, !(S.ads && S.ads[C.key])) : fail('Pick an advert.'); };
+  // Old names, kept so nothing breaks: a campaign is now an advert switch.
+  Z.campaigns = S => Z.adverts(S).map(o => Object.assign(o, { cost: o.weekly, weeks: 0, weeksLeft: 0, note: '+' + Math.round(o.vis * 100) + '% visitors, per week' }));
+  Z.runCampaign = (S, i) => Z.setAdvert(S, i, true);
+  function adsWeek(S) { // start of the week: adverts the bank can't cover switch themselves off, most expensive first
+    if (!S.ads) S.ads = {};
+    const on = D.CAMPAIGNS.filter(C => S.ads[C.key]).sort((x, y) => adWeekly(S, y) - adWeekly(S, x));
+    let total = on.reduce((t, C) => t + adWeekly(S, C), 0);
+    on.forEach(C => { if (S.money >= total && S.money >= 0) return; total -= adWeekly(S, C); delete S.ads[C.key];
+      news(S, C.name + ' switched off: not enough money.', 'bad'); ev(S, 'ad_off', { key: C.key }); });
+  }
 
   // ----- rarity crates at the trader: 5 crates of one rarity per visit -----
   const crateBase = S => 12 + Z.rank(S) * 4;
@@ -882,7 +910,7 @@
     const no = ban(S, 'crate'); if (no) return no;
     const info = Z.crateInfo(S); if (!info) return fail('No crate on offer.');
     if (!spendOpt(S, info.cost)) return need(info.cost);
-    const sp = pick(cratePool(S, info.rarity)), a = makeAnimal(S, sp.id, crateBase(S) + ri(0, 12), { variant: Math.random() < 0.06 });
+    const sp = pick(cratePool(S, info.rarity)), a = makeAnimal(S, sp.id, crateBase(S) + ri(0, 12), { variant: Math.random() < D.CRATE_VARIANT });
     oppositeIfLonely(S, a);
     const isNew = !S.book[sp.id];
     S.offers.crates--; addArrival(S, a, 'crate'); discover(S, a, 'crate');
@@ -1488,6 +1516,7 @@
 
   Z.tick = function (S) {
     if (S.ch && S.ch.done) { S.fx = []; return; } // a finished challenge level stands still
+    adsWeek(S);
     const c = Z.refresh(S); S.fx = [];
     const visitors = Math.round(c.visitors * rnd(0.95, 1.05));
     const tickets = Math.round(visitors * Z.ticket(S)), shopsIn = visitors * c.spend;
@@ -1499,6 +1528,7 @@
     Object.keys(c.shopVal).forEach(id => { const amt = Math.round(visitors * c.shopVal[id]); if (amt > 0) fx(S, { type: 'money', amt: amt, item: +id }); });
     if (c.rpw >= 1) fx(S, { type: 'rp', amt: Math.round(c.rpw) });
     addRep(S, visitors / D.VISITORS_PER_REP + c.repw, 'visitors');
+    if (c.ads) { D.CAMPAIGNS.forEach(C => { if (S.ads[C.key]) addRep(S, adRepWeek(S, C), 'campaign'); }); S.yr.spent += c.ads; S.life.spent += c.ads; }
     S.week++;
     S.mods = S.mods.filter(m => m.until > S.week);
     if (S.candidates.length && S.week - S.candAt >= D.CANDIDATE_WEEKS) S.candidates = [];
@@ -1516,6 +1546,7 @@
     });
     if (S.yearly && S.week > S.yearly.at) applyYearly(S, S.yearly.def, true);
     if (S.week % 5 === 2 && lively(S)) callerArrive(S);
+    if (lively(S) && S.traderAt != null && S.week >= S.traderAt) traderArrive(S);
     // happenings: a rare treat, about one every 40 to 56 weeks (D.HAP_GAP)
     if (S.happening) { if (!S.happening.options) S.happening = null; else if (S.week - S.happening.at >= 2) applyHappening(S, S.happening.def, true); }
     const woy = S.week % D.WPY;
@@ -1576,6 +1607,8 @@
     // Round 5 fields: fill defaults so older version 3 saves keep loading
     if (!Array.isArray(S.arrivals)) S.arrivals = [];
     if (!S.pairs || typeof S.pairs !== 'object') S.pairs = {}; // R9 pairings found
+    if (!S.ads || typeof S.ads !== 'object') S.ads = {};          // R9 adverts (an old timed campaign just runs out its visitor boost)
+    if (S.traderAt === undefined) S.traderAt = S.offers && S.offers.kind === 'trader' ? S.offers.at + D.TRADER_WEEKS : S.openedAt != null ? S.week + 3 : null;
     if (S.hiring === undefined) S.hiring = null;
     if (!Array.isArray(S.candidates)) S.candidates = [];
     if (S.offers && S.offers.kind === 'trader' && S.offers.crateRarity == null) { S.offers.crateRarity = rollCrateRarity(S); if (S.offers.crates) S.offers.crates = D.CRATES_PER_VISIT; }

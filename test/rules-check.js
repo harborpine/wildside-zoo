@@ -154,14 +154,14 @@ check('compareOwned: species, sex, better / worse / mixed, offers, ids and arriv
   eq(Z.compareOwned(S, S.arrivals[0]), Z.compareOwned(S, c.animal), 'arrival entry');
 });
 
-check('rarity crates: 5 of one rarity per trader visit, rarer visits rarer, price by rarity and rank', () => {
+check('rarity crates: D.CRATES_PER_VISIT (3, R9) of one rarity per trader visit, rarer visits rarer, price by rarity and rank', () => {
   const S = NG(); S.money = 1e9; const info = Z.crateInfo(S);
-  ok(info && info.left === 5 && info.total === 5 && info.rarity >= 1 && info.rarity <= 5 && info.cost > 0 && info.name === D.RARITY.name[info.rarity]);
+  ok(info && info.left === D.CRATES_PER_VISIT && info.total === D.CRATES_PER_VISIT && info.rarity >= 1 && info.rarity <= 5 && info.cost > 0 && info.name === D.RARITY.name[info.rarity]);
   ok(info.pool.length && info.pool.every(id => D.SPECIES[id].rarity === info.rarity && !D.BIOMES[D.SPECIES[id].biome].secret && S.regions[D.SPECIES[id].biome]));
   ok(Z.callersHere(S).find(c => c.kind === 'trader').crateRarity === info.rarity);
   const n = S.animals.length, pen = Z.holding(S).length;
-  for (let i = 0; i < 5; i++) { const r = Z.openCrate(S); ok(r.ok && r.pending && r.rarity === info.rarity && r.price === Z.animalValue(r.animal)); ok(Z.arrival(S, r.animal.id), 'waiting as an arrival'); }
-  eq(S.animals.length, n, 'nothing housed automatically'); eq(Z.holding(S).length, pen); eq(S.arrivals.length, 5);
+  for (let i = 0; i < D.CRATES_PER_VISIT; i++) { const r = Z.openCrate(S); ok(r.ok && r.pending && r.rarity === info.rarity && r.price === Z.animalValue(r.animal)); ok(Z.arrival(S, r.animal.id), 'waiting as an arrival'); }
+  eq(S.animals.length, n, 'nothing housed automatically'); eq(Z.holding(S).length, pen); eq(S.arrivals.length, D.CRATES_PER_VISIT);
   eq(Z.crateInfo(S), null); ok(!Z.openCrate(S).ok, 'sixth crate refused');
   const tally = r => { const c = [0, 0, 0, 0, 0, 0]; for (let i = 0; i < 2000; i++) { const T = NG(); T.rep = D.RANK_REP[r - 1]; Z.debug.caller(T, 'trader'); c[T.offers.crateRarity]++; } return c; };
   const low = tally(1), high = tally(9);
@@ -231,7 +231,7 @@ check('an old-shaped version 3 save (before round 5) loads and plays 50 ticks', 
   const S = NG(); S.money = 1e6; Z.startExpedition(S, 'savanna', [S.staff[1].id], 0); tickN(S, 3);
   const o = JSON.parse(Z.serialize(S)); delete o.arrivals; delete o.hiring; delete o.offers.crateRarity; o.offers.crates = 1;
   o.candidates = [JSON.parse(JSON.stringify(S.staff[0]))]; o.items.forEach(i => { delete i.closedUntil; }); o.hapAt = o.week + 7;
-  const L = Z.deserialize(JSON.stringify(o)); ok(L, 'loads'); eq(L.arrivals, []); eq(L.hiring, null); ok(L.offers.crateRarity >= 1 && L.offers.crates === 5); ok(Z.crateInfo(L).rarity === L.offers.crateRarity);
+  const L = Z.deserialize(JSON.stringify(o)); ok(L, 'loads'); eq(L.arrivals, []); eq(L.hiring, null); ok(L.offers.crateRarity >= 1 && L.offers.crates === D.CRATES_PER_VISIT); ok(Z.crateInfo(L).rarity === L.offers.crateRarity);
   tickN(L, 50); eq(L.week, o.week + 50); ok(isFinite(L.money) && L.arrivals.length === 0 && L.animals.length >= 3, 'finds arrived and were housed');
   eq(Z.deserialize(Z.serialize(L)) && 1, 1);
 });
@@ -249,8 +249,9 @@ check('hiring tiers', () => {
 
 check('campaigns and yearly spend ladders', () => {
   const S = NG(); S.money = 1e6; const list = Z.campaigns(S); eq(list.length, 4);
-  const v0 = Z.c(S).visitors, r = Z.runCampaign(S, 0); ok(r.ok && r.rep > 0); ok(Z.c(S).visitors > v0, 'visitors up'); ok(!Z.runCampaign(S, 0).ok, 'same kind cannot run twice'); ok(Z.campaigns(S)[0].weeksLeft === 4);
-  ok(Z.runCampaign(S, 1).ok, 'a different kind can run alongside');
+  // R9 (note 26): a campaign is now an advert switch; the old names still work
+  const v0 = Z.c(S).visitors, r = Z.runCampaign(S, 0); ok(r.ok && r.on && r.weekly > 0); ok(Z.c(S).visitors > v0, 'visitors up'); ok(Z.campaigns(S)[0].on && Z.campaigns(S)[0].weeksLeft === 0);
+  ok(Z.runCampaign(S, 1).ok, 'a different kind can run alongside'); Z.setAdvert(S, 0, false); Z.setAdvert(S, 1, false);
   tickN(S, D.YEARLY.openday); ok(S.yearly && S.yearly.id === 'openday', 'open day plan'); ok(S.reports.some(x => x.type === 'yearlyplan'));
   const y = Z.resolveYearly(S, 1); ok(y.ok && y.crowd > 0 && y.spend > 0); ok(S.reports.some(x => x.type === 'yearly' && x.id === 'openday')); eq(S.yearly, null);
   const S2 = NG(); tickN(S2, D.YEARLY.openday + 1); eq(S2.yearly, null, 'ignored plan resolves itself'); ok(S2.elog.some(e => e.t === 'yearly' && e.auto));
@@ -359,7 +360,7 @@ check('blank start: bare land, two penned zebras, money covers the starter', () 
 check('starter:true reproduces the classic layout', () => {
   const S = NG(), at = Z.starterSpots(); eq(S.money, D.START_MONEY_CLASSIC); eq(S.items.length, 2);
   eq([S.items[0].k, S.items[0].t, S.items[0].q, S.items[0].r, S.items[0].n], ['hab', 'savanna', at.hab.q, at.hab.r, 1]); eq([S.items[1].k, S.items[1].t, S.items[1].q, S.items[1].r], ['fac', 'snack', at.snack.q, at.snack.r]);
-  ok(S.animals.length === 2 && S.animals.every(a => a.hab === S.items[0].id)); eq(S.openedAt, 0); ok(S.offers && S.offers.list.length === 4);
+  ok(S.animals.length === 2 && S.animals.every(a => a.hab === S.items[0].id)); eq(S.openedAt, 0); ok(S.offers && S.offers.list.length === D.TRADER_ANIMALS);
   const B = Z.newGame(); Z.build(B, 'hab', 'savanna', at.hab.q, at.hab.r, 0); Z.build(B, 'fac', 'snack', at.snack.q, at.snack.r, 0);
   eq(B.items.map(i => [i.k, i.t, i.q, i.r]), S.items.map(i => [i.k, i.t, i.q, i.r]), 'a rebuilt blank zoo matches'); eq(B.money, S.money); eq(Z.c(B).maint, Z.c(S).maint, "upkeep of the buildings");
 });
@@ -932,6 +933,31 @@ check('locked versus cannot afford: lists and refusals say which', () => {
   eq(Z.buildCheck(S, 'fac', 'snack').why, 'money'); eq(Z.buildCheck(S, 'fac', 'gift').why, 'lock'); eq(Z.buildCheck(S, 'hab', 'jungle').why, 'lock');
   S.money = 1e7; eq(Z.buildCheck(S, 'fac', 'snack').ok, true);
   S.money = 0; eq(Z.advertise(S, 0).why, 'money'); eq(Z.advertise(S, 3).why, 'lock'); eq(Z.doResearch(S, rl.find(r => r.why === 'rp').id).why, 'rp');
+});
+
+check('adverts: on/off, charged and felt every week, switch off by themselves when the bank runs dry; old saves load', () => {
+  const S = NG(); S.money = 1e5; Z.refresh(S); const c0 = Z.c(S).cost, v0 = Z.c(S).visitors, ad = Z.adverts(S)[0];
+  eq([ad.on, ad.why, ad.afford], [false, '', true]); eq(Z.adverts(S)[2].why, 'lock', 'TV ad needs rank 3');
+  ok(Z.setAdvert(S, ad.key, true).ok); Z.refresh(S); ok(Math.abs(Z.c(S).cost - c0 - ad.weekly) < 1e-6, 'weekly cost added'); ok(Z.c(S).visitors > v0); eq(Z.adCost(S), ad.weekly);
+  const rep0 = S.rep; tickN(S, 3); ok(S.ads[ad.key] && S.rep > rep0, 'still on, reputation coming in');
+  S.money = ad.weekly - 1; S.reports = []; Z.tick(S); ok(!S.ads[ad.key], 'switched itself off'); ok(S.news.some(n => /switched off/.test(n.msg))); eq(S.reports.filter(r => r.type === 'ad').length, 0, 'no pop-up');
+  S.money = 0; eq(Z.setAdvert(S, ad.key, true).why, 'money'); ok(Z.toggleAdvert(S, ad.key).ok === false);
+  S.money = 1e5; ok(Z.toggleAdvert(S, ad.key).on === true); ok(Z.toggleAdvert(S, ad.key).on === false);
+  const o = JSON.parse(Z.serialize(S)); delete o.ads; delete o.traderAt; const L = Z.deserialize(JSON.stringify(o)); ok(L.ads && typeof L.ads === 'object' && L.traderAt != null);
+});
+check('trader: every 13 weeks, 2 animals and 3 crates; headhunter and director still come', () => {
+  const S = NG(); let visits = [], others = 0;
+  for (let w = 0; w < 96; w++) { S.reports = []; S.money = 1e5; Z.tick(S); S.reports.forEach(r => { if (r.type === 'caller') { if (r.kind === 'trader') visits.push(S.week); else others++; } }); }
+  ok(visits.length >= 6 && visits.length <= 8, visits.length + ' trader visits in 2 years');
+  for (let i = 1; i < visits.length; i++) ok(visits[i] - visits[i - 1] >= D.TRADER_WEEKS, 'gap ' + (visits[i] - visits[i - 1]));
+  ok(others >= 6, 'headhunter / director visits ' + others);
+  Z.debug.caller(S, 'trader'); eq([S.offers.list.length, S.offers.crates, Z.crateInfo(S).total], [2, 3, 3]);
+  return visits.join(',');
+});
+check('tighter money: wages and running costs x D.TIGHT in a long-term zoo, unchanged in a challenge', () => {
+  const S = NG(), C = Z.newChallenge('small'), s = S.staff[0];
+  ok(D.TIGHT.wage > 1 && D.TIGHT.run > 1); eq(Z.salary(s, S), Z.salary(s));
+  ok(Z.salary(s, C) < Z.salary(s, S), 'challenge wage is lower'); ok(Z.tight(C, 'run') === 1 && Z.tight(S, 'run') === D.TIGHT.run);
 });
 
 console.log(failed ? '\nRULES CHECK: ' + failed + ' FAILED' : '\nRULES CHECK: ALL PASSED');

@@ -255,7 +255,12 @@
   // visit, by zoo rank band (ranks 1-2, 3-4, 5-6, 7-8, 9-10). CRATE_ODDS is the old name, kept as the same table.
   D.CRATE_VISIT = [[55, 33, 10, 2, 0], [45, 33, 16, 5, 1], [35, 32, 22, 9, 2], [25, 30, 27, 14, 4], [15, 27, 31, 20, 7]];
   D.CRATE_ODDS = D.CRATE_VISIT;
-  D.CRATES_PER_VISIT = 5;
+  D.CRATES_PER_VISIT = 3; // R9 (note 18): 3 mystery crates per visit
+  D.CRATE_VARIANT = 0.14; // rare-variant chance per crate (was 0.06 when visits brought 5 crates every ~10 weeks)
+  D.TRADER_WEEKS = 13;    // R9: the trader comes every 3 months
+  D.TRADER_ANIMALS = 2;   // R9: animals on show per trader visit
+  D.AD_WEEK_K = 1.0;      // R9 (note 26): an advert's weekly price = this x its old campaign price / its old length
+  D.TIGHT = { wage: 1.8, run: 1.8 }; // R9 (note 17): wages and running costs in the long-term zoos (challenges use 1)
   D.CRATE_RANK_K = 0.12; // crate price = expected animal value x 1.3 + this x the rank money scale x rarity
   D.EXP_TWO = 0.2;      // chance an expedition brings back 2 animals instead of 1
   // Star-level expeditions: the player picks a star (= rarity) level 1 to 5 for the chosen region. cost = multiplier on the region's

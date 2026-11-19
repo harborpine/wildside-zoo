@@ -355,7 +355,7 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
     let img = null, name = info.detail;
     if (p.type === 'hire') { img = pUrl('headhunter', 2); name = info.detail || 'Hiring'; }
     else if (p.type === 'campaign') { img = iUrl('rep', 3); name = p.name; }
-    else if (p.type === 'expedition') { img = pUrl(lead ? lead.role : 'explorer', 2); name = p.star ? [shortRegion(p.region), ' ', String(p.star), symS('star-on', 'Stars')] : shortRegion(p.region); }
+    else if (p.type === 'expedition') { img = pUrl(lead ? lead.role : 'explorer', 2); name = p.star ? [shortRegion(p.region), ' ', ui.effort(p.star, 5)] : shortRegion(p.region); }   // effort level, not stars (note 22)
     else if (p.type === 'breed') { const a = E.animal(s, p.a); img = a ? aUrl(a, 2) : null; name = a ? E.sp(a).name : info.detail; }
     else { img = iUrl('ready-event', 3); name = D.THEMES[p.theme] ? D.THEMES[p.theme].name : info.detail; }
     const b = el('button', { type: 'button', cls: 'row mn-r mn-run tappable' + (info.choice ? ' mn-hot' : '') },
@@ -994,11 +994,11 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
       if (s.candidates && s.candidates.length) body.appendChild(ui.btn('Who turned up', candidatesScreen, { cls: 'blue', alert: candNew(s), sub: String(s.candidates.length) }));
       if (s.headhunt) seenUi(s).hh = hhSig(s);   // the headhunter is shown right here, so it counts as seen
       if (s.headhunt) {
-        const h = s.headhunt, fee = E.headhuntFee(h);
+        const h = s.headhunt, fee = E.headhuntFee(h, S());
         body.appendChild(ui.section('Headhunter'));
         body.appendChild(row({ img: pUrl(h.role, 3), title: h.name, sub: [D.ROLES[h.role].name, ' ', lvBox(h.lvl)], line: staffChips(h), act: ui.btn('Hire', guard(() => { const r = Core.act('hireHeadhunt'); if (r.ok) { ui.toast(h.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', sub: money(fee), disabled: s.money < fee || s.staff.length >= cap, sub: s.staff.length >= cap ? 'Staff full' : mny(fee) }) }));
       }
-      body.appendChild(el('div', { cls: 'list' }, s.staff.map(st => row({ img: pUrl(st.role, 3), title: st.name, sub: [D.ROLES[st.role].name, ' ', lvBox(st.lvl), ' ', money(E.salary(st)) + '/wk'], extra: staffChips(st), right: busy[st.id] ? imgEl(iUrl('busy', 3), 'mn-mini') : null, tap: () => staffDetail(st.id) }))));
+      body.appendChild(el('div', { cls: 'list' }, s.staff.map(st => row({ img: pUrl(st.role, 3), title: st.name, sub: [D.ROLES[st.role].name, ' ', lvBox(st.lvl), ' ', money(E.salary(st, S())) + '/wk'], extra: staffChips(st), right: busy[st.id] ? imgEl(iUrl('busy', 3), 'mn-mini') : null, tap: () => staffDetail(st.id) }))));
     } });
   }
   function staffDetail(id) {
@@ -1010,7 +1010,7 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
       body.appendChild(el('div', { cls: 'center' }, R.name, ' ', lvBox(st.lvl)));
       body.appendChild(ui.bar(Math.min(1, st.xp / (40 + st.lvl * 30)), { cls: 'blue' }));
       body.appendChild(el('div', { cls: 'mn-capwrap mn-bigchips' }, SKILLS.map(k => K(k, st[k]))));
-      body.appendChild(kv('Pay', mny(E.salary(st))));
+      body.appendChild(kv('Pay', mny(E.salary(st, S()))));
       if (busy) body.appendChild(kv('Status', 'On a project'));
       const wait = E.trainWait(s, st);
       body.appendChild(ui.btn('Train', () => trainScreen(id), { cls: 'primary big', sub: wait > 0 ? [ui.sym('time', { scale: 2, label: 'Wait', text: '' }), ' ' + wait] : mny(E.trainCost(st)) }));
@@ -1071,7 +1071,7 @@ button.mn-slot.mn-chal{width:100%;gap:10px;padding:4px 10px;min-height:52px;back
       const s = S(), full = s.staff.length >= E.staffCap(s); body.appendChild(staffCapChip());
       seenUi(s).cand = candSig(s);
       body.appendChild(rows((s.candidates || []).map((c, i) => row({ img: pUrl(c.role, 3), title: c.name, sub: [D.ROLES[c.role].name, ' ', lvBox(c.lvl)], line: el('span', { cls: 'mn-cl' }, [c.star ? ui.sym('star', { scale: 2, label: 'Standout', text: '*' }) : null].concat(SKILLS.map(k => K(k, c[k])))),
-        act: ui.btn('Hire', guard(() => { const r = Core.act('hireCandidate', i); if (r.ok) { ui.toast(c.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', disabled: full, sub: full ? 'Staff full' : money(E.salary(c)) + '/wk' }) })), 'Nobody left.'));
+        act: ui.btn('Hire', guard(() => { const r = Core.act('hireCandidate', i); if (r.ok) { ui.toast(c.name + ' joined', 'good'); api.rerender(); } }), { cls: 'primary', disabled: full, sub: full ? 'Staff full' : money(E.salary(c, S())) + '/wk' }) })), 'Nobody left.'));
     } };
   }
   function candidatesScreen() { push(candidatesDef()); }
