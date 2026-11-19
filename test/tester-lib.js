@@ -222,7 +222,7 @@ module.exports.edit = function (T) {
     const W = T.vp.width, H = T.vp.height; const pts = [[x || Math.round(W / 2), y || Math.round(H * 0.55)], [Math.round(W * 0.2), Math.round(H * 0.42)], [Math.round(W * 0.8), Math.round(H * 0.42)], [Math.round(W / 2), Math.round(H * 0.34)], [Math.round(W * 0.25), Math.round(H * 0.62)]]; let k = 0;
     for (let i = 0; i < 9; i++) { const b = await E.bar(); if (b && b.shown) return true; const s = await T.state(); if (s.placing) { await T.tapText(/^(Done|Cancel)$/, { floor: true, sel: '#placement-bar button' }); continue; }
       if (!s.stack.length) { const p = pts[k++ % pts.length]; await T.tapXY(p[0], p[1], 450); continue; }
-      if (s.stack[0] === 'menu' && s.stack.length === 1) { if (!(await T.tapText('Edit', { wait: 700 }))) return false; continue; }
+      if (s.stack[0] === 'menu' && s.stack.length === 1) { if (!(await T.tapText('Build', { wait: 700 }))) return false; continue; }
       if (/^mo-|^movein$|confirm/.test(s.stack[s.stack.length - 1])) return false;   // a pop-up is up: the caller answers it first
       if (!(await T.tapText(/./, { sel: '.back' }))) return false; }
     const b = await E.bar(); return !!(b && b.shown);

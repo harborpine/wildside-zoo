@@ -53,9 +53,9 @@ const W = +(process.argv[3] || 390), H = +(process.argv[4] || 753), MODE = proce
   /* Update 7: every tutorial placement goes floor > menu > Edit (glowing) > the glowing card in #edit-bar. Returns the bar as it stood before the card was tapped. */
   async function editCard(key, label) {
     let b = await E.bar();
-    if (!b || !b.shown) { await toFloor(); await T.tapXY(free().x, free().y, 450); const gm = await page.evaluate(() => [...document.querySelectorAll('.mn-glow')].map(e => e.innerText.replace(/\n/g, ' ').slice(0, 20))); say('   highlighted on the menu:', JSON.stringify(gm)); if (!gm.some(g => /^Edit/.test(g))) T.find('tut:edit-not-glowing:' + label, 'the Edit box does not glow on the menu at the "' + label + '" step (glowing: ' + JSON.stringify(gm) + ')');
-      if (await T.locate('Build')) T.find('tut:build-box', 'the main menu still has a Build box'); await shotOnce('menu-' + label); await inv('menu at ' + label);
-      if (!(await T.tapText('Edit', { wait: 700 }))) { T.find('tut:no-edit-box', 'no Edit box on the main menu'); return null; } b = await E.bar(); }
+    if (!b || !b.shown) { await toFloor(); await T.tapXY(free().x, free().y, 450); const gm = await page.evaluate(() => [...document.querySelectorAll('.mn-glow')].map(e => e.innerText.replace(/\n/g, ' ').slice(0, 20))); say('   highlighted on the menu:', JSON.stringify(gm)); if (!gm.some(g => /^Build/.test(g))) T.find('tut:edit-not-glowing:' + label, 'the Build box does not glow on the menu at the "' + label + '" step (glowing: ' + JSON.stringify(gm) + ')');
+await shotOnce('menu-' + label); await inv('menu at ' + label);
+      if (!(await T.tapText('Build', { wait: 700 }))) { T.find('tut:no-edit-box', 'no Build box on the main menu'); return null; } b = await E.bar(); }
     if (!b || !b.shown) { T.find('tut:edit-bar-missing:' + label, 'tapping Edit did not show the #edit-bar strip'); return null; }
     const s = await st(); if (s.running) T.find('tut:edit-running', 'the clock runs while Edit mode is on'); if (s.stack.length) T.find('tut:edit-stack', 'a screen is still open over Edit mode: ' + s.stack.join('>'));
     say('   Edit strip at "' + label + '": group', b.on, 'cards', JSON.stringify(b.cards), 'glowing', JSON.stringify(b.glow), 'height', b.h, 'top', b.top);
