@@ -24,7 +24,7 @@
   const errors = [];
   const handlers = {};
   const stack = [];                          // entries: {id, def, layer, panel, body, titleEl, api}
-  let $strip, $date, $stars, $money, $vis, $goal, $floor, $news, $screens, $toasts, $stage;
+  let $strip, $date, $stars, $money, $vis, $rp, $rpw, $goal, $floor, $news, $screens, $toasts, $stage;
 
   // ------------------------------------------------------------------ small helpers
   const $ = id => document.getElementById(id);
@@ -128,6 +128,8 @@
     if (label && typeof label === 'object') return statChip(label.icon, value, { name: label.name, tone: kind }); return el('span', { cls: 'chip' + (kind ? ' ' + kind : '') }, el('b', label), el('span', { cls: 'v' }, value == null ? '?' : String(value))); }
   function sign(level) { const k = level == null ? 'q' : ['m2', 'm1', 'p1', 'p2'][Math.max(0, Math.min(3, level | 0))]; return el('span', { cls: 'sg ' + k }, fmt.signs(level)); }
   function stars(n, max) { max = max || 5; const w = el('span', { cls: 'stars', 'aria-label': n + ' of ' + max + ' stars' }); for (let i = 0; i < max; i++) w.appendChild(el('i', { cls: 'star' + (i < n ? '' : ' off') })); return w; }
+  // Expedition effort level (owner notes 22 and 32): rising bars, like a signal meter, never stars (stars mean animal rarity or rank)
+  function effort(n, max) { max = max || 5; const w = el('span', { cls: 'effort', role: 'img', 'aria-label': 'Effort level ' + n + ' of ' + max, title: 'Effort level ' + n }); for (let i = 0; i < max; i++) w.appendChild(el('i', { cls: i < n ? 'on' : '', style: { height: (35 + 65 * (i + 1) / max) + '%' } })); return w; }
   function flames(n, max) { max = max || 3; const w = el('span', { cls: 'flames', 'aria-label': n + ' flames' }); for (let i = 0; i < max; i++) w.appendChild(el('i', { cls: 'flame' + (i < n ? '' : ' off') })); return w; }
   function bar(frac, o) { o = o || {}; const f = Math.max(0, Math.min(1, +frac || 0)); return el('span', { cls: 'bar' + (o.cls ? ' ' + o.cls : ''), role: 'progressbar', 'aria-valuenow': Math.round(f * 100) }, el('i', { style: { width: (f * 100) + '%' } }), o.label ? el('em', o.label) : null); }
   function section(text) { return el('div', { cls: 'sec' }, text); }
@@ -178,7 +180,7 @@
       body.appendChild(el('div', { cls: 'btnrow' }, btn(o.no || 'No', () => api.pop(), { cls: 'ghost big' }), btn(o.yes || 'Yes', () => { api.pop(); if (onYes) onYes(); }, { cls: (o.danger ? 'danger' : 'primary') + ' big' })));
     } });
   }
-  const ui = { chipRow, statChip, astat, skillChip, grade, sym, cost, el, btn, grid, list, stat, img, icon, sign, stars, flames, bar, section, note, tabs, reveal, choices, toast, confirm };
+  const ui = { chipRow, statChip, astat, skillChip, grade, sym, cost, el, btn, grid, list, stat, img, icon, sign, stars, flames, effort, bar, section, note, tabs, reveal, choices, toast, confirm };
 
   // ------------------------------------------------------------------ screen stack
   function isRunning() { return !!S && !stack.length && !busy && !placing() && !editing() && !(LANDSCAPE && LANDSCAPE.matches); }
@@ -500,8 +502,12 @@
   function updateStrip() {
     document.body.classList.toggle('title-on', !window.ZCore || !S0());
     const S = curView(); if (!S || !$strip) return;
-    $date.textContent = fmt.date(S); $money.textContent = fmt.money(S.money); $money.className = 'v' + (S.money < 0 ? ' neg' : '');
-    $vis.textContent = fmt.num(S.visitorsLast || 0) + '/wk';
+    // one text row: date, money, visitors, research (+ gain per week, owner note 24). Full numbers when they fit, short ones (12.5K) when not.
+    const rpw = (() => { try { return E.rpPerWeek ? +E.rpPerWeek(S) || 0 : 0; } catch (e) { return 0; } })();
+    const fill = sh => { const n = sh ? fmt.short : fmt.num; $money.textContent = (S.money < 0 ? '-$' : '$') + n(Math.abs(S.money)); $vis.textContent = n(S.visitorsLast || 0) + (sh ? '' : '/wk');
+      if ($rp) { $rp.textContent = n(Math.floor(S.rp || 0)); $rpw.textContent = '+' + (rpw >= 10 || sh ? Math.round(rpw) : rpw.toFixed(1).replace(/\.0$/, '')) + (sh ? '' : '/wk'); } };
+    $date.textContent = fmt.date(S); $money.className = 'v' + (S.money < 0 ? ' neg' : '');
+    const row = $date.parentNode; fill(false); if (row && row.scrollWidth > row.clientWidth + 1) fill(true);
     const max = D.RANK_REP.length, rk = Math.max(1, E.rank(S)); const ex = $stars.getAttribute('data-n');
     if (ex !== String(rk)) { $stars.setAttribute('data-n', rk); $stars.innerHTML = ''; $stars.appendChild(stars(rk, max)); }
     updateGoal(S0());
@@ -583,6 +589,11 @@
   function build() {
     $strip = $('strip'); $date = $('s-date'); $stars = $('s-stars'); $money = $('s-money'); $vis = $('s-vis'); $goal = $('goal'); $floor = $('floor'); $news = $('news'); $screens = $('screens'); $toasts = $('toasts'); $stage = $('stage');
     if (!$strip || !$screens) throw new Error('Page markup missing (index.html)');
+    if ($vis && !$('s-rp')) {   // research chip: flask, points, and the weekly gain (made here so index.html needs no change)
+      const u = iconUrl('rp', 2), chip = el('span', { cls: 'chipm rpchip', title: 'Research points, gain per week' }, u ? el('img', { cls: 'px', src: u, alt: 'Research' }) : el('i', { cls: 'flask' }), el('span', { id: 's-rp', cls: 'v' }, '0'), el('span', { id: 's-rpw', cls: 'gain' }, '+0'));
+      $vis.parentNode.parentNode.appendChild(chip);
+    }
+    $rp = $('s-rp'); $rpw = $('s-rpw');
     $news.addEventListener('click', () => onFloorTap({}));
     document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && stack.length && !stack[stack.length - 1].modal) pop(); });
     document.addEventListener('gesturestart', ev => ev.preventDefault());

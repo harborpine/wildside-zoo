@@ -47,9 +47,9 @@ async function run(name) {
     await ev(() => { ZCore.onReport('*', (r, d) => d()); ZT.S.money = 60000; });
     await page.touchscreen.tap(196, 400); await sleep(500);
     const boxes = await ev(() => [...document.querySelectorAll('.layer:not([hidden]) .gbox')].map(b => b.textContent.trim()));
-    check(boxes.some(b => b.startsWith('Edit')) && !boxes.some(b => b.startsWith('Build')), 'the main menu has Edit and no Build (' + boxes.join(' | ') + ')');
-    check(await ev(() => { const g = [...document.querySelectorAll('.layer:not([hidden]) .gbox')].find(b => b.textContent.trim().startsWith('Edit')), i = g.querySelector('img'); return !!i && i.src === ZSprites.iconUrl('edit', 6); }), 'the Edit box carries the edit symbol');
-    await tap('Edit', 600);
+    check(boxes.some(b => b.startsWith('Build')) && !boxes.some(b => b.startsWith('Edit')), 'the main menu has Build and no Edit (' + boxes.join(' | ') + ')');
+    check(await ev(() => { const g = [...document.querySelectorAll('.layer:not([hidden]) .gbox')].find(b => b.textContent.trim().startsWith('Build')), i = g.querySelector('img'); return !!i && i.src === ZSprites.iconUrl('edit', 6); }), 'the Build box carries the edit symbol');
+    await tap('Build', 600);
     let b = await bar(); await shot('edit-bar');
     const hasEdit = await ev(() => !!(window.ZRender && ZRender.startEdit));
     console.log('  renderer Edit mode present: ' + hasEdit + '; groups ' + JSON.stringify(b && b.tabs) + '; cards ' + JSON.stringify(b && b.cards));

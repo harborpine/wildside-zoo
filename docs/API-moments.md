@@ -4,6 +4,12 @@ Global: `ZMoments`. One IIFE, loaded last. It registers a handler for every repo
 (`ZMoments.init()` registers them again, harmlessly). CSS is injected once as `<style id="mo-style">`, every class starts with `mo-`.
 Tests: `node test/moments-shot.js [chromium] [webkit] [--quick] [--only=late,cards,callers,happenings,yearly,reveals,yearend,realplay,reopen,inmenu]` (headless; shots in `test/shots/moments-*.png`).
 
+## Update 9 (2026-11-18)
+
+- Expedition result card: the run's level shows as `Effort N` plus `ZCore.ui.effort` bars (`.mo-xeff`, still `.mo-xstar` with `data-star`), no stars.
+- Where-list rows show `pair.kind` from `ZE.arrivalChoices`: green `+`, red `-`, or both for mixed (`.mo-pms[data-pair]`).
+- The "Tap to continue" hint no longer blinks (note 31).
+
 ## Update 7 (2026-11-15): who lives where, green and red results, star level, challenge card
 
 Where this section disagrees with older text further down, this section wins.

@@ -74,7 +74,7 @@
 .mo-big { font-size: 42px; line-height: 1; }
 .mo-big small { font-size: 20px; color: var(--ink2); }
 .mo-good .mo-big, .mo-good.mo-big { color: var(--good); } .mo-bad .mo-big, .mo-bad.mo-big { color: var(--bad); } .mo-gold .mo-big, .mo-gold.mo-big { color: var(--gold-d); }
-.mo-hint { margin-top: 4px; font-size: 13px; color: var(--ink2); animation: mo-blink 1.1s steps(2) infinite; }
+.mo-hint { margin-top: 4px; font-size: 13px; color: var(--ink2); }
 .mo-hint::after { content: " \\25BC"; font-size: 10px; }
 .mo-pic { height: 140px; display: flex; align-items: flex-end; justify-content: center; position: relative; }
 .mo-pic img { max-height: 100%; max-width: 100%; image-rendering: pixelated; }
@@ -189,8 +189,9 @@
 .mo-vmark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--cream); box-shadow: 0 0 0 2px var(--bd); }
 .mo-vmark img { height: 18px; width: auto; image-rendering: pixelated; }
 .mo-bigmark img { height: 72px; width: auto; }
-.mo-xstar .stars { gap: 4px; }
+.mo-xeff { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 30px; } .mo-effn { font-size: 16px; font-weight: 700; color: #17507d; }
 .mo-wrow .mid { gap: 3px; } .mo-wtop { display: flex; align-items: center; gap: 6px; min-width: 0; } .mo-wtop .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mo-pms { flex: none; display: inline-flex; gap: 2px; } .mo-pm { display: inline-block; width: 18px; height: 18px; line-height: 18px; text-align: center; font-size: 15px; font-weight: 700; color: #fff; box-shadow: 0 0 0 1px #000; } .mo-pm.good { background: #2e8b3a; } .mo-pm.bad { background: #c0392b; }
 .mo-wtop .mo-room { min-width: 0; flex: none; } .mo-wtop .mo-fee { flex: none; margin-right: 2px; } .mo-wtop .btn { flex: none; margin: 0; }
 .mo-resl { display: flex; gap: 1px; width: 100%; height: 32px; overflow: hidden; align-items: flex-end; }
 .mo-res { flex: none; width: 23px; height: 32px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 1px; }
@@ -350,6 +351,12 @@
       line.appendChild(el('span', { cls: 'mo-res more' }, '+' + (n - keep)));
     });
   }
+  // Owner note 27: a small green + (gets along), red - (clashes) or both, for the pairings this animal would start in that habitat.
+  function pairTag(p) {
+    if (!p || !p.kind) return null;
+    const one = k => el('span', { cls: 'mo-pm ' + k, title: k === 'bad' ? 'Clashes' : 'Gets along', 'aria-label': k === 'bad' ? 'Clashes' : 'Gets along' }, k === 'bad' ? '-' : '+');
+    return el('span', { cls: 'mo-pms', 'data-pair': p.kind }, p.kind === 'mixed' ? [one('good'), one('bad')] : one(p.kind === 'bad' ? 'bad' : 'good'));
+  }
   function whereList(card, st, f, afterDecision) {
     const M = st.M, id = f.id;
     M.clearParts(); M.clear(); card.textContent = ''; card.className = 'mo-card mo-fast';
@@ -378,7 +385,7 @@
       }
       const feeEl = c.hab == null && fee != null ? el('span', { cls: 'mo-fee' }, sym('coin', '$', 'upkeep'), el('b', String(fee)), sym('time', '', 'per week', 2)) : null;
       const row = el('div', { cls: 'mo-row compact mo-wrow tap' + (c.fit ? '' : ' off') + (c.best ? ' sel' : '') }, left,
-        el('div', { cls: 'mid' }, el('div', { cls: 'mo-wtop' }, el('span', { cls: 't' }, label, ' ', c.best ? sym('ok', 'o', 'best place') : null), feeEl, room), res));
+        el('div', { cls: 'mid' }, el('div', { cls: 'mo-wtop' }, el('span', { cls: 't' }, label, ' ', c.best ? sym('ok', 'o', 'best place') : null), pairTag(c.pair), feeEl, room), res));
       if (c.fit) row.addEventListener('click', () => { const r = Z.act('keepArrival', id, c.hab); if (r && r.ok) { ui.toast(animalName(f) + (c.hab == null ? ' is in the pen' : ' joins ' + label), 'good'); afterDecision(); } });
       rows.appendChild(row);
     });
@@ -733,10 +740,10 @@
     const ms = n ? Math.max(850, Math.min(1800, Math.floor(3400 / n))) : 0, f = ms ? Math.min(1, ms / 1800) : 1;
     const region = D.BIOMES[r.region] ? D.BIOMES[r.region].region : 'the wild';
     const steps = found.map((x, k) => { const dec = arr && x.pending; return animalStep(x, dec ? { kicker: 'Found ' + (k + 1) + ' of ' + n, decide: true, isNew: x.isNew } : { kicker: 'Found ' + (k + 1) + ' of ' + n, ms: ms, f: f, hab: x.hab, isNew: x.isNew }); });
-    const lvl = r.star != null && r.star > 0 ? Math.min(5, r.star | 0) : 0;   // the star level that was run (older reports have none)
+    const lvl = r.star != null && r.star > 0 ? Math.min(5, r.star | 0) : 0;   // the effort level that was run (the engine still calls it star; older reports have none)
     steps.push({ anim: 500, verdict: { good: all.length > 0, title: all.length ? 'Expedition back' : 'Nothing found' }, render(card, st) {
       card.appendChild(el('div', { cls: 'mo-title' }, region));
-      if (lvl) { const sv = ui.stars(lvl, 5); sv.classList.add('big'); card.appendChild(el('div', { cls: 'mo-stars mo-xstar', 'data-star': String(lvl) }, sv)); }
+      if (lvl) { const sv = ui.effort ? ui.effort(lvl, 5) : el('span', null, String(lvl)); sv.classList.add('big'); card.appendChild(el('div', { cls: 'mo-xeff mo-xstar', 'data-effort': String(lvl), 'data-star': String(lvl) }, el('span', { cls: 'mo-effn' }, 'Effort ' + lvl), sv)); }   // notes 22 and 32: effort level, not stars
       if (n) {
         const th = el('div', { cls: 'mo-thumbs' });
         found.forEach(x => th.appendChild(el('div', { cls: 'mo-pic' }, pic(aUrl(x.sp, { variant: !!x.variant }, 3)))));

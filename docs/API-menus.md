@@ -4,6 +4,39 @@ One IIFE, one global: `ZMenus`. Loaded after `core.js`, before `moments.js`. Bui
 Every state change goes through `ZCore.act`. Checks: `node test/menus-shot.js [chromium|webkit]` (headless, writes `test/shots/menus-*.png`),
 `node test/menus-sheet.js <name> <shot> <shot> ...` puts shots side by side, `node test/menus-dbg.js <screen>` lists anything wider than the phone.
 
+## Update 9 (2026-11-18): read this first; it wins over anything older below
+
+Checks: `node test/menus-u9.js [chromium|webkit]` (shots `test/shots/menus-u9-*.png`).
+
+- **No zoom setting** (note 19): the System screen lost its Close/Far row; the map has pinch zoom (renderer).
+- **Build** (note 21): the menu box and every coach/legend word say Build (the `edit` symbol stays). Internal names (`ZMenus.edit`, `#edit-bar`) are unchanged.
+- **Build strip cards** (note 23): picture, the name underneath (2 lines max), one line of effect symbols (`facFx`: `Sells $/$$/$$$`,
+  habitat `+N%` for neighbour draw, coin `+N%` for neighbour shops, visitors `+N%` zoo-wide, flask `+N` research a week, heart for the vet,
+  fame `+N` a week; habitats show `Home`, land `Room`), then the price. Cards are 92 px wide, still one sideways strip.
+- **Locks** (note 16): a lock only means not unlocked yet (rank, research, a challenge rule, a job level). Too little money or research:
+  greyed card with the price in red, no lock. A facility at its limit shows a red cross and `Max`. `why()` adds a lock only to texts
+  starting `Needs`, `Rank`, `Level`, `Top` or `Not in` (and never to `Need $...`).
+- **Expeditions** (notes 22, 32): flow is now team (`exp-team`) then one Send out page (`exp-confirm`) with region tiles (`.mn-xr[data-region]`,
+  only when more than one region is open) and effort levels 1 to 5 (`.mn-xs[data-effort]`, also still `data-star`) drawn as bars (`ZCore.ui.effort`),
+  locked levels keep the lock. It opens on the first picked explorer's last mission (`ZE.lastMission`, `ZE.defaultEffort`); a first mission opens on
+  effort 1. The region list screen (`exp-region`) is gone (`expRegion()` now opens the team screen). The team rows show each explorer's last mission
+  (region tile and effort bars).
+- **Challenges** (note 20): under the level line a details panel (`.mn-lvd[data-detail]`) for the picked level: number and name, the goal in words,
+  rules (weeks, start money, rows, only-these habitats, habitat cap, no expeditions, given animals/staff) and three boxes: stars and the week they
+  need (`stars[0]`, `stars[1]`, `weeks`). Under 600 px tall the rules line hides (the cards above show them as symbols).
+- **Combos** (notes 27, 28): two tabs, Buildings and Animals. Not-found entries show only the name, greyed (no clue, no parts). Near misses
+  ("One piece short") only for combos already found. Animals tab: biome tiles, then the pairings of that biome from `ZE.pairList` (found: both
+  animals and a green `+` or red `-`). Animals > Zoo shows the marks of `ZE.pairsIn` beside each habitat's name (tap for the names); the where-list
+  shows `pairPreview` marks.
+- **Adverts** (note 26): the Advertise screen (`campaigns`) lists `ZE.adverts`: name, visitor boost, cost per week and an on/off switch
+  (`.mn-sw[data-ad]`, `role=switch`, `aria-checked`) that calls `setAdvert`; total weekly cost on top. Locked ones show a lock and the rank;
+  too dear shows the price in red and a note on tap. No lengths anywhere. The Projects box shows how many are on.
+- **Trader** (note 18): screens read the counts from the engine (2 animals, 3 crates); the crate count defaults to `D.CRATES_PER_VISIT`.
+- **Breeding** (note 29): the "Who leads?" pick always shows, even with one free worker.
+- **Who turned up** (note 30): it and the Staff box glow only while there are applicants not yet seen; seen ones are kept in `S.ui.seen.cand`
+  (headhunter: `S.ui.seen.hh`, seen once the Staff screen is open). Hiring one does not make the rest new again.
+- **Steady frames** (note 31): `.mn-glow` (tutorial highlight) and `.alert` no longer animate.
+
 ## Update 7 (2026-11-15): read this first; it wins over anything older below
 
 Checks: `node test/menus-u7.js [chromium|webkit]` (Edit mode, Send out page, one-screen event, best crown, gold frames and no `.badge`, challenges),

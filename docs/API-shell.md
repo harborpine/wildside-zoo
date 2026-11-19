@@ -4,6 +4,14 @@ Global: `ZCore`. Loaded after `ZRender`, before `menus.js` and `moments.js`. `wi
 Everything below was exercised by `test/shell-shot.js` on Chromium and WebKit. Try the sample screens at `index.html?demo=1`
 (`ZDemo.show('grid' | 'list' | 'sub' | 'choice' | 'reveal' | 'reveal2' | 'misc' | 'confirm' | 'toast' | 'log')`, source `test/shell-demo.js`).
 
+## Update 9 (2026-11-18)
+
+- **Top strip** (note 24): a fourth chip on the text row, made by `build()` (index.html unchanged): flask, `#s-rp` (research points, whole) and
+  `#s-rpw` (`+N/wk`, from `ZE.rpPerWeek`). When the row would overflow, every number switches to `fmt.short` and the `/wk` words drop
+  (checked at 320, 375, 393 and 430 wide, row still 31 px under the inset).
+- **`ZCore.ui.effort(n, max)`**: expedition effort level as rising bars (`.effort`, `.effort.big`), never stars.
+- **`.alert` is steady** (note 31): the gold frame no longer pulses; the card hint text no longer blinks.
+
 ## Update 7 (2026-11-15): strip, panels, alert frame, floor speed, goal chip, challenges
 
 Where this section disagrees with older text further down, this section wins.

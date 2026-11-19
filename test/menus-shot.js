@@ -76,7 +76,7 @@ async function run(name) {
   await page.touchscreen.tap(195, 330); await sleep(500);
   check(await stack() === 'menu', 'tapping the floor opens the main menu (' + await stack() + ')');
   await screen('menu');
-  for (const b of ['Projects', 'Edit', 'Animals', 'Staff', 'Research', 'Info', 'System']) check(await ev(b => [...document.querySelectorAll('.layer:not([hidden]) .gbox')].some(x => x.textContent.startsWith(b)), b), 'main menu has ' + b);
+  for (const b of ['Projects', 'Build', 'Animals', 'Staff', 'Research', 'Info', 'System']) check(await ev(b => [...document.querySelectorAll('.layer:not([hidden]) .gbox')].some(x => x.textContent.startsWith(b)), b), 'main menu has ' + b);
 
   // ---------------------------------------------------------------- staff: hire through an advert, then the rest of the team screens
   await tap('Staff'); await screen('staff'); await chipCheck('staff list');
@@ -175,7 +175,7 @@ async function run(name) {
     }, { kind, t });
   }
   // Edit mode replaces the Build lists and the Move screen (Update 7): the same things are checked through the strip on the map.
-  await openMenu(); await tap('Edit', { wait: 600 }); await shot('edit');
+  await openMenu(); await tap('Build', { wait: 600 }); await shot('edit');
   let eb = await ebar(); check((await stack()) === '' && eb && eb.shown && eb.small === 0 && eb.below === 0, 'Edit closes the menu and shows the strip, every button at least 44 px (' + JSON.stringify(eb && { small: eb.small, below: eb.below }) + ')');
   const habsBefore = await S(() => ZT.S.items.filter(i => i.k === 'hab').length);
   await etap('.mn-et[data-grp="hab"]'); await etap('.mn-ec[data-key="hab:jungle"]', 700);
@@ -300,7 +300,7 @@ async function run(name) {
   await ev(() => ZT.popAll()); await openMenu(); await tap('System'); await screen('system');
   await tap('Save now', { wait: 300 }); check(await ev(() => !!localStorage.getItem('wildside-zoo-v3-slot1')), 'Save now wrote the save');
   await tap('2x'); check(await ev(() => ZCore.speed === 2), 'speed changed to 2x'); await tap('1x'); check(await ev(() => ZCore.speed === 1), 'speed back to 1x');
-  const z0 = await ev(() => ZRender.getZoom()); await tap('Far'); check(await ev(() => ZRender.getZoom()) === 0, 'zoom changed'); await tap('Close');
+  check(!(await ev(() => [...document.querySelectorAll('.layer:not([hidden]) .mn-lab')].some(e => /zoom/i.test(e.textContent)))), 'no Zoom setting (pinch zoom on the map instead)');
   await tap('How to play'); await screen('how');
   const lg = await ev(() => { const names = [...Object.values(ZD.ASTAT), ...Object.values(ZD.SKILL)].map(x => x.name), L = [...document.querySelectorAll('.layer:not([hidden])')].pop(), t = L.querySelector('.mn-legend').textContent; return { missing: names.filter(n => !t.includes(n)), icons: L.querySelectorAll('.mn-legend .sym').length }; });
   check(lg.missing.length === 0 && lg.icons >= 20, 'the symbol legend lists every stat and skill (' + lg.icons + ' symbols' + (lg.missing.length ? ', missing ' + lg.missing : '') + ')'); await back();
@@ -322,7 +322,7 @@ async function run(name) {
   await ev(() => { document.querySelector('.layer:not([hidden]) .pbody').scrollTop = 700; }); await shot('late-book-scrolled'); await back();
   await tap('Fits'); await screen('late-fits'); await back(); await tap('Combos'); await screen('late-combos'); await back(); await back();
   await tap('Research'); await tap('Know-how'); await screen('late-research'); await back(); await back();
-  await tap('Edit', { wait: 600 }); await shot('late-edit-habs');
+  await tap('Build', { wait: 600 }); await shot('late-edit-habs');
   for (const g of ['shop', 'fun', 'sci', 'mark']) { await etap('.mn-et[data-grp="' + g + '"]'); await shot('late-edit-' + g); const e2 = await ebar(); if (e2.small || e2.below) small.push('edit strip ' + g + ': ' + e2.small + ' small, ' + e2.below + ' below the inset'); }
   check(await ev(() => { const s = document.querySelector('#edit-bar .mn-es'); return s.scrollHeight <= s.clientHeight + 1; }), 'late game: the Edit strip never scrolls up and down');
   await etap('.mn-et.done', 500); await openMenu();

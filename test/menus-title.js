@@ -72,10 +72,10 @@ async function run(name) {
   await shot(page, 'tut-1-floor');
   // step 2: Edit, then a Savanna from the strip (Update 7: the tutorial runs through Edit mode)
   await page.touchscreen.tap(195, 400); await sleep(900);
-  check(await step(page) === 1 && (await coach(page) || '').startsWith('Edit: place a Savanna'), 'opening the menu completes step 1 (' + await coach(page) + ')'); await shot(page, 'tut-2-menu');
-  check(await ev(page, () => { const g = document.querySelector('.layer:not([hidden]) .mn-glow'); return !!g && g.textContent.trim().startsWith('Edit'); }), 'the Edit box is softly highlighted');
-  await tap(page, 'Edit', { wait: 900 }); await shot(page, 'tut-2-habitats');
-  let eb = await ebar(); check(eb.shown && eb.glow.join() === 'hab:savanna' && eb.cards.includes('hab:savanna') && (await coach(page) || '').startsWith('Edit: place a Savanna'), 'in Edit mode the Savanna habitat is highlighted in the strip and the hint stays up (' + JSON.stringify(eb.glow) + ')');
+  check(await step(page) === 1 && (await coach(page) || '').startsWith('Build: place a Savanna'), 'opening the menu completes step 1 (' + await coach(page) + ')'); await shot(page, 'tut-2-menu');
+  check(await ev(page, () => { const g = document.querySelector('.layer:not([hidden]) .mn-glow'); return !!g && g.textContent.trim().startsWith('Build'); }), 'the Edit box is softly highlighted');
+  await tap(page, 'Build', { wait: 900 }); await shot(page, 'tut-2-habitats');
+  let eb = await ebar(); check(eb.shown && eb.glow.join() === 'hab:savanna' && eb.cards.includes('hab:savanna') && (await coach(page) || '').startsWith('Build: place a Savanna'), 'in Edit mode the Savanna habitat is highlighted in the strip and the hint stays up (' + JSON.stringify(eb.glow) + ')');
   await etap('.mn-ec[data-key="hab:savanna"]', 900);
   check((await coach(page) || '').startsWith('Tap a spot'), 'while the ghost is up the strip says "Tap a spot, then Place." (' + await coach(page) + ')');
   const clear = await ev(page, () => { const c = document.querySelector('.mn-coach').getBoundingClientRect(), n = document.getElementById('placement-note').getBoundingClientRect(), b = document.getElementById('placement-bar').getBoundingClientRect(); const hit = (a, z) => !(a.bottom <= z.top || a.top >= z.bottom); return { note: hit(c, n) && n.height > 0, bar: hit(c, b) && b.height > 0 }; });
@@ -126,7 +126,7 @@ async function run(name) {
   await tapSel(page, '.mn-slot.empty', 0); await tap(page, 'Next'); await tap(page, 'No', { wait: 800 });
   check(await ev(page, () => ZCore.slot === 1 || ZCore.slot === 3) && await coach(page) === null && await step(page) === 'off', 'tutorial No: no strip');
   await page.touchscreen.tap(195, 400); await sleep(700);
-  check(await ev(page, () => { const g = document.querySelector('.layer:not([hidden]) .mn-glow'); return !!g && g.textContent.trim().startsWith('Edit'); }), 'a blank zoo without the tutorial still highlights Edit'); await shot(page, 'blank-menu');
+  check(await ev(page, () => { const g = document.querySelector('.layer:not([hidden]) .mn-glow'); return !!g && g.textContent.trim().startsWith('Build'); }), 'a blank zoo without the tutorial still highlights Edit'); await shot(page, 'blank-menu');
   await ev(page, () => ZT.popAll());
   await ev(page, () => ZCore.toTitle()); await sleep(600);
   // delete needs a confirm
@@ -145,7 +145,7 @@ async function run(name) {
   await page.touchscreen.tap(195, 400); await sleep(900); check(await step(page) === 1, 'at step 2 before the reload');
   await ev(page, () => ZT.save()); await page.reload(); await page.waitForFunction(() => window.ZT && window.ZMenus); await sleep(600);
   check(await stack(page) === 'title', 'after reload the title shows'); await tapSel(page, '.mn-slothit', 0); await sleep(800);
-  check(await step(page) === 1 && (await coach(page) || '').startsWith('Edit: place a Savanna'), 'reload resumes the tutorial at the same step (' + await step(page) + ')');
+  check(await step(page) === 1 && (await coach(page) || '').startsWith('Build: place a Savanna'), 'reload resumes the tutorial at the same step (' + await step(page) + ')');
   await ctx.close();
 
   // ---------------------------------------------------------------- boxes fit without scrolling, at seven phone sizes
@@ -169,10 +169,10 @@ async function run(name) {
   await ev(page, () => { ZCore.WEEK_MS[1] = 1e9; ZCore.WEEK_MS[2] = 1e9; });
   check(await ev(page, () => ZT.S.items.length === 0 && ZE.holding(ZT.S).length === 2), 'play=blank gives bare land and two zebras in the pen');
   await page.touchscreen.tap(195, 380); await sleep(600);
-  check(await ev(page, () => { const g = document.querySelector('.layer:not([hidden]) .mn-glow'); return !!g && g.textContent.trim().startsWith('Edit'); }), 'Edit is the highlighted box on bare land');
+  check(await ev(page, () => { const g = document.querySelector('.layer:not([hidden]) .mn-glow'); return !!g && g.textContent.trim().startsWith('Build'); }), 'Edit is the highlighted box on bare land');
   await tap(page, 'Projects'); await shot(page, 'blank-projects'); const pbox = await ev(page, () => [...document.querySelectorAll('.layer:not([hidden]) .gbox')].map(b => b.textContent.replace(/s+/g, ' ').trim()).join(' | ')); console.log('  blank Projects boxes: ' + pbox);
   await tap(page, 'Event', { wait: 200 }); await tap(page, 'Back');
-  await tap(page, 'Edit', { wait: 700 }); await shot(page, 'blank-build');
+  await tap(page, 'Build', { wait: 700 }); await shot(page, 'blank-build');
   { const e4 = await ebar(); check(e4.shown && e4.cards.includes('hab:savanna') && e4.glow.join() === 'hab:savanna', 'bare land: Edit lists the Savanna habitat, affordable and highlighted (' + e4.cards.join(',') + ')'); await etap('.mn-et[data-grp="shop"]'); await shot(page, 'blank-facilities'); const e5 = await ebar(); check(e5.cards.includes('fac:snack'), 'and the Snack Stand under the shops tab'); await etap('.mn-et.done', 500); await page.touchscreen.tap(195, 380); await sleep(600); }
   const lists = await ev(page, () => { const s = ZT.S; return { sav: ZE.habBuildCost(s, 'savanna') <= s.money, snack: ZE.facCost(s, 'snack') <= s.money }; });
   check(lists.sav && lists.snack, 'Savanna and Snack Stand are affordable at the start');
@@ -203,7 +203,7 @@ async function run(name) {
   await ev(page, () => { ZT.popAll(); const S = ZT.S; let q = 0, r = 0, ok = false; for (let rr = 19; rr >= 0 && !ok; rr--) for (let c = 0; c < ZD.GRID_W && !ok; c++) { const p = ZE.fromOffset(c, rr); if (ZE.canPlace(S, 'hab', 'savanna', p[0], p[1], 0)) { q = p[0]; r = p[1]; ok = true; } } const res = ZCore.act('build', 'hab', 'savanna', q, r, 0); ZCore.act('moveIn', res.id); });
   await sleep(900); const st2 = await step(page);
   await ev(page, () => { const h = ZT.S.items.find(i => i.k === 'hab'); ZCore.act('remove', h.id); }); await sleep(3300);
-  check(st2 === 2 && await step(page) === 1 && (await coach(page) || '').startsWith('Edit: place a Savanna'), 'removing the only habitat mid-tutorial brings the habitat step back (' + st2 + ' then ' + await step(page) + ')');
+  check(st2 === 2 && await step(page) === 1 && (await coach(page) || '').startsWith('Build: place a Savanna'), 'removing the only habitat mid-tutorial brings the habitat step back (' + st2 + ' then ' + await step(page) + ')');
   await ctx.close();
 
   // title fits without scrolling at every size, even with three used slots

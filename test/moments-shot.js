@@ -884,11 +884,11 @@ async function run(name) {
   if (want('expstar')) {
     console.log(' -- expedition card shows the star level that was run');
     await fresh();
-    const starsOnCard = () => ev(() => { const x = document.querySelector('.layer:not([hidden]) .mo-xstar'); if (!x) return null; const r = x.getBoundingClientRect(), c = x.closest('.mo-card').getBoundingClientRect(); return { all: x.querySelectorAll('.star').length, lit: x.querySelectorAll('.star:not(.off)').length, inside: r.left >= c.left && r.right <= c.right && r.height >= 18 }; });
+    const starsOnCard = () => ev(() => { const x = document.querySelector('.layer:not([hidden]) .mo-xstar'); if (!x) return null; const r = x.getBoundingClientRect(), c = x.closest('.mo-card').getBoundingClientRect(); return { all: x.querySelectorAll('.effort i').length, lit: x.querySelectorAll('.effort i.on').length, stars: x.querySelectorAll('.star').length, word: /Effort \d/.test(x.textContent), inside: r.left >= c.left && r.right <= c.right && r.height >= 18 }; });
     for (const star of [1, 3, 5]) {
       await pushReport({ type: 'expedition', region: 'savanna', star: star, found: star === 3 ? [] : await mkFound(1), rp: 5, fragment: 0, notes: [], ups: [], staff: [] });
       await waitStack(s => s.cur && s.cur.final, 6000); await sleep(700); const sc = await starsOnCard(); if (star !== 1) await shot('expedition-star' + star);
-      check(!!sc && sc.all === 5 && sc.lit === star && sc.inside, 'a ' + star + '-star run shows ' + star + ' of 5 stars on the result card ' + JSON.stringify(sc));
+      check(!!sc && sc.all === 5 && sc.lit === star && sc.stars === 0 && sc.word && sc.inside, 'an effort ' + star + ' run shows Effort ' + star + ' with ' + star + ' of 5 bars and no stars on the result card ' + JSON.stringify(sc));
       for (let g = 0; g < 6 && (await state()).stack.length; g++) { await tapAway(); await sleep(450); } await settled('expedition star ' + star);
     }
     await pushReport({ type: 'expedition', region: 'savanna', star: null, found: [], rp: 5, fragment: 0, notes: [], ups: [], staff: [] });
